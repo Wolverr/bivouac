@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.em
  * citation markers. Works on partial text, so it can render while streaming.
  */
 fun renderAnswer(text: String, accent: Color): AnnotatedString = buildAnnotatedString {
-    val lines = text.split('\n')
+    val lines = tablesToLists(text.split('\n')).map(::stripMath)
     lines.forEachIndexed { i, raw ->
         val heading = HEADING.matchEntire(raw)
         val bullet = BULLET.matchEntire(raw)
@@ -33,6 +33,48 @@ fun renderAnswer(text: String, accent: Color): AnnotatedString = buildAnnotatedS
         }
         if (i < lines.lastIndex) append('\n')
     }
+}
+
+/**
+ * Tables are unreadable on a phone. Each data row becomes a bold label (first
+ * cell) followed by "column: value" bullets.
+ */
+private fun tablesToLists(lines: List<String>): List<String> {
+    val out = ArrayList<String>()
+    var header: List<String>? = null
+    for (line in lines) {
+        val t = line.trim()
+        if (!(t.startsWith("|") && t.endsWith("|") && t.length > 1)) {
+            header = null
+            out += line
+            continue
+        }
+        val cells = t.trim('|').split('|').map { it.trim() }
+        when {
+            cells.all { it.matches(Regex(":?-{2,}:?")) } -> Unit  // separator row
+            header == null -> header = cells
+            else -> {
+                out += "**${cells.first()}**"
+                cells.drop(1).forEachIndexed { i, c -> out += "- ${header.getOrNull(i + 1) ?: ""}: $c" }
+            }
+        }
+    }
+    return out
+}
+
+private val SUBSCRIPT = mapOf('0' to '₀', '1' to '₁', '2' to '₂', '3' to '₃', '4' to '₄',
+    '5' to '₅', '6' to '₆', '7' to '₇', '8' to '₈', '9' to '₉')
+private val MATH = Regex("\\$\\$?([^$]{1,80}?)\\$\\$?")
+
+/** Inline LaTeX the models like for formulas: $LiFePO_4$ -> LiFePO₄. */
+private fun stripMath(line: String): String = MATH.replace(line) { m ->
+    // "$5 to $10" is money, not math: only touch spans with formula syntax.
+    if (m.groupValues[1].none { it == '_' || it == '^' || it == '\\' }) return@replace m.value
+    m.groupValues[1]
+        .replace(Regex("_\\{?(\\d+)}?")) { d -> d.groupValues[1].map { SUBSCRIPT[it] ?: it }.joinToString("") }
+        .replace(Regex("\\\\(text|mathrm)\\{([^}]*)}"), "$2")
+        .replace("\\times", "×").replace("\\approx", "≈").replace("\\cdot", "·")
+        .replace("{", "").replace("}", "")
 }
 
 private val HEADING = Regex("^(#{1,6})\\s+(.*)$")

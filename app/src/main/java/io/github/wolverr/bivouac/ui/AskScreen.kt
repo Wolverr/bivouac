@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +40,11 @@ import java.util.Locale
 fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val s by vm.ask.collectAsStateWithLifecycle()
     val lib by vm.library.collectAsStateWithLifecycle()
+    val focus = LocalFocusManager.current
+    val ask = {
+        focus.clearFocus()  // hide the keyboard so the answer is visible
+        vm.askQuestion()
+    }
 
     Column(
         modifier.fillMaxSize().imePadding().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
@@ -59,11 +65,11 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Ask anything — works offline") },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { vm.askQuestion() }),
+            keyboardActions = KeyboardActions(onSearch = { ask() }),
             maxLines = 4,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = vm::askQuestion, enabled = !s.running) { Text("Ask") }
+            Button(onClick = { ask() }, enabled = !s.running) { Text("Ask") }
             if (s.running) OutlinedButton(onClick = vm::stop) { Text("Stop") }
         }
 

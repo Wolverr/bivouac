@@ -78,11 +78,11 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
                 "- Use your own knowledge to explain and connect facts, but when a fact comes only from your memory " +
                 "and not the excerpts, don't cite it, and be careful with exact numbers and dates.\n" +
                 "- If the excerpts are irrelevant, ignore them.\n" +
-                "- Be concise: a few short paragraphs or a short list."
+                "- Be concise: a few short paragraphs or a short list. The screen is small: never use tables or LaTeX."
 
         const val SYSTEM_NO_SOURCES =
             "You are Bivouac, an offline research assistant running on a phone. Answer accurately and concisely. " +
                 "Lead with the direct answer, then give the key supporting details. If you are not sure about a " +
-                "fact, say so instead of guessing."
+                "fact, say so instead of guessing. The screen is small: use short paragraphs or lists, never tables or LaTeX."
     }
 }
