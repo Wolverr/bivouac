@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.wolverr.bivouac.llm.CompletionStats
 import io.github.wolverr.bivouac.llm.FileStore
+import io.github.wolverr.bivouac.llm.LibFile
 import io.github.wolverr.bivouac.llm.GenEvent
 import io.github.wolverr.bivouac.llm.LlmRuntime
 import io.github.wolverr.bivouac.llm.ModelInfo
@@ -26,11 +27,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.File
 
 data class LibraryState(
-    val models: List<File> = emptyList(),
-    val packs: List<File> = emptyList(),
+    val models: List<LibFile> = emptyList(),
+    val packs: List<LibFile> = emptyList(),
     val loadedModel: String? = null,
     val modelInfo: ModelInfo? = null,
     val openPack: String? = null,
@@ -38,7 +38,6 @@ data class LibraryState(
     val openPlaces: String? = null,
     val placesInfo: String? = null,
     val busy: String? = null,
-    val importProgress: Float? = null,
     val error: String? = null,
     val benchResult: String? = null,
     val allCores: Boolean = true,
@@ -105,64 +104,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun refresh() = _library.update { it.copy(models = models.list(), packs = packs.list()) }
 
-    fun importFile(uri: Uri) = viewModelScope.launch {
-        _library.update { it.copy(busy = "Importing…", importProgress = 0f, error = null) }
-        val (name, _) = FileStore.describe(getApplication(), uri)
-        val store = if (name.endsWith(".db")) packs else models
-        runCatching {
-            store.import(uri) { copied, total ->
-                if (total > 0) _library.update { it.copy(importProgress = copied.toFloat() / total) }
-            }
-        }.onSuccess { f -> if (store === packs) openPack(f) }
-            .onFailure { e -> _library.update { it.copy(error = e.message) } }
-        _library.update { it.copy(busy = null, importProgress = null) }
+    /** Links picked files in place (no copy); .db files are packs, .gguf files are models. */
+    fun linkFiles(uris: List<Uri>) = viewModelScope.launch {
+        _library.update { it.copy(error = null) }
+        for (uri in uris) {
+            val (name, _) = FileStore.describe(getApplication(), uri)
+            val store = if (name.endsWith(".db")) packs else models
+            runCatching { store.link(uri) }
+                .onSuccess { f -> if (store === packs) openPack(f) }
+                .onFailure { e -> _library.update { it.copy(error = "$name: ${e.message}") } }
+        }
         refresh()
     }
 
-    fun loadModel(file: File) = viewModelScope.launch {
+    fun loadModel(file: LibFile) = viewModelScope.launch {
         _library.update { it.copy(busy = "Loading ${file.name}…", error = null, benchResult = null) }
         val lib = _library.value
-        runtime.load(file.absolutePath, LlmRuntime.LoadOptions(allCores = lib.allCores, repack = lib.repack))
-            .onSuccess { info -> _library.update { it.copy(loadedModel = file.absolutePath, modelInfo = info) } }
+        runtime.load(models.path(file), LlmRuntime.LoadOptions(allCores = lib.allCores, repack = lib.repack))
+            .onSuccess { info -> _library.update { it.copy(loadedModel = file.id, modelInfo = info) } }
             .onFailure { e -> _library.update { it.copy(loadedModel = null, modelInfo = null, error = e.message) } }
         _library.update { it.copy(busy = null) }
     }
 
-    private fun isPlacesPack(f: File) = f.name.startsWith("places")
+    private fun isPlacesPack(f: LibFile) = f.name.startsWith("places")
 
-    fun openPack(file: File) = viewModelScope.launch {
+    fun openPack(file: LibFile) = viewModelScope.launch {
+        val path = packs.path(file)
         if (isPlacesPack(file)) {
-            places.open(file.absolutePath)
+            places.open(path)
                 .onSuccess {
                     val info = "${places.meta("places")} places · ${places.meta("source")}"
-                    _library.update { it.copy(openPlaces = file.absolutePath, placesInfo = info) }
+                    _library.update { it.copy(openPlaces = file.id, placesInfo = info) }
                 }
                 .onFailure { e -> _library.update { it.copy(openPlaces = null, placesInfo = null, error = e.message) } }
             return@launch
         }
-        corpus.open(file.absolutePath)
+        corpus.open(path)
             .onSuccess {
                 val info = "${corpus.meta("articles")} articles · ${corpus.meta("source")}"
-                _library.update { it.copy(openPack = file.absolutePath, packInfo = info) }
+                _library.update { it.copy(openPack = file.id, packInfo = info) }
             }
             .onFailure { e -> _library.update { it.copy(openPack = null, packInfo = null, error = e.message) } }
     }
 
-    fun delete(file: File) = viewModelScope.launch {
+    fun delete(file: LibFile) = viewModelScope.launch {
         val lib = _library.value
-        if (lib.loadedModel == file.absolutePath) {
+        if (lib.loadedModel == file.id) {
             runtime.unload()
             _library.update { it.copy(loadedModel = null, modelInfo = null) }
         }
-        if (lib.openPack == file.absolutePath) {
+        if (lib.openPack == file.id) {
             corpus.close()
             _library.update { it.copy(openPack = null, packInfo = null) }
         }
-        if (lib.openPlaces == file.absolutePath) {
+        if (lib.openPlaces == file.id) {
             places.close()
             _library.update { it.copy(openPlaces = null, placesInfo = null) }
         }
-        file.delete()
+        (if (file.name.endsWith(".db")) packs else models).remove(file)
         refresh()
     }
 

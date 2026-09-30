@@ -20,19 +20,24 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import io.github.wolverr.bivouac.llm.Catalog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.io.File
+import io.github.wolverr.bivouac.llm.LibFile
 import java.util.Locale
 
 @Composable
 fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val s by vm.library.collectAsStateWithLifecycle()
     val device = vm.runtime.device
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) vm.importFile(uri)
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) vm.linkFiles(uris)
     }
 
     Column(
@@ -49,11 +54,12 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        GetDataSection(vm, s)
+
         Button(onClick = { picker.launch(arrayOf("*/*")) }, enabled = s.busy == null) {
-            Text("Import a model (.gguf) or knowledge pack (.db)")
+            Text("Add downloaded files (.gguf, .db)")
         }
         s.busy?.let { Text(it) }
-        s.importProgress?.let { p -> LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth()) }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         Text("Models", style = MaterialTheme.typography.titleMedium)
@@ -61,7 +67,7 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text("No models yet. Download a .gguf file to the phone, then import it here.", style = MaterialTheme.typography.bodyMedium)
         }
         s.models.forEach { f ->
-            val loaded = s.loadedModel == f.absolutePath
+            val loaded = s.loadedModel == f.id
             FileCard(f, active = loaded, activeLabel = "Loaded", actionLabel = if (loaded) "Reload" else "Load",
                 enabled = s.busy == null, onAction = { vm.loadModel(f) }, onDelete = { vm.delete(f) })
         }
@@ -94,13 +100,59 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text("No knowledge pack. Without one, answers come from the model's memory only.", style = MaterialTheme.typography.bodyMedium)
         }
         s.packs.forEach { f ->
-            val inUse = s.openPack == f.absolutePath || s.openPlaces == f.absolutePath
+            val inUse = s.openPack == f.id || s.openPlaces == f.id
             FileCard(f, active = inUse, activeLabel = "In use",
                 actionLabel = if (inUse) null else "Use",
                 enabled = s.busy == null, onAction = { vm.openPack(f) }, onDelete = { vm.delete(f) })
         }
         s.packInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         s.placesInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    }
+}
+
+/**
+ * Downloads go through the phone's browser (resumable, works for tens of GB) so the
+ * app itself never needs network access; the downloaded files are then linked in place.
+ */
+@Composable
+private fun GetDataSection(vm: AppViewModel, s: LibraryState) {
+    val context = LocalContext.current
+    val items = remember { Catalog.load(context) }
+    if (items.isEmpty()) return
+    val have = (s.models + s.packs).map { it.name }.toSet()
+    val ramGb = vm.runtime.device.totalRamGb
+    Text("Get data", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "1. Tap Download: your browser saves the file to Downloads.  2. Come back and tap \"Add downloaded files\". " +
+            "Bivouac itself has no internet permission.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    items.forEach { item ->
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(item.name, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    String.format(Locale.US, "%.1f GB · %s", item.bytes / 1e9, item.license),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(item.about, style = MaterialTheme.typography.bodySmall)
+                if (item.min_ram_gb > ramGb) {
+                    Text(
+                        String.format(Locale.US, "Needs about %.0f GB RAM; this phone has %.1f GB.", item.min_ram_gb, ramGb),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (item.file in have) {
+                    Text("Added", color = MaterialTheme.colorScheme.primary)
+                } else {
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url)))
+                    }) { Text("Download") }
+                }
+            }
+        }
     }
 }
 
@@ -117,7 +169,7 @@ private fun SettingRow(title: String, subtitle: String, checked: Boolean, onChan
 
 @Composable
 private fun FileCard(
-    f: File,
+    f: LibFile,
     active: Boolean,
     activeLabel: String,
     actionLabel: String?,
@@ -128,11 +180,14 @@ private fun FileCard(
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(f.name, style = MaterialTheme.typography.titleSmall)
-            Text(String.format(Locale.US, "%.2f GB", f.length() / 1e9), style = MaterialTheme.typography.bodySmall)
+            Text(
+                String.format(Locale.US, "%.2f GB", f.size / 1e9) + if (f.linked) " · linked in place" else "",
+                style = MaterialTheme.typography.bodySmall,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (active) Text(activeLabel, color = MaterialTheme.colorScheme.primary)
                 if (actionLabel != null) TextButton(onClick = onAction, enabled = enabled) { Text(actionLabel) }
-                TextButton(onClick = onDelete, enabled = enabled) { Text("Delete") }
+                TextButton(onClick = onDelete, enabled = enabled) { Text(if (f.linked) "Remove" else "Delete") }
             }
         }
     }
