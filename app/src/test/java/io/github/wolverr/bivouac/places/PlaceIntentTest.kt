@@ -29,7 +29,7 @@ class PlaceIntentTest {
 
     @Test
     fun cityQueries() {
-        assertEquals("Berlin", parse("What are the must-see museums in Berlin")!!.location)
+        assertEquals("Berlin", parse("museums in Berlin")!!.location)
         assertEquals("Shinjuku Station in Tokyo", parse("Where can I find a pharmacy near Shinjuku Station in Tokyo?")!!.location)
         assertTrue(parse("coffee near me")!!.categoryWords.contains("cafe"))
     }
@@ -41,5 +41,18 @@ class PlaceIntentTest {
         assertNull(parse("Why did the Bronze Age collapse happen?"))
         // A place noun without any location isn't a place search.
         assertNull(parse("How do restaurants make money?"))
+        // Questions about what places are or mean need Wikipedia, not the map.
+        assertNull(parse("What are the must-see museums in Berlin and what is each known for?"))
+        assertNull(parse("What is the history of art in France?"))
+    }
+
+    @Test
+    fun supermarketsAndDiets() {
+        val nouns = nouns + "grocery"
+        val i = PlaceIntent.parse("supermarket in Genova", nouns)
+        assertEquals("Genova", i!!.location)
+        assertTrue("grocery" in i.nounWords)
+        assertTrue(PlaceIntent.parse("vegan restaurants in Lisbon", nouns)!!.categoryWords.any { it in PlaceIntent.DIET_WORDS })
+        assertTrue(PlaceIntent.parse("pharmacy in Lisbon", nouns)!!.categoryWords.none { it in PlaceIntent.DIET_WORDS })
     }
 }

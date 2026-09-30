@@ -46,6 +46,9 @@ data class PlaceIntent(
 
         /** Questions about what a place is or means belong to Wikipedia, not the map. */
         private val KNOWLEDGE = Regex("\\b(must[- ]see|famous|known for|history|worth (?:a )?visit|most important)\\b")
+        /** Modifiers that are about diet (after synonym expansion). */
+        val DIET_WORDS = setOf("vegetarian", "vegan", "halal", "kosher", "gluten", "gluten-free")
+
         private val NEAR_ME = Regex("\\b(near me|nearby|near here|around here|close by|closest|nearest|around me)\\b")
         private val LOCATION = Regex("\\b(?:near|around|close to|in|at|by|next to)\\s+(?:the\\s+)?(.+?)\\s*[?.!]*$", RegexOption.IGNORE_CASE)
         private val WORD = Regex("[\\p{L}][\\p{L}'\\-]*")

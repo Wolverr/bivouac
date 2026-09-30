@@ -140,7 +140,11 @@ def generate(port: int, user: str):
     req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions", body, {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=900) as r:
         res = json.load(r)
-    return res["choices"][0]["message"]["content"].strip(), res.get("usage", {})
+    text = res["choices"][0]["message"]["content"]
+    # Like the app (research/ThinkFilter.kt): reasoning blocks and stray special tokens are not the answer.
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
+    text = re.sub(r"<\|[a-z_]+\|>", "", text)
+    return text.strip(), res.get("usage", {})
 
 
 def main():

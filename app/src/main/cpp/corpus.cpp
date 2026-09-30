@@ -150,9 +150,17 @@ bool Corpus::find_article(const std::string & title, ArticleRef & out) {
         return true;
     }
     // Other names for articles ("GPS", "TCP"), from Wikipedia redirects; see tools/build_aliases.py.
-    return has_alias_ &&
-           lookup("SELECT a.id, a.title, a.prior, a.first_chunk, a.n_chunks FROM alias l "
-                  "JOIN article a ON a.id = l.article WHERE l.norm_title = ?1 ORDER BY l.views DESC LIMIT 1");
+    if (has_alias_ &&
+        lookup("SELECT a.id, a.title, a.prior, a.first_chunk, a.n_chunks FROM alias l "
+               "JOIN article a ON a.id = l.article WHERE l.norm_title = ?1 ORDER BY l.views DESC LIMIT 1")) {
+        return true;
+    }
+    // Disambiguation pages aren't in the pack ("New York", "Mercury"): take the most viewed
+    // "X (...)" or "X City" article, if it is popular enough (>= 10,000 views/month) to be
+    // what people mean. Without the floor, "need" would become "Need (album)".
+    return lookup("SELECT id, title, prior, first_chunk, n_chunks FROM article "
+                  "WHERE ((norm_title >= ?1 || ' (' AND norm_title < ?1 || ' )') OR norm_title = ?1 || ' city') "
+                  "AND prior >= 9.21 ORDER BY prior DESC LIMIT 1");
 }
 
 std::vector<std::string> Corpus::other_names(int64_t article, int limit) {

@@ -96,7 +96,7 @@ class ResearchPipeline(
             if (nearby.isNotEmpty()) {
                 // Place instructions travel with the list: in the system prompt, small models
                 // leaked them ("cuisine notes") into unrelated answers.
-                appendLine(PLACES_HEADER)
+                appendLine(placesHeader(placeIntent!!))
                 nearby.forEachIndexed { i, p ->
                     append("[P${i + 1}] ${p.displayName} — ${p.categoryLabel} — ${formatDistance(p.distanceM)}")
                     listOfNotNull(p.street, p.locality).joinToString(", ").takeIf { it.isNotEmpty() }?.let { append(" — $it") }
@@ -121,10 +121,24 @@ class ResearchPipeline(
         val turns = history(conversation, settings.historyChars - prompt.length) + ChatTurn("user", prompt)
         val (prefix, rest) = llm.chatPrompt(system, turns)
         val answer = StringBuilder()
+        val filter = ThinkFilter()
         llm.complete(prefix, rest, settings.sampling).collect { ev ->
-            if (ev is GenEvent.Token) answer.append(ev.text)
-            if (ev is GenEvent.Done && ev.stats.error.isEmpty() && !ev.stats.cancelled) {
-                conversation.turns += Conversation.Turn(question, prompt, answer.toString().trim())
+            if (ev is GenEvent.Token) {
+                val visible = filter.feed(ev.text)
+                if (visible.isNotEmpty()) {
+                    answer.append(visible)
+                    emit(ResearchEvent.Llm(GenEvent.Token(visible)))
+                }
+                return@collect
+            }
+            if (ev is GenEvent.Done) {
+                filter.flush().takeIf { it.isNotEmpty() }?.let {
+                    answer.append(it)
+                    emit(ResearchEvent.Llm(GenEvent.Token(it)))
+                }
+                if (ev.stats.error.isEmpty() && !ev.stats.cancelled) {
+                    conversation.turns += Conversation.Turn(question, prompt, answer.toString().trim())
+                }
             }
             emit(ResearchEvent.Llm(ev))
         }
@@ -168,7 +182,8 @@ class ResearchPipeline(
         val t0 = System.currentTimeMillis()
 
         // Articles named in the question lead with their intro: that's where definitions live.
-        val named = titleMatches(corpus, question).take(3)
+        val named = (listOfNotNull(listArticle(corpus, question)) + titleMatches(corpus, question))
+            .distinctBy { it.id }.take(3)
         val namedIds = named.map { it.id }.toSet()
         val leads = named.mapNotNull { corpus.chunk(it, 0) }
         val candidates = corpus.search(query, limit = settings.maxSources * 4, priorWeight = settings.priorWeight)
@@ -219,6 +234,29 @@ class ResearchPipeline(
     }
 
     /**
+     * "museums in Berlin", "tallest buildings in Dubai": Wikipedia's list article
+     * ("List of museums in Berlin") answers these far better than any single
+     * museum's page. Tries the longest noun phrase and place first; aliases catch
+     * near-misses ("List of museums and galleries in Berlin"). Mirrors tools/retrieve_proto.py.
+     */
+    private suspend fun listArticle(corpus: Corpus, question: String): Article? {
+        if (EXPLAIN_QUERY.containsMatchIn(question)) return null  // "what causes earthquakes in Japan" isn't a list
+        for (m in LIST_QUERY.findAll(question)) {
+            val nouns = m.groupValues[1].split(WHITESPACE).filterNot(Evidence::isStop)
+            val place = m.groupValues[3].split(WHITESPACE).takeWhile { it.lowercase() !in PLACE_STOP }.take(4)
+            if (nouns.isEmpty() || place.isEmpty() || !place[0][0].isUpperCase()) continue
+            for (n in nouns.size downTo 1) {
+                val what = nouns.takeLast(n).joinToString(" ").lowercase()
+                for (k in place.size downTo 1) {
+                    val where = place.take(k).joinToString(" ")
+                    for (prep in listOf("in", "of")) corpus.findArticle("List of $what $prep $where")?.let { return it }
+                }
+            }
+        }
+        return null
+    }
+
+    /**
      * No name-like word ("GPS", "mRNA", "Germany" mid-sentence) and every content word
      * common. Such a title counts only for a real topic ("Season", "Age of the universe"),
      * not an obscure one ("Determine", "Broad Strokes"). Mirrors tools/retrieve_proto.py.
@@ -233,7 +271,19 @@ class ResearchPipeline(
 
     companion object {
         /** Mirrored in tools/answer_proto.py. */
-        const val PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend from this list using the labels like [P1] and say how far each is; never invent places that aren't listed. The list may be incomplete, so for dietary needs also point out places whose cuisine usually suits them."
+        const val PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend from this list " +
+            "using the labels like [P1] and say how far each is; never invent places that aren't listed."
+        private const val DIET_NOTE = "The list may be incomplete, so also point out places whose cuisine usually suits this diet."
+
+        /** The diet sentence only when a diet was asked for: otherwise small models add diet notes to pharmacies. */
+        fun placesHeader(intent: PlaceIntent): String =
+            if (intent.categoryWords.any { it in PlaceIntent.DIET_WORDS }) "$PLACES_HEADER $DIET_NOTE" else PLACES_HEADER
+        private val LIST_QUERY = Regex(
+            "((?:[\\p{L}-]+\\s+){0,2}[\\p{L}-]+s)\\s+(in|of|near|around)\\s+(?:the\\s+)?([\\p{L}][\\p{L}'\\- ]*)",
+        )
+        private val WHITESPACE = Regex("\\s+")
+        private val EXPLAIN_QUERY = Regex("^\\s*(why|how)\\b|\\bcaus", RegexOption.IGNORE_CASE)
+        private val PLACE_STOP = setOf("and", "or", "for", "with", "that", "which", "what", "to", "is", "are")
         private const val COMMON_DF = 20_000
         private val COMMON_MIN_PRIOR = kotlin.math.ln(1.0 + 3_000)  // prior = ln(1 + monthly views)
 

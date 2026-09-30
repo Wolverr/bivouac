@@ -7,3 +7,4 @@ local.properties
 /tools/.venv/
 .idea/
 eval/old-prompt-v1/
+eval/partial/
