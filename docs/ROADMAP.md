@@ -22,7 +22,8 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - [~] M1: app runs a GGUF on the phone: import, load, streaming answer, prefill progress, benchmark
   (APK builds; waiting for on-device test)
 - [ ] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks); measure size
-- [ ] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
+- [~] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
+  (code done and building; needs a real pack + device test)
 - [ ] M4: model selection on real hardware (Qwen3.6-35B-A3B vs Gemma 4 26B-A4B vs smaller MoEs)
 - [ ] M5: install UX: pack manifest, hash check, in-app import/download
 - [ ] M6: places pack (OSM) + "near me" queries
@@ -40,6 +41,13 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
   FTS5 index size vs raw text on the sample: detail=full 54%, column 32%, none 15%.
   Projected full English pack: ~19 GB (none) / ~25 GB (column) / ~33 GB (full).
   Plan: detail=column (keeps title/section weighting) unless storage gets tight.
+
+- 2026-09-30: research pipeline in app (search → sentence-compressed numbered sources →
+  cited answer; Library tab for models + packs). Builder parallelized (~10 s / 10k articles
+  → ~2 h for all of English Wikipedia on the 4-core PC). Pageviews (2025-08) streaming from
+  Wikimedia into tools/data/pageviews_en.tsv; FineWiki shards downloading (2/15 done).
+  NEXT: device test of the APK with Qwen3.5-2B; when downloads finish, build full pack:
+  `python build_corpus.py --pageviews data/pageviews_en.tsv --full-top 2000000 --out out/wiki.db`
 
 ## Dev notes
 
