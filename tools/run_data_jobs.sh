@@ -21,6 +21,13 @@ places_cmd="{ [ -s data/places.parquet ] && grep -q ' places in ' places_fetch.l
 
 start() {  # name, memory cap, command
     if command -v systemd-run >/dev/null && systemctl --user show-environment >/dev/null 2>&1; then
+        if systemctl --user is-active --quiet "$1"; then
+            echo "$1 is already running"
+            return
+        fi
+        # A failed or finished run leaves the unit name taken until it's reset.
+        systemctl --user reset-failed "$1" 2>/dev/null || true
+        systemctl --user stop "$1" 2>/dev/null || true
         local caps=()
         [ -n "$2" ] && caps=(-p "MemoryMax=$2" -p MemorySwapMax=1G)
         systemd-run --user --unit="$1" --working-directory="$PWD" --collect "${caps[@]}" bash -c "$3"
