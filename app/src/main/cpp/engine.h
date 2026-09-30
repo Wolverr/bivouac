@@ -45,7 +45,10 @@ public:
     static void init_backends(const std::string & native_lib_dir);
 
     // Returns an empty string on success, otherwise an error message.
-    std::string load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & cpus, bool repack);
+    // `gen_cpus` run token-by-token generation (bandwidth-bound: fast cores only);
+    // `batch_cpus` run prompt processing (compute-bound: more cores help).
+    std::string load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & gen_cpus,
+                     const std::vector<int> & batch_cpus, bool repack);
     void unload();
     bool loaded() const { return model_ != nullptr; }
 
@@ -70,9 +73,11 @@ private:
     llama_model   * model_ = nullptr;
     llama_context * ctx_ = nullptr;
     ggml_threadpool_t threadpool_ = nullptr;
+    ggml_threadpool_t threadpool_batch_ = nullptr;
     common_chat_templates_ptr templates_;
     int n_batch_ = 256;
     int n_threads_ = 4;
+    int n_threads_batch_ = 4;
 
     std::vector<llama_token> kv_tokens_;        // tokens currently held in sequence 0
     std::vector<llama_token> snapshot_tokens_;  // prefix covered by snapshot_

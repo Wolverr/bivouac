@@ -38,7 +38,8 @@ void Engine::init_backends(const std::string & native_lib_dir) {
     LOGI("backends loaded from %s", native_lib_dir.c_str());
 }
 
-std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & cpus, bool repack) {
+std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & gen_cpus,
+                         const std::vector<int> & batch_cpus, bool repack) {
     unload();
 
     llama_model_params mp = llama_model_default_params();
@@ -52,7 +53,8 @@ std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const
         return "could not load model file (corrupt, unsupported architecture, or out of memory)";
     }
 
-    n_threads_ = cpus.empty() ? 4 : (int) cpus.size();
+    n_threads_ = gen_cpus.empty() ? 4 : (int) gen_cpus.size();
+    n_threads_batch_ = batch_cpus.empty() ? n_threads_ : (int) batch_cpus.size();
     n_batch_ = n_batch;
 
     llama_context_params cp = llama_context_default_params();
@@ -61,7 +63,7 @@ std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const
     cp.n_ubatch = n_batch;
     cp.n_seq_max = 1;
     cp.n_threads = n_threads_;
-    cp.n_threads_batch = n_threads_;
+    cp.n_threads_batch = n_threads_batch_;
     cp.no_perf = false;
     ctx_ = llama_init_from_model(model_, cp);
     if (!ctx_) {
@@ -70,23 +72,31 @@ std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const
         return "could not create context (not enough memory for the requested context size?)";
     }
 
-    // A persistent threadpool pinned to the big cores. Letting the scheduler
-    // move inference threads onto little cores roughly halves decode speed.
+    // Persistent threadpools pinned to chosen cores. Letting the scheduler move
+    // decode threads onto little cores roughly halves generation speed, while
+    // prompt processing is compute-bound and gains from every core.
     ggml_backend_dev_t cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
     if (cpu_dev) {
         auto * reg = ggml_backend_dev_backend_reg(cpu_dev);
         auto * tp_new = (decltype(ggml_threadpool_new) *) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_new");
-        if (tp_new) {
-            ggml_threadpool_params tpp = ggml_threadpool_params_default(n_threads_);
+        auto make_pool = [&](const std::vector<int> & cpus, int n, bool paused) -> ggml_threadpool_t {
+            ggml_threadpool_params tpp = ggml_threadpool_params_default(n);
             for (int cpu : cpus) {
                 if (cpu >= 0 && cpu < GGML_MAX_N_THREADS) tpp.cpumask[cpu] = true;
             }
             tpp.strict_cpu = false;  // threads may use any core in the mask
             tpp.prio = GGML_SCHED_PRIO_HIGH;
             tpp.poll = 50;
-            threadpool_ = tp_new(&tpp);
+            tpp.paused = paused;
+            return tp_new(&tpp);
+        };
+        if (tp_new) {
+            const bool split = !batch_cpus.empty() && batch_cpus != gen_cpus;
+            if (split) threadpool_batch_ = make_pool(batch_cpus, n_threads_batch_, false);
+            // Only one pool polls at a time; the decode pool starts paused when split.
+            threadpool_ = make_pool(gen_cpus, n_threads_, split);
             if (threadpool_) {
-                llama_attach_threadpool(ctx_, threadpool_, nullptr);
+                llama_attach_threadpool(ctx_, threadpool_, threadpool_batch_);
             } else {
                 LOGW("threadpool creation failed; using ggml defaults");
             }
@@ -97,7 +107,8 @@ std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const
     kv_tokens_.clear();
     snapshot_tokens_.clear();
     snapshot_.clear();
-    LOGI("loaded %s: n_ctx=%d n_batch=%d threads=%d repack=%d", path.c_str(), n_ctx, n_batch, n_threads_, repack);
+    LOGI("loaded %s: n_ctx=%d n_batch=%d threads=%d batch_threads=%d repack=%d", path.c_str(), n_ctx, n_batch,
+         n_threads_, n_threads_batch_, repack);
     return "";
 }
 
@@ -106,12 +117,16 @@ void Engine::unload() {
         llama_free(ctx_);
         ctx_ = nullptr;
     }
-    if (threadpool_) {
+    if (threadpool_ || threadpool_batch_) {
         ggml_backend_dev_t cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
         auto * reg = ggml_backend_dev_backend_reg(cpu_dev);
         auto * tp_free = (decltype(ggml_threadpool_free) *) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_free");
-        if (tp_free) tp_free(threadpool_);
+        if (tp_free) {
+            if (threadpool_) tp_free(threadpool_);
+            if (threadpool_batch_) tp_free(threadpool_batch_);
+        }
         threadpool_ = nullptr;
+        threadpool_batch_ = nullptr;
     }
     if (model_) {
         llama_model_free(model_);
@@ -310,7 +325,7 @@ std::string Engine::model_info_json() const {
       << ",\"n_params\":" << llama_model_n_params(model_)
       << ",\"n_ctx\":" << (ctx_ ? llama_n_ctx(ctx_) : 0)
       << ",\"n_ctx_train\":" << llama_model_n_ctx_train(model_)
-      << ",\"threads\":" << n_threads_
+      << ",\"threads\":" << n_threads_ << ",\"batch_threads\":" << n_threads_batch_
       << ",\"recurrent\":" << (llama_model_is_recurrent(model_) || llama_model_is_hybrid(model_) ? "true" : "false")
       << ",\"system\":\"" << json_escape(llama_print_system_info()) << "\"}";
     return o.str();
@@ -345,8 +360,8 @@ std::string Engine::bench(int n_prompt, int n_gen) {
     llama_memory_clear(mem, true);
     kv_tokens_.clear();
 
-    LOGI("bench: pp%d %.2f tok/s, tg%d %.2f tok/s, threads=%d", n_prompt, n_prompt / ((t1 - t0) / 1e6),
-         n_gen, n_gen / ((t2 - t1) / 1e6), n_threads_);
+    LOGI("bench: pp%d %.2f tok/s, tg%d %.2f tok/s, threads=%d batch_threads=%d", n_prompt, n_prompt / ((t1 - t0) / 1e6),
+         n_gen, n_gen / ((t2 - t1) / 1e6), n_threads_, n_threads_batch_);
     std::ostringstream o;
     o << "{\"pp_tokens\":" << n_prompt << ",\"pp_tps\":" << (n_prompt / ((t1 - t0) / 1e6))
       << ",\"tg_tokens\":" << n_gen << ",\"tg_tps\":" << (n_gen / ((t2 - t1) / 1e6)) << "}";

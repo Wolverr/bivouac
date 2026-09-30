@@ -41,16 +41,21 @@ JNIEXPORT void JNICALL JNI_FN(nativeInit)(JNIEnv * env, jobject, jbyteArray lib_
     Engine::init_backends(to_string(env, lib_dir));
 }
 
-JNIEXPORT jbyteArray JNICALL JNI_FN(nativeLoad)(JNIEnv * env, jobject, jbyteArray path, jint n_ctx, jint n_batch,
-                                                jintArray cpus, jboolean repack) {
-    std::vector<int> cpu_list;
-    if (cpus) {
-        const jsize n = env->GetArrayLength(cpus);
-        cpu_list.resize(n);
-        env->GetIntArrayRegion(cpus, 0, n, cpu_list.data());
+static std::vector<int> to_ints(JNIEnv * env, jintArray arr) {
+    std::vector<int> out;
+    if (arr) {
+        out.resize(env->GetArrayLength(arr));
+        env->GetIntArrayRegion(arr, 0, (jsize) out.size(), out.data());
     }
+    return out;
+}
+
+JNIEXPORT jbyteArray JNICALL JNI_FN(nativeLoad)(JNIEnv * env, jobject, jbyteArray path, jint n_ctx, jint n_batch,
+                                                jintArray gen_cpus, jintArray batch_cpus, jboolean repack) {
+    const auto gen = to_ints(env, gen_cpus);
+    const auto batch = to_ints(env, batch_cpus);
     std::lock_guard<std::mutex> lock(g_mutex);
-    return to_bytes(env, g_engine.load(to_string(env, path), n_ctx, n_batch, cpu_list, repack));
+    return to_bytes(env, g_engine.load(to_string(env, path), n_ctx, n_batch, gen, batch, repack));
 }
 
 JNIEXPORT void JNICALL JNI_FN(nativeUnload)(JNIEnv *, jobject) {

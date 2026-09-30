@@ -14,7 +14,14 @@ internal object NativeEngine {
     }
 
     external fun nativeInit(nativeLibDir: ByteArray)
-    external fun nativeLoad(path: ByteArray, nCtx: Int, nBatch: Int, cpus: IntArray, repack: Boolean): ByteArray
+    external fun nativeLoad(
+        path: ByteArray,
+        nCtx: Int,
+        nBatch: Int,
+        genCpus: IntArray,
+        batchCpus: IntArray,
+        repack: Boolean,
+    ): ByteArray
     external fun nativeUnload()
     external fun nativeFormatChat(system: ByteArray, user: ByteArray, thinking: Boolean): ByteArray
     external fun nativeCancel()

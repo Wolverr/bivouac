@@ -39,6 +39,7 @@ data class ModelInfo(
     val n_ctx: Int = 0,
     val n_ctx_train: Int = 0,
     val threads: Int = 0,
+    val batch_threads: Int = 0,
     val recurrent: Boolean = false,
     val system: String = "",
 )
@@ -75,15 +76,20 @@ class LlmRuntime private constructor(context: Context) {
     data class LoadOptions(
         val nCtx: Int = 4096,
         val nBatch: Int = 256,
-        /** Also run on the efficiency cores. Helps prompt reading on phones with few big cores. */
-        val allCores: Boolean = false,
+        /**
+         * Read prompts on every core. Prompt processing is compute-bound, so the efficiency
+         * cores add real throughput (+33% on a 2-big-core phone); generation stays on the big cores.
+         */
+        val allCores: Boolean = true,
         /** Let llama.cpp copy weights into a faster layout (costs about the model's size in extra RAM). */
         val repack: Boolean = true,
     )
 
     suspend fun load(path: String, opts: LoadOptions = LoadOptions()): Result<ModelInfo> = withContext(llmThread) {
-        val cpus = if (opts.allCores) device.allCores else device.bigCores
-        val err = NativeEngine.nativeLoad(path.toByteArray(), opts.nCtx, opts.nBatch, cpus, opts.repack).decodeToString()
+        val batchCpus = if (opts.allCores) device.allCores else device.bigCores
+        val err = NativeEngine.nativeLoad(
+            path.toByteArray(), opts.nCtx, opts.nBatch, device.bigCores, batchCpus, opts.repack,
+        ).decodeToString()
         if (err.isNotEmpty()) Result.failure(IllegalStateException(err))
         else Result.success(json.decodeFromString<ModelInfo>(NativeEngine.nativeModelInfo().decodeToString()))
     }

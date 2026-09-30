@@ -61,7 +61,8 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text("No models yet. Download a .gguf file to the phone, then import it here.", style = MaterialTheme.typography.bodyMedium)
         }
         s.models.forEach { f ->
-            FileCard(f, active = s.loadedModel == f.absolutePath, activeLabel = "Loaded", actionLabel = "Load",
+            val loaded = s.loadedModel == f.absolutePath
+            FileCard(f, active = loaded, activeLabel = "Loaded", actionLabel = if (loaded) "Reload" else "Load",
                 enabled = s.busy == null, onAction = { vm.loadModel(f) }, onDelete = { vm.delete(f) })
         }
 
@@ -71,8 +72,8 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                     Text(info.desc, style = MaterialTheme.typography.titleSmall)
                     Text(
                         String.format(
-                            Locale.US, "%.1fB params · %.2f GB · ctx %d · %d threads%s",
-                            info.n_params / 1e9, info.size_bytes / 1e9, info.n_ctx, info.threads,
+                            Locale.US, "%.1fB params · %.2f GB · ctx %d · %d threads (%d reading)%s",
+                            info.n_params / 1e9, info.size_bytes / 1e9, info.n_ctx, info.threads, info.batch_threads,
                             if (info.recurrent) " · hybrid/recurrent" else "",
                         ),
                         style = MaterialTheme.typography.bodySmall,
@@ -85,7 +86,7 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         }
 
         Text("Performance (applies on next Load)", style = MaterialTheme.typography.titleMedium)
-        SettingRow("Use efficiency cores too", "More threads; can speed up reading long prompts", s.allCores, vm::setAllCores)
+        SettingRow("Use all cores for reading", "Faster reading of sources; answers still use the fast cores", s.allCores, vm::setAllCores)
         SettingRow("Repack weights", "Faster math, but uses extra RAM about the model's size", s.repack, vm::setRepack)
 
         Text("Knowledge packs", style = MaterialTheme.typography.titleMedium)
@@ -93,7 +94,8 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text("No knowledge pack. Without one, answers come from the model's memory only.", style = MaterialTheme.typography.bodyMedium)
         }
         s.packs.forEach { f ->
-            FileCard(f, active = s.openPack == f.absolutePath, activeLabel = "In use", actionLabel = "Use",
+            FileCard(f, active = s.openPack == f.absolutePath, activeLabel = "In use",
+                actionLabel = if (s.openPack == f.absolutePath) null else "Use",
                 enabled = s.busy == null, onAction = { vm.openPack(f) }, onDelete = { vm.delete(f) })
         }
         s.packInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
@@ -116,7 +118,7 @@ private fun FileCard(
     f: File,
     active: Boolean,
     activeLabel: String,
-    actionLabel: String,
+    actionLabel: String?,
     enabled: Boolean,
     onAction: () -> Unit,
     onDelete: () -> Unit,
@@ -127,7 +129,7 @@ private fun FileCard(
             Text(String.format(Locale.US, "%.2f GB", f.length() / 1e9), style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (active) Text(activeLabel, color = MaterialTheme.colorScheme.primary)
-                else TextButton(onClick = onAction, enabled = enabled) { Text(actionLabel) }
+                if (actionLabel != null) TextButton(onClick = onAction, enabled = enabled) { Text(actionLabel) }
                 TextButton(onClick = onDelete, enabled = enabled) { Text("Delete") }
             }
         }

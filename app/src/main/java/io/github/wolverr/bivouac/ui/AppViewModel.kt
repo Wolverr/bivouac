@@ -33,7 +33,7 @@ data class LibraryState(
     val importProgress: Float? = null,
     val error: String? = null,
     val benchResult: String? = null,
-    val allCores: Boolean = false,
+    val allCores: Boolean = true,
     val repack: Boolean = true,
 )
 
@@ -62,7 +62,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         LibraryState(
             models = models.list(),
             packs = packs.list(),
-            allCores = prefs.getBoolean("all_cores", false),
+            allCores = prefs.getBoolean("all_cores_reading", true),
             repack = prefs.getBoolean("repack", true),
         ),
     )
@@ -128,7 +128,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Changes apply on the next model load. */
     fun setAllCores(on: Boolean) {
-        prefs.edit().putBoolean("all_cores", on).apply()
+        prefs.edit().putBoolean("all_cores_reading", on).apply()
         _library.update { it.copy(allCores = on) }
     }
 
