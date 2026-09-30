@@ -24,8 +24,8 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - [~] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
   (code done and building; needs a real pack + device test)
 - [ ] M4: model selection on real hardware (Qwen3.6-35B-A3B vs Gemma 4 26B-A4B vs smaller MoEs)
-- [ ] M5: install UX: pack manifest, hash check, in-app import/download
-- [ ] M6: places pack (OSM) + "near me" queries
+- [~] M5: install UX: catalog + browser download + link-in-place (done); host packs, fill catalog URLs (todo)
+- [~] M6: places (Overture Maps) + "near me" queries: app side done; places.db build pending download
 - [ ] M7: eval harness vs frontier + web, published results
 - [ ] M8: README, demo video, public repo, poidh claim
 
@@ -63,6 +63,14 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
   12.4 / 7.2, **1.6 GB**. Repack ≈ 2x prefill for +model-size RAM; little cores help prefill (+33%)
   but not decode (bandwidth-bound). NEXT: separate batch threadpool (all cores) vs decode
   threadpool (big cores); auto repack when RAM allows; Reload button in Library.
+
+- 2026-09-30: router + conversation memory + chat UI; title matching in retrieval; fixed an
+  FTS phrase-query crash (detail=column). Places (M6): Overture 2026-09-23.1, confidence ≥ 0.7,
+  traveler categories, R*Tree pack; geocoding via Wikipedia infobox coordinates → locality
+  centroids; GPS via LocationManager. Install (M5): link-in-place via /proc/self/fd, browser
+  downloads, no INTERNET permission. Background jobs: pageviews → full wiki pack build
+  (tools/build_full.log), places fetch (tools/places_fetch.log), then `python build_places.py`.
+  Jobs must be started with `setsid nohup … &` — plain nohup died when the terminal closed.
 
 ## Dev notes
 
