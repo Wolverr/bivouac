@@ -28,6 +28,7 @@ WORD_RE = re.compile(r"[\w][\w'\-]*", re.UNICODE)
 # looks_like_acronym() in corpus.cpp: "TCP", "PoS"; not "L2" (one capital) or "AC/DC".
 ACRONYM_RE = re.compile(r"^(?=(?:[^A-Z]*[A-Z]){2})[A-Z][A-Za-z0-9&\-]{1,9}$")
 SENT_RE = re.compile(r"(?<=[.!?])\s+|\s*\n\s*")  # infobox lines are sentences too
+PADDING_RE = re.compile(r"[ \t]{2,}")
 
 
 def keywords(question: str) -> list[str]:
@@ -270,6 +271,67 @@ def list_article(pack: "Pack", question: str):
     return None
 
 
+LIST_SKIP_CELL = re.compile(r"^(:?-+:?|name|names|image|picture|photo|rank|no\.?|#)$", re.I)
+CITATION_RE = re.compile(r"\[\s*\d+\s*\]")
+HAS_LETTER = re.compile(r"[^\W\d_]")
+
+
+def list_rows(text: str) -> list[tuple[str, list[str], bool]]:
+    """Evidence.listRows: the entries of a list article chunk as (name, other cells, ranked).
+    Markdown table rows ("| Pergamon Museum | Museum Island | ... |"; a leading rank column like
+    "1" or "=4" is dropped and sets ranked) and bullet items ("- Café Procope – the oldest ...")."""
+    out = []
+    for line in text.split("\n"):
+        line = CITATION_RE.sub("", line).strip()
+        ranked = False
+        if line.startswith("|"):
+            cells = [x.strip() for x in line.strip("|").split("|")]
+            cells = [x for x in cells if x]
+            while cells and not HAS_LETTER.search(cells[0]):
+                cells.pop(0)
+                ranked = True
+            if not cells or LIST_SKIP_CELL.match(cells[0]):
+                continue
+            name, rest = cells[0], cells[1:]
+        elif line[:2] in ("- ", "* "):
+            item = line[2:].strip()
+            name = re.split(r"\s[–—-]\s|,|\(|:", item, maxsplit=1)[0].strip()
+            rest = [item[len(name):].strip(" ,–—-:")]
+        else:
+            continue
+        if 3 <= len(name) <= 80 and HAS_LETTER.search(name):
+            out.append((name, [x for x in rest if x], ranked))
+    return out
+
+
+def list_entries(pack: "Pack", article, k: int = 8, max_chunks: int = 80, max_names: int = 200) -> list[str]:
+    """ResearchPipeline.listEntries: the k most viewed entries of a list article that are articles
+    themselves, as "Name: cell — cell" lines. "Must-see museums in Berlin" wants the Pergamon Museum,
+    not the first rows alphabetically, and one 450-character excerpt of a padded table is one row.
+    Ranked lists ("tallest buildings", a rank column) keep their order instead."""
+    _, _, first, n = article
+    found, names, ranked = {}, set(), 0
+    for c in range(first, first + min(n, max_chunks)):
+        for name, rest, is_ranked in list_rows(pack.text(c)):
+            if name in names or len(names) >= max_names:
+                continue
+            names.add(name)
+            row = pack.find_article(name)
+            if row and row[0] not in found:
+                line = name + (": " + " — ".join(rest) if rest else "")
+                found[row[0]] = (row[4], len(found), line[:LIST_LINE_CHARS])
+                ranked += is_ranked
+    entries = list(found.values())
+    if ranked * 2 >= len(entries):
+        entries.sort(key=lambda e: e[1])  # list order
+    else:
+        entries.sort(key=lambda e: -e[0])  # most viewed first
+    return [line for _, _, line in entries[:k]]
+
+
+LIST_LINE_CHARS = 160
+
+
 def named_articles(pack: "Pack", question: str, k: int = 3):
     """The list article first, then title matches, deduplicated (ResearchPipeline.retrieve)."""
     out, seen = [], set()
@@ -299,6 +361,7 @@ def is_namesake(title: str, question: str) -> bool:
 
 def compress(text: str, words: list[str], max_chars=500) -> str:
     """Keeps the sentences with the most question words, in original order."""
+    text = PADDING_RE.sub(" ", text)  # markdown tables are padded with long runs of spaces
     sents = SENT_RE.split(text)
     if len(text) <= max_chars:
         return text

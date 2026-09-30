@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 from places_proto import Places, parse_intent
-from retrieve_proto import Pack, compress, fts_query, is_namesake, keywords, named_articles
+from retrieve_proto import Pack, compress, fts_query, is_namesake, keywords, list_entries, named_articles
 
 ROOT = Path(__file__).resolve().parent.parent
 SYSTEM = (ROOT / "app/src/main/assets/prompts/system.txt").read_text().strip()
@@ -37,6 +37,7 @@ PERSONAL = re.compile(
 # ResearchPipeline.Settings defaults.
 MAX_SOURCES, PER_ARTICLE, EVIDENCE_CHARS, PRIOR_WEIGHT, NAMED_BOOST = 6, 2, 450, 0.5, 4.0
 INFOBOX_FACT_CHARS = 200
+LIST_SECTION = "Most viewed entries"  # ResearchPipeline.LIST_SECTION
 SAMPLING = dict(temperature=0.4, top_p=0.95, top_k=20, min_p=0.0, repeat_penalty=1.05, max_tokens=700)
 # Fixed seed: an unchanged prompt gives an unchanged answer, so a before/after comparison
 # (grade.py pair) measures the change instead of sampling luck. Unseeded reruns of identical
@@ -63,8 +64,15 @@ def retrieve(pack: Pack, q: str):
         return []
     named = named_articles(pack, q)
     named_ids = {a[0] for a in named}
-    cands, facts, seen = [], {}, set()
+    cands, facts, seen, whole, expanded = [], {}, set(), {}, set()
     for art_id, title, first_chunk, n_chunks in named:
+        if title.startswith("List of"):
+            entries = list_entries(pack, (art_id, title, first_chunk, n_chunks))
+            if entries:  # its most viewed entries, not its first rows
+                cands.append((first_chunk, art_id, title, LIST_SECTION))
+                whole[first_chunk] = "\n".join(entries)
+                expanded.add(art_id)  # no further chunks of it: they'd repeat rows
+                continue
         cid, sec, fact_line, infobox = lead(pack, title, first_chunk, n_chunks, words)
         cands.append((cid, art_id, title, sec))
         facts[cid] = fact_line
@@ -77,7 +85,7 @@ def retrieve(pack: Pack, q: str):
     needed = (len(words) + 1) // 2
     picked, per = [], {}
     for i, (cid, art, title, sec) in enumerate(cands):
-        if cid in seen or per.get(art, 0) >= PER_ARTICLE:
+        if cid in seen or per.get(art, 0) >= PER_ARTICLE or (art in expanded and cid not in whole):
             continue
         # Relevance gate (Evidence.overlap): named articles' leads always pass.
         if i >= len(named) and (overlap(f"{title} {sec} {pack.text(cid)}", words) < needed
@@ -90,6 +98,9 @@ def retrieve(pack: Pack, q: str):
             break
     out = []
     for i, (cid, title, sec) in enumerate(picked):
+        if cid in whole:
+            out.append((i + 1, title, sec, whole[cid]))
+            continue
         f = facts.get(cid, "")
         ev = compress(pack.text(cid), words, EVIDENCE_CHARS - len(f))
         out.append((i + 1, title, sec, f"{f}\n{ev}" if f else ev))
