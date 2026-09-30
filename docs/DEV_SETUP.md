@@ -56,8 +56,7 @@ USB devices aren't visible inside WSL by default. Easiest: use Windows' own adb.
 
 (Alternative: `usbipd-win` attaches the phone to WSL so Linux adb sees it.)
 
-## Claude Code on the new machine
+## Picking up on the new machine
 
-Install Claude Code inside Ubuntu and run it from `~/bivouac`. The project state lives
-in `docs/ROADMAP.md` (milestones, measurements, next steps), so a new session can pick
-up where the last one stopped.
+The project state lives in `docs/ROADMAP.md` (milestones, measurements, next steps),
+so work can pick up where it last stopped.

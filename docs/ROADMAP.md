@@ -18,8 +18,8 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 
 ## Resume here (handoff, 2026-09-30 evening)
 
-Dev machine: home Windows PC, WSL2 Ubuntu-24.04, repo /home/nicolas/bivouac (Claude runs on
-the Windows side and reaches WSL with `wsl -e bash -lc ...`; editing through
+Dev machine: home Windows PC, WSL2 Ubuntu-24.04, repo /home/nicolas/bivouac (from the
+Windows side, reach WSL with `wsl -e bash -lc ...`; editing through
 \\\\wsl.localhost drops the exec bit on .sh files, so re-run `chmod +x tools/*.sh`).
 
 Data: out/wiki.db (6.49 M articles, 18.3 GB incl. 2.28 M aliases) and out/places.db (30.0 M places, 5.3 GB)
