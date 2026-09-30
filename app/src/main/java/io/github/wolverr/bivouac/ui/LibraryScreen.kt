@@ -94,11 +94,13 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text("No knowledge pack. Without one, answers come from the model's memory only.", style = MaterialTheme.typography.bodyMedium)
         }
         s.packs.forEach { f ->
-            FileCard(f, active = s.openPack == f.absolutePath, activeLabel = "In use",
-                actionLabel = if (s.openPack == f.absolutePath) null else "Use",
+            val inUse = s.openPack == f.absolutePath || s.openPlaces == f.absolutePath
+            FileCard(f, active = inUse, activeLabel = "In use",
+                actionLabel = if (inUse) null else "Use",
                 enabled = s.busy == null, onAction = { vm.openPack(f) }, onDelete = { vm.delete(f) })
         }
         s.packInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        s.placesInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
 }
 

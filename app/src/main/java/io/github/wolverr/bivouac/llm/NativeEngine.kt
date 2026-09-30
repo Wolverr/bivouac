@@ -51,4 +51,9 @@ internal object NativeEngine {
     external fun corpusSearch(query: ByteArray, limit: Int, priorWeight: Double, withText: Boolean): ByteArray
     external fun corpusFindArticle(title: ByteArray): ByteArray
     external fun corpusChunk(chunk: Long): ByteArray
+
+    // Places pack (read-only SQL); returns {"rows":[[...]],"error":""}.
+    external fun placesOpen(path: ByteArray): ByteArray
+    external fun placesClose()
+    external fun placesQuery(sql: ByteArray, args: Array<ByteArray>): ByteArray
 }

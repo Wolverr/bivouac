@@ -5,6 +5,7 @@ add_library(bivouac_sqlite STATIC ${BIVOUAC_TP}/sqlite/sqlite3.c)
 target_include_directories(bivouac_sqlite PUBLIC ${BIVOUAC_TP}/sqlite)
 target_compile_definitions(bivouac_sqlite PRIVATE
         SQLITE_ENABLE_FTS5
+        SQLITE_ENABLE_RTREE
         SQLITE_THREADSAFE=2
         SQLITE_DEFAULT_MEMSTATUS=0
         SQLITE_OMIT_LOAD_EXTENSION

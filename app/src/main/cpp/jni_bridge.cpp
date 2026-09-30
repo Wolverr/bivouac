@@ -12,11 +12,13 @@
 #include "corpus.h"
 #include "engine.h"
 #include "json_util.h"
+#include "sql_pack.h"
 
 static Engine g_engine;
 static std::mutex g_mutex;  // serializes load/complete/unload; cancel() stays lock-free
 
 static Corpus g_corpus;
+static SqlPack g_places;
 static std::mutex g_corpus_mutex;
 
 static std::string to_string(JNIEnv * env, jbyteArray arr) {
@@ -199,6 +201,33 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(corpusChunk)(JNIEnv * env, jobject, jlong ch
     if (!g_corpus.chunk_text(chunk, text, section, article)) return to_bytes(env, "{}");
     return to_bytes(env, "{\"article\":" + std::to_string(article) + ",\"section\":\"" + json_escape(section) +
                              "\",\"text\":\"" + json_escape(text) + "\"}");
+}
+
+// ---- Places pack (generic read-only SQL) -----------------------------------
+
+JNIEXPORT jbyteArray JNICALL JNI_FN(placesOpen)(JNIEnv * env, jobject, jbyteArray path) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    return to_bytes(env, g_places.open(to_string(env, path)));
+}
+
+JNIEXPORT void JNICALL JNI_FN(placesClose)(JNIEnv *, jobject) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    g_places.close();
+}
+
+// Returns {"rows":[[...],...],"error":"..."}.
+JNIEXPORT jbyteArray JNICALL JNI_FN(placesQuery)(JNIEnv * env, jobject, jbyteArray sql, jobjectArray args) {
+    std::vector<std::string> a;
+    const jsize n = args ? env->GetArrayLength(args) : 0;
+    for (jsize i = 0; i < n; i++) {
+        auto * b = (jbyteArray) env->GetObjectArrayElement(args, i);
+        a.push_back(to_string(env, b));
+        env->DeleteLocalRef(b);
+    }
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    std::string err;
+    const std::string rows = g_places.query_json(to_string(env, sql), a, err);
+    return to_bytes(env, "{\"rows\":" + rows + ",\"error\":\"" + json_escape(err) + "\"}");
 }
 
 }  // extern "C"

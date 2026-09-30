@@ -79,7 +79,7 @@ private fun stripMath(line: String): String = MATH.replace(line) { m ->
 
 private val HEADING = Regex("^(#{1,6})\\s+(.*)$")
 private val BULLET = Regex("^(\\s*)[-*+]\\s+(.*)$")
-private val INLINE = Regex("\\*\\*(.+?)\\*\\*|__(.+?)__|(?<![*\\w])\\*(?!\\s)(.+?)(?<!\\s)\\*(?![*\\w])|`([^`]+)`|\\[(\\d{1,2})]")
+private val INLINE = Regex("\\*\\*(.+?)\\*\\*|__(.+?)__|(?<![*\\w])\\*(?!\\s)(.+?)(?<!\\s)\\*(?![*\\w])|`([^`]+)`|\\[(P?\\d{1,2})]")
 
 private fun AnnotatedString.Builder.inline(s: String, accent: Color) {
     var last = 0

@@ -1,5 +1,8 @@
 package io.github.wolverr.bivouac.ui
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +25,7 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -41,7 +45,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.wolverr.bivouac.places.Place
 import io.github.wolverr.bivouac.research.CrisisResources
+import io.github.wolverr.bivouac.research.ResearchPipeline
 import io.github.wolverr.bivouac.research.Source
 import java.util.Locale
 
@@ -97,7 +103,9 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            itemsIndexed(s.turns) { i, turn -> TurnView(turn, running = s.running && i == s.turns.lastIndex) }
+            itemsIndexed(s.turns) { i, turn ->
+                TurnView(turn, running = s.running && i == s.turns.lastIndex, onRetry = vm::retryLast)
+            }
         }
 
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
@@ -128,11 +136,12 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TurnView(t: TurnUi, running: Boolean) {
+private fun TurnView(t: TurnUi, running: Boolean, onRetry: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(t.question, style = MaterialTheme.typography.titleMedium)
 
         if (t.crisis) CrisisCard()
+        if (t.placeSearch != null) PlacesBlock(t, running, onRetry)
 
         val prefill = t.prefill
         if (running && t.answer.isEmpty()) {
@@ -171,6 +180,51 @@ private fun TurnView(t: TurnUi, running: Boolean) {
             t.sources.forEach { SourceCard(it) }
         }
         HorizontalDivider(Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
+private fun PlacesBlock(t: TurnUi, running: Boolean, onRetry: () -> Unit) {
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) onRetry()
+    }
+    val center = t.placeCenter
+    when {
+        t.needsLocationPermission -> Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("To find places near you, Bivouac needs your location (GPS works offline; nothing leaves the phone).")
+                FilledTonalButton(onClick = {
+                    permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                }, enabled = !running) { Text("Allow location") }
+            }
+        }
+        center == null -> Text(
+            if (t.placeSearch?.nearMe == true) "Couldn't get your location. Is location turned on?"
+            else "Couldn't find \"${t.placeSearch?.location}\" on the offline map.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+        t.places.isEmpty() -> Text("No matching places found near ${center.label}.", style = MaterialTheme.typography.bodySmall)
+        else -> {
+            Text("Near ${center.label}", style = MaterialTheme.typography.labelLarge)
+            t.places.forEachIndexed { i, p -> PlaceRow(i + 1, p) }
+        }
+    }
+}
+
+@Composable
+private fun PlaceRow(n: Int, p: Place) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text("[P$n] ${p.displayName}", style = MaterialTheme.typography.labelLarge)
+            Text(
+                listOfNotNull(p.categoryLabel, ResearchPipeline.formatDistance(p.distanceM), p.street, p.phone).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 

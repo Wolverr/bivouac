@@ -9,6 +9,11 @@ import io.github.wolverr.bivouac.llm.FileStore
 import io.github.wolverr.bivouac.llm.GenEvent
 import io.github.wolverr.bivouac.llm.LlmRuntime
 import io.github.wolverr.bivouac.llm.ModelInfo
+import io.github.wolverr.bivouac.places.DeviceLocation
+import io.github.wolverr.bivouac.places.GeoPoint
+import io.github.wolverr.bivouac.places.Place
+import io.github.wolverr.bivouac.places.PlaceIntent
+import io.github.wolverr.bivouac.places.Places
 import io.github.wolverr.bivouac.research.Conversation
 import io.github.wolverr.bivouac.research.Corpus
 import io.github.wolverr.bivouac.research.ResearchEvent
@@ -30,6 +35,8 @@ data class LibraryState(
     val modelInfo: ModelInfo? = null,
     val openPack: String? = null,
     val packInfo: String? = null,
+    val openPlaces: String? = null,
+    val placesInfo: String? = null,
     val busy: String? = null,
     val importProgress: Float? = null,
     val error: String? = null,
@@ -50,6 +57,11 @@ data class TurnUi(
     val error: String? = null,
     val usedLibrary: Boolean = false,
     val crisis: Boolean = false,
+    val places: List<Place> = emptyList(),
+    /** Where places were searched around; null with [placeSearch] set means the location wasn't found. */
+    val placeCenter: GeoPoint? = null,
+    val placeSearch: PlaceIntent? = null,
+    val needsLocationPermission: Boolean = false,
 )
 
 data class AskState(
@@ -64,7 +76,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val models = FileStore(app, "models", ".gguf")
     private val packs = FileStore(app, "packs", ".db")
     private val corpus = Corpus()
-    private val pipeline = ResearchPipeline(runtime, corpus)
+    private val places = Places()
+    private val pipeline = ResearchPipeline(runtime, corpus, places) { DeviceLocation.current(app) }
     private val conversation = Conversation()
 
     private val prefs = app.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
@@ -85,8 +98,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var askJob: Job? = null
 
     init {
-        // Open the first knowledge pack automatically: most people have exactly one.
-        packs.list().firstOrNull()?.let(::openPack)
+        // Open packs automatically: one Wikipedia pack and one places pack at most.
+        packs.list().filter(::isPlacesPack).firstOrNull()?.let(::openPack)
+        packs.list().filterNot(::isPlacesPack).firstOrNull()?.let(::openPack)
     }
 
     private fun refresh() = _library.update { it.copy(models = models.list(), packs = packs.list()) }
@@ -114,7 +128,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _library.update { it.copy(busy = null) }
     }
 
+    private fun isPlacesPack(f: File) = f.name.startsWith("places")
+
     fun openPack(file: File) = viewModelScope.launch {
+        if (isPlacesPack(file)) {
+            places.open(file.absolutePath)
+                .onSuccess {
+                    val info = "${places.meta("places")} places · ${places.meta("source")}"
+                    _library.update { it.copy(openPlaces = file.absolutePath, placesInfo = info) }
+                }
+                .onFailure { e -> _library.update { it.copy(openPlaces = null, placesInfo = null, error = e.message) } }
+            return@launch
+        }
         corpus.open(file.absolutePath)
             .onSuccess {
                 val info = "${corpus.meta("articles")} articles · ${corpus.meta("source")}"
@@ -132,6 +157,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (lib.openPack == file.absolutePath) {
             corpus.close()
             _library.update { it.copy(openPack = null, packInfo = null) }
+        }
+        if (lib.openPlaces == file.absolutePath) {
+            places.close()
+            _library.update { it.copy(openPlaces = null, placesInfo = null) }
         }
         file.delete()
         refresh()
@@ -179,6 +208,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     when (ev) {
                         is ResearchEvent.Routed -> updateLast { it.copy(crisis = ev.decision.crisis) }
                         is ResearchEvent.Searching -> updateLast { it.copy(status = "Searching the library…", usedLibrary = true) }
+                        is ResearchEvent.PlacesFound -> updateLast {
+                            it.copy(
+                                places = ev.places, placeCenter = ev.center, placeSearch = ev.intent,
+                                status = "Reading places…",
+                                needsLocationPermission = ev.intent.nearMe && !DeviceLocation.hasPermission(getApplication()),
+                            )
+                        }
                         is ResearchEvent.Sources -> updateLast {
                             it.copy(sources = ev.sources, searchMs = ev.searchMs, status = "Reading sources…")
                         }
@@ -200,6 +236,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (_ask.value.turns.isNotEmpty()) updateLast { it.copy(status = null) }
             }
         }
+    }
+
+    /** Asks the last question again, e.g. after location permission was granted. */
+    fun retryLast() {
+        if (_ask.value.running) return
+        val q = _ask.value.turns.lastOrNull()?.question ?: return
+        _ask.update { it.copy(turns = it.turns.dropLast(1), input = q) }
+        askQuestion()
     }
 
     fun stop() {

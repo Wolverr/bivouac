@@ -4,6 +4,11 @@ import io.github.wolverr.bivouac.llm.ChatTurn
 import io.github.wolverr.bivouac.llm.GenEvent
 import io.github.wolverr.bivouac.llm.LlmRuntime
 import io.github.wolverr.bivouac.llm.Sampling
+import io.github.wolverr.bivouac.places.GeoPoint
+import io.github.wolverr.bivouac.places.Place
+import io.github.wolverr.bivouac.places.PlaceIntent
+import io.github.wolverr.bivouac.places.Places
+import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -15,6 +20,8 @@ sealed interface ResearchEvent {
     data class Routed(val decision: Router.Decision) : ResearchEvent
     data class Searching(val query: String) : ResearchEvent
     data class Sources(val sources: List<Source>, val searchMs: Long) : ResearchEvent
+    /** center == null: the location couldn't be found (or GPS isn't available). */
+    data class PlacesFound(val intent: PlaceIntent, val center: GeoPoint?, val places: List<Place>) : ResearchEvent
     data class Llm(val event: GenEvent) : ResearchEvent
 }
 
@@ -33,7 +40,13 @@ class Conversation {
     fun clear() = turns.clear()
 }
 
-class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?) {
+class ResearchPipeline(
+    private val llm: LlmRuntime,
+    private val corpus: Corpus?,
+    private val places: Places? = null,
+    /** The phone's position for "near me" questions; null when unavailable or not permitted. */
+    private val locate: suspend () -> GeoPoint? = { null },
+) {
 
     data class Settings(
         val maxSources: Int = 6,
@@ -51,7 +64,10 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
         val decision = Router.decide(question, !conversation.isEmpty)
         emit(ResearchEvent.Routed(decision))
 
-        val sources = if (decision.route == Router.Route.LOOKUP && corpus?.path != null) {
+        val placeIntent = places?.takeIf { it.path != null }?.let { PlaceIntent.parse(question, it.placeNouns) }
+        val nearby = if (placeIntent != null) findPlaces(placeIntent) else emptyList()
+
+        val sources = if (placeIntent == null && decision.route == Router.Route.LOOKUP && corpus?.path != null) {
             // A short follow-up ("and its population?") needs the earlier topic to search well.
             val query = if (decision.followUp) "${conversation.lastQuestion.orEmpty()} $question" else question
             retrieve(query, settings)
@@ -60,7 +76,17 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
         }
 
         val prompt = buildString {
-            if (sources.isNotEmpty()) {
+            if (nearby.isNotEmpty()) {
+                appendLine("Places from the offline map (straight-line distances):")
+                nearby.forEachIndexed { i, p ->
+                    append("[P${i + 1}] ${p.displayName} — ${p.categoryLabel} — ${formatDistance(p.distanceM)}")
+                    listOfNotNull(p.street, p.locality).joinToString(", ").takeIf { it.isNotEmpty() }?.let { append(" — $it") }
+                    p.phone?.let { append(" — $it") }
+                    appendLine()
+                }
+                appendLine()
+                append("Question: ")
+            } else if (sources.isNotEmpty()) {
                 appendLine("Wikipedia excerpts:")
                 for (s in sources) {
                     val where = if (s.passage.section.isEmpty()) s.passage.title else "${s.passage.title} — ${s.passage.section}"
@@ -83,6 +109,15 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
             }
             emit(ResearchEvent.Llm(ev))
         }
+    }
+
+    private suspend fun FlowCollector<ResearchEvent>.findPlaces(intent: PlaceIntent): List<Place> {
+        val places = places ?: return emptyList()
+        emit(ResearchEvent.Searching("places"))
+        val center = if (intent.nearMe) locate() else places.geocode(intent.location!!, corpus?.takeIf { it.path != null })
+        val found = if (center != null) places.nearby(center, places.categoriesFor(intent)) else emptyList()
+        emit(ResearchEvent.PlacesFound(intent, center, found))
+        return found
     }
 
     /**
@@ -160,6 +195,9 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
     }
 
     companion object {
+        fun formatDistance(m: Double): String =
+            if (m < 1000) "${(m / 10).toInt() * 10} m" else String.format(Locale.US, "%.1f km", m / 1000)
+
         // One prompt for every kind of message, so the engine's cached prefix always applies.
         const val SYSTEM =
             "You are Bivouac, an assistant that runs fully offline on a phone.\n" +
@@ -170,6 +208,9 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
                 "- Personal or casual messages: reply warmly and naturally, like a thoughtful friend. If something is " +
                 "ambiguous (for example feeling unwell physically or emotionally), ask a short clarifying question. " +
                 "If someone may be in danger, gently encourage them to contact local emergency services or someone they trust.\n" +
+                "- When a list of places from the offline map is provided, recommend from it using the labels like " +
+                "[P1], mention how far each is, and never invent places that aren't listed. The list may be incomplete, " +
+                "so for dietary needs, point out places whose cuisine usually suits them too.\n" +
                 "- If you're not sure about something, say so instead of guessing.\n" +
                 "- Be concise. The screen is small: use short paragraphs or lists, never tables or LaTeX."
     }

@@ -1,0 +1,45 @@
+package io.github.wolverr.bivouac.places
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class PlaceIntentTest {
+    private val nouns = setOf("restaurant", "pharmacy", "museum", "cafe", "hotel", "atm", "toilet", "station", "drugstore", "supermarket")
+
+    private fun parse(q: String) = PlaceIntent.parse(q, nouns)
+
+    @Test
+    fun vitaliksExample() {
+        val i = parse("Vegetarian restaurants near the Duomo in Florence?")
+        assertNotNull(i)
+        assertEquals("Duomo in Florence", i!!.location)
+        assertTrue(i.categoryWords.containsAll(listOf("vegetarian", "vegan", "restaurant")))
+    }
+
+    @Test
+    fun nearMeUsesTheDevice() {
+        val i = parse("where is the nearest pharmacy")
+        assertNotNull(i)
+        assertTrue(i!!.nearMe)
+        assertTrue("pharmacy" in i.categoryWords)
+    }
+
+    @Test
+    fun cityQueries() {
+        assertEquals("Berlin", parse("What are the must-see museums in Berlin")!!.location)
+        assertEquals("Shinjuku Station in Tokyo", parse("Where can I find a pharmacy near Shinjuku Station in Tokyo?")!!.location)
+        assertTrue(parse("coffee near me")!!.categoryWords.contains("cafe"))
+    }
+
+    @Test
+    fun ordinaryQuestionsAreNotPlaceQueries() {
+        assertNull(parse("What is the capital of Kazakhstan?"))
+        assertNull(parse("Explain how a heat pump works"))
+        assertNull(parse("Why did the Bronze Age collapse happen?"))
+        // A place noun without any location isn't a place search.
+        assertNull(parse("How do restaurants make money?"))
+    }
+}
