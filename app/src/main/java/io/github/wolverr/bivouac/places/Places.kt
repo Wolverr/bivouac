@@ -110,9 +110,15 @@ class Places {
             parseCoordinates(infobox.text)?.let { return GeoPoint(it.first, it.second, article.title) }
         }
         for (c in candidates) {
+            // Overture uses local names: "Florence" alone finds Florence, Alabama; the
+            // article's other names add "firenze", and the biggest locality wins.
+            val names = (listOf(c.lowercase()) + (corpus?.findArticle(c)?.let { corpus.otherNames(it) } ?: emptyList()))
+                .flatMap { listOf(it, it.substringBefore(",").trim()) }  // "roma, italy" -> also "roma"
+                .distinct()
             val row = query(
-                "SELECT lat, lon, name FROM locality WHERE name = ?1 ORDER BY n DESC LIMIT 1",
-                c.lowercase(),
+                "SELECT lat, lon, name FROM locality WHERE name IN (${names.indices.joinToString(",") { "?${it + 1}" }}) " +
+                    "ORDER BY n DESC LIMIT 1",
+                *names.toTypedArray(),
             ).firstOrNull() ?: continue
             return GeoPoint((row[0] as Number).toDouble(), (row[1] as Number).toDouble(), c)
         }

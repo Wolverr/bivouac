@@ -61,6 +61,18 @@ class Corpus {
             .takeIf { it.id != 0L }
     }
 
+    /** Other names people use for [article] (Wikipedia redirects), most viewed first. */
+    suspend fun otherNames(article: Article, limit: Int = 20): List<String> = withContext(Dispatchers.IO) {
+        json.decodeFromString(NativeEngine.corpusOtherNames(article.id, limit).decodeToString())
+    }
+
+    /** Chunks containing all of [word]'s parts, counted up to [cap]. */
+    suspend fun docFreq(word: String, cap: Int): Int = withContext(Dispatchers.IO) {
+        val parts = Evidence.parts(word)
+        if (parts.isEmpty()) cap
+        else NativeEngine.corpusDocFreq(parts.joinToString(" AND ") { "\"$it\"" }.toByteArray(), cap)
+    }
+
     suspend fun chunk(article: Article, index: Int): Passage? = withContext(Dispatchers.IO) {
         if (index !in 0 until article.n_chunks) return@withContext null
         val id = article.first_chunk + index

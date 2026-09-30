@@ -41,11 +41,15 @@ public:
     std::string meta(const std::string & key);
 
     // Full-text search. `fts_query` is FTS5 query syntax. Returns up to `limit`
-    // chunks ranked by BM25 blended with the article popularity prior.
+    // chunks ranked by colrank (BM25, see fts_rank.c) blended with the article popularity prior.
     std::vector<ChunkHit> search(const std::string & fts_query, int limit, double prior_weight);
 
-    // Exact (case-insensitive, whitespace-normalized) title lookup.
+    // Exact (case-insensitive, whitespace-normalized) title lookup, then the alias table.
     bool find_article(const std::string & title, ArticleRef & out);
+    // Chunks matching the query, counted up to `cap`: cheap test for "is this an everyday word".
+    int doc_freq(const std::string & fts_query, int cap);
+    // Other names of an article from the alias table, most viewed first ("firenze" for Florence).
+    std::vector<std::string> other_names(int64_t article, int limit);
 
     // Chunk text and metadata.
     bool chunk_text(int64_t chunk, std::string & text, std::string & section, int64_t & article);
@@ -59,6 +63,7 @@ private:
     ZSTD_DCtx_s * dctx_ = nullptr;
     ZSTD_DDict_s * ddict_ = nullptr;
     std::string error_;
+    bool has_alias_ = false;  // packs built before build_aliases.py have no alias table
 
     // Small LRU of decompressed blocks: neighbouring chunks share blocks.
     static constexpr size_t kCacheBlocks = 64;

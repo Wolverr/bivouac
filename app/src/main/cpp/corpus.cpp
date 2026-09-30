@@ -1,4 +1,5 @@
 #include "corpus.h"
+#include "fts_rank.h"
 
 #include <algorithm>
 #include <cctype>
@@ -49,6 +50,16 @@ std::string Corpus::open(const std::string & path) {
         return error_;
     }
     sqlite3_exec(db_, "PRAGMA mmap_size=268435456; PRAGMA cache_size=-65536;", nullptr, nullptr, nullptr);
+    // bm25() scores every row 0 on our contentless detail=column index; colrank() doesn't.
+    if (bivouac_fts_rank_register(db_) != SQLITE_OK) {
+        error_ = "could not register colrank()";
+        close();
+        return error_;
+    }
+    {
+        Stmt a(db_, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'alias'");
+        has_alias_ = a.ok() && sqlite3_step(a.s) == SQLITE_ROW;
+    }
 
     Stmt st(db_, "SELECT data FROM dict WHERE id = 1");
     if (!st.ok() || sqlite3_step(st.s) != SQLITE_ROW) {
@@ -93,7 +104,7 @@ std::vector<ChunkHit> Corpus::search(const std::string & fts_query, int limit, d
     const int n_candidates = std::max(limit * 8, 200);
     Stmt st(db_,
             "SELECT f.id, f.s, c.article, c.section, a.title, a.prior "
-            "FROM (SELECT rowid AS id, bm25(fts, 6.0, 2.0, 1.0) AS s FROM fts WHERE fts MATCH ?1 "
+            "FROM (SELECT rowid AS id, colrank(fts, 6.0, 2.0, 1.0) AS s FROM fts WHERE fts MATCH ?1 "
             "      ORDER BY s LIMIT ?2) AS f "
             "JOIN chunk c ON c.id = f.id JOIN article a ON a.id = c.article");
     if (!st.ok()) {
@@ -121,17 +132,47 @@ std::vector<ChunkHit> Corpus::search(const std::string & fts_query, int limit, d
 
 bool Corpus::find_article(const std::string & title, ArticleRef & out) {
     if (!db_) return false;
-    Stmt st(db_, "SELECT id, title, prior, first_chunk, n_chunks FROM article WHERE norm_title = ?1 "
-                 "ORDER BY prior DESC LIMIT 1");
     const std::string norm = normalize_title(title);
-    sqlite3_bind_text(st.s, 1, norm.c_str(), -1, SQLITE_TRANSIENT);
-    if (sqlite3_step(st.s) != SQLITE_ROW) return false;
-    out.id = sqlite3_column_int64(st.s, 0);
-    out.title = st.text(1);
-    out.prior = sqlite3_column_double(st.s, 2);
-    out.first_chunk = sqlite3_column_int64(st.s, 3);
-    out.n_chunks = sqlite3_column_int(st.s, 4);
-    return true;
+    auto lookup = [&](const char * sql) {
+        Stmt st(db_, sql);
+        if (!st.ok()) return false;
+        sqlite3_bind_text(st.s, 1, norm.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(st.s) != SQLITE_ROW) return false;
+        out.id = sqlite3_column_int64(st.s, 0);
+        out.title = st.text(1);
+        out.prior = sqlite3_column_double(st.s, 2);
+        out.first_chunk = sqlite3_column_int64(st.s, 3);
+        out.n_chunks = sqlite3_column_int(st.s, 4);
+        return true;
+    };
+    if (lookup("SELECT id, title, prior, first_chunk, n_chunks FROM article WHERE norm_title = ?1 "
+               "ORDER BY prior DESC LIMIT 1")) {
+        return true;
+    }
+    // Other names for articles ("GPS", "TCP"), from Wikipedia redirects; see tools/build_aliases.py.
+    return has_alias_ &&
+           lookup("SELECT a.id, a.title, a.prior, a.first_chunk, a.n_chunks FROM alias l "
+                  "JOIN article a ON a.id = l.article WHERE l.norm_title = ?1 ORDER BY l.views DESC LIMIT 1");
+}
+
+std::vector<std::string> Corpus::other_names(int64_t article, int limit) {
+    std::vector<std::string> out;
+    if (!db_ || !has_alias_) return out;
+    Stmt st(db_, "SELECT norm_title FROM alias WHERE article = ?1 ORDER BY views DESC LIMIT ?2");
+    if (!st.ok()) return out;
+    sqlite3_bind_int64(st.s, 1, article);
+    sqlite3_bind_int(st.s, 2, limit);
+    while (sqlite3_step(st.s) == SQLITE_ROW) out.push_back(st.text(0));
+    return out;
+}
+
+int Corpus::doc_freq(const std::string & fts_query, int cap) {
+    if (!db_ || fts_query.empty()) return 0;
+    Stmt st(db_, "SELECT count(*) FROM (SELECT 1 FROM fts WHERE fts MATCH ?1 LIMIT ?2)");
+    if (!st.ok()) return 0;
+    sqlite3_bind_text(st.s, 1, fts_query.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(st.s, 2, cap);
+    return sqlite3_step(st.s) == SQLITE_ROW ? sqlite3_column_int(st.s, 0) : 0;
 }
 
 bool Corpus::read_block(int64_t block, std::string & out) {

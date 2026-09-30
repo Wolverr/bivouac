@@ -14,6 +14,7 @@ import re
 import sqlite3
 import sys
 import time
+from pathlib import Path
 
 import zstandard as zstd
 
@@ -43,9 +44,31 @@ def fts_query(words: list[str]) -> str:
 class Pack:
     def __init__(self, path: str):
         self.db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        # colrank(): BM25 that works on contentless detail=column tables (the built-in
+        # bm25() scores every row 0 there). Same C code as the app; build with
+        # cmake -B native/build -S native -G Ninja && ninja -C native/build
+        ext = Path(__file__).parent / "native" / "build" / "fts_rank.so"
+        if not ext.exists():
+            sys.exit(f"missing {ext}: build tools/native first (see retrieve_proto.py)")
+        self.db.enable_load_extension(True)
+        self.db.load_extension(str(ext), entrypoint="sqlite3_ftsrank_init")
+        self.db.enable_load_extension(False)
         zdict = zstd.ZstdCompressionDict(self.db.execute("SELECT data FROM dict WHERE id=1").fetchone()[0])
         self.dctx = zstd.ZstdDecompressor(dict_data=zdict)
         self.cache: dict[int, bytes] = {}
+        self.has_alias = self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='alias'").fetchone() is not None
+
+    def find_article(self, title: str):
+        """(id, title, first_chunk, n_chunks, prior) by exact title, else by alias ("GPS"); like the app."""
+        norm = " ".join(title.replace("_", " ").casefold().split())
+        row = self.db.execute("SELECT id, title, first_chunk, n_chunks, prior FROM article WHERE norm_title = ? "
+                              "ORDER BY prior DESC LIMIT 1", (norm,)).fetchone()
+        if row is None and self.has_alias:
+            row = self.db.execute(
+                "SELECT a.id, a.title, a.first_chunk, a.n_chunks, a.prior FROM alias l JOIN article a "
+                "ON a.id = l.article WHERE l.norm_title = ? ORDER BY l.views DESC LIMIT 1", (norm,)).fetchone()
+        return row
 
     def text(self, chunk_id: int) -> str:
         block, off, ln = self.db.execute("SELECT block, off, len FROM chunk WHERE id=?", (chunk_id,)).fetchone()
@@ -57,7 +80,7 @@ class Pack:
     def search(self, q: str, limit=8, per_article=2, prior_weight=0.5, candidates=200, boost_articles=frozenset(), boost=4.0):
         rows = self.db.execute(
             "SELECT f.id, f.s, c.article, c.section, a.title, a.prior FROM "
-            "(SELECT rowid AS id, bm25(fts, 6.0, 2.0, 1.0) AS s FROM fts WHERE fts MATCH ? ORDER BY s LIMIT ?) f "
+            "(SELECT rowid AS id, colrank(fts, 6.0, 2.0, 1.0) AS s FROM fts WHERE fts MATCH ? ORDER BY s LIMIT ?) f "
             "JOIN chunk c ON c.id=f.id JOIN article a ON a.id=c.article",
             (q, candidates),
         ).fetchall()
@@ -75,6 +98,36 @@ class Pack:
 
 
 TOKEN_RE = re.compile(r"[\w][\w'\-.]*", re.UNICODE)
+
+# A lowercase word in more chunks than this is everyday language. An article titled
+# only with such words counts when it's a real topic ("Season", "Age of the universe")
+# and is skipped when obscure ("Determine" 272 views/month, "Broad Strokes" 87).
+COMMON_DF = 20_000
+COMMON_MIN_VIEWS = 3_000
+
+
+def everyday(pack: "Pack", words: list[str], at_start: bool) -> bool:
+    """No name-like word and every content word common."""
+    if any(is_named(w, at_start and k == 0) for k, w in enumerate(words)):
+        return False
+    return all(doc_freq(pack, w) > COMMON_DF for w in words if w.lower() not in STOP)
+
+
+def is_named(tok: str, first: bool) -> bool:
+    """Written as a name: capitalized mid-sentence, or any inner capital ("GPS", "mRNA")."""
+    if any(c.isupper() for c in tok[1:]):
+        return True
+    return tok[:1].isupper() and not first
+
+
+def doc_freq(pack: "Pack", word: str, cap: int = COMMON_DF + 1) -> int:
+    """Chunks containing the word, counted up to `cap` (cheap even for common words)."""
+    # Punctuated tokens ("don't", "CFS/EEVDF") would be phrase queries, unsupported with detail=column.
+    parts = re.findall(r"\w+", word)
+    if not parts:
+        return cap
+    q = " AND ".join(f'"{p}"' for p in parts)
+    return pack.db.execute("SELECT count(*) FROM (SELECT 1 FROM fts WHERE fts MATCH ? LIMIT ?)", (q, cap)).fetchone()[0]
 
 
 def title_matches(pack: "Pack", question: str, max_n: int = 5):
@@ -98,12 +151,11 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
             if phrase.lower().endswith("s") and len(phrase) > 3:
                 cands.append(phrase[:-1])  # "tardigrades" -> "tardigrade"
             for c in cands:
-                row = pack.db.execute(
-                    "SELECT id, title, first_chunk, n_chunks FROM article WHERE norm_title = ? ORDER BY prior DESC LIMIT 1",
-                    (" ".join(c.casefold().split()),),
-                ).fetchone()
+                row = pack.find_article(c)
+                if row and row[4] < math.log1p(COMMON_MIN_VIEWS) and everyday(pack, words, i == 0):
+                    continue
                 if row and row[0] not in seen:
-                    found.append(row)
+                    found.append(row[:4])
                     seen.add(row[0])
                     for j in range(i, i + n):
                         used[j] = True

@@ -17,6 +17,7 @@ add_library(bivouac SHARED
         engine.cpp
         model_probe.cpp
         corpus.cpp
+        fts_rank.c
         sql_pack.cpp
         jni_bridge.cpp)
 

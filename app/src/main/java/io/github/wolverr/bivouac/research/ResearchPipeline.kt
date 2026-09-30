@@ -209,13 +209,30 @@ class ResearchPipeline(
                     listOf(phrase)
                 }
                 val hit = candidates.firstNotNullOfOrNull { corpus.findArticle(it) } ?: continue
+                if (hit.prior < COMMON_MIN_PRIOR && everyday(corpus, words, i == 0)) continue
                 if (found.putIfAbsent(hit.id, hit) == null) (i until i + n).forEach { used[it] = true }
             }
         }
         return found.values.toList()
     }
 
+    /**
+     * No name-like word ("GPS", "mRNA", "Germany" mid-sentence) and every content word
+     * common. Such a title counts only for a real topic ("Season", "Age of the universe"),
+     * not an obscure one ("Determine", "Broad Strokes"). Mirrors tools/retrieve_proto.py.
+     */
+    private suspend fun everyday(corpus: Corpus, words: List<String>, atStart: Boolean): Boolean {
+        val named = words.withIndex().any { (k, w) ->
+            w.drop(1).any(Char::isUpperCase) || (w.first().isUpperCase() && !(atStart && k == 0))
+        }
+        if (named) return false
+        return words.filterNot(Evidence::isStop).all { corpus.docFreq(it, COMMON_DF + 1) > COMMON_DF }
+    }
+
     companion object {
+        private const val COMMON_DF = 20_000
+        private val COMMON_MIN_PRIOR = kotlin.math.ln(1.0 + 3_000)  // prior = ln(1 + monthly views)
+
         fun formatDistance(m: Double): String =
             if (m < 1000) "${(m / 10).toInt() * 10} m" else String.format(Locale.US, "%.1f km", m / 1000)
     }

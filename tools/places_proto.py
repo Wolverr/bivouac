@@ -122,11 +122,10 @@ class Places:
         cands = list(dict.fromkeys(cands))
         if self.wiki:
             for c in cands:
-                row = self.wiki.db.execute(
-                    "SELECT title, first_chunk FROM article WHERE norm_title = ? ORDER BY prior DESC LIMIT 1",
-                    (norm_title(c),)).fetchone()
+                row = self.wiki.find_article(c)  # like Corpus.findArticle: title, then alias
                 if not row:
                     continue
+                row = (row[1], row[2])
                 sec = self.wiki.db.execute("SELECT section FROM chunk WHERE id = ?", (row[1],)).fetchone()
                 if not sec or sec[0] != "Infobox":
                     continue
@@ -138,11 +137,26 @@ class Places:
                     lon = float(m[3]) * (-1 if m[4] == "W" else 1)
                     return lat, lon, f"wiki:{row[0]}"
         for c in cands:
-            row = self.db.execute("SELECT lat, lon, country, n FROM locality WHERE name = ? ORDER BY n DESC LIMIT 1",
-                                  (c.lower(),)).fetchone()
+            # Overture uses local names: "Florence" alone finds Florence, Alabama; the
+            # article's aliases add "firenze", and the biggest locality wins.
+            # "roma, italy" -> also "roma"
+            names = list(dict.fromkeys(x for n in [c.lower()] + self.local_names(c) for x in (n, n.split(",")[0].strip())))
+            row = self.db.execute(
+                "SELECT lat, lon, country, n, name FROM locality WHERE name IN (%s) ORDER BY n DESC LIMIT 1"
+                % ",".join("?" * len(names)), names).fetchone()
             if row:
-                return row[0], row[1], f"locality:{c} ({row[2]}, {row[3]} places)"
+                return row[0], row[1], f"locality:{row[4]} ({row[2]}, {row[3]} places)"
         return None
+
+    def local_names(self, phrase, limit=20):
+        """Other names of the Wikipedia article called `phrase` (most viewed first)."""
+        if not self.wiki or not self.wiki.has_alias:
+            return []
+        row = self.wiki.find_article(phrase)
+        if not row:
+            return []
+        return [r[0] for r in self.wiki.db.execute(
+            "SELECT norm_title FROM alias WHERE article = ? ORDER BY views DESC LIMIT ?", (row[0], limit))]
 
     def within(self, lat, lon, radius, cats):
         d_lat = radius / 111_320.0

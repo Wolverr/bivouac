@@ -200,6 +200,22 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(corpusFindArticle)(JNIEnv * env, jobject, jb
 }
 
 // Returns {"article":..,"section":"..","text":".."} or {} if missing.
+// JSON array of strings.
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusOtherNames)(JNIEnv * env, jobject, jlong article, jint limit) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    std::string o = "[";
+    for (const auto & n : g_corpus.other_names(article, limit)) {
+        if (o.size() > 1) o += ",";
+        o += "\"" + json_escape(n) + "\"";
+    }
+    return to_bytes(env, o + "]");
+}
+
+JNIEXPORT jint JNICALL JNI_FN(corpusDocFreq)(JNIEnv * env, jobject, jbyteArray query, jint cap) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    return g_corpus.doc_freq(to_string(env, query), cap);
+}
+
 JNIEXPORT jbyteArray JNICALL JNI_FN(corpusChunk)(JNIEnv * env, jobject, jlong chunk) {
     std::lock_guard<std::mutex> lock(g_corpus_mutex);
     std::string text, section;

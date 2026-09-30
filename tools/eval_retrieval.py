@@ -48,7 +48,9 @@ def main():
             got = retrieve(pack, q["q"], args.k, use_titles)
             ms += (time.time() - t0) * 1000
             titles = {h[2] for h in got}
-            if titles & set(q["gold"]):
+            # Wikipedia titles start with a capital: gold "mRNA vaccine" is the article "MRNA vaccine".
+            gold = {g[:1].upper() + g[1:] for g in q["gold"]}
+            if titles & gold:
                 hit += 1
             else:
                 misses.append((q["id"], q["gold"], sorted(titles)[:4]))

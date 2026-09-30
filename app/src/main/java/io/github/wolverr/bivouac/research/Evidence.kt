@@ -47,6 +47,9 @@ object Evidence {
 
     fun isStop(word: String) = word.lowercase() in STOP
 
+    /** A token's word parts ("don't" -> don, t): punctuated tokens would be FTS phrase queries. */
+    fun parts(word: String): List<String> = word.lowercase().split(NON_WORD).filter { it.isNotEmpty() }
+
     /**
      * How many of the question words a text mentions. Words are matched by their first
      * five letters, a cheap stand-in for stemming ("volcanoes" matches "volcanic").

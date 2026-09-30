@@ -1,1 +1,2 @@
 SQLite 3.53.4 amalgamation (public domain) from https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip
+sqlite3ext.h from the same zip (for tools/native fts_rank.so)

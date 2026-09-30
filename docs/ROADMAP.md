@@ -22,24 +22,25 @@ Dev machine: home Windows PC, WSL2 Ubuntu-24.04, repo /home/nicolas/bivouac (Cla
 the Windows side and reaches WSL with `wsl -e bash -lc ...`; editing through
 \\\\wsl.localhost drops the exec bit on .sh files, so re-run `chmod +x tools/*.sh`).
 
-Running as a systemd user service (check `tools/status.sh`):
-- bivouac-wiki: FineWiki download (done, 13 GB) -> pageviews (5.6 GB dump) -> build out/wiki.db (~2 h)
-Done: out/places.db (30.0 M places, 167,710 localities, 5.3 GB).
+Data: out/wiki.db (6.49 M articles, 18.3 GB incl. 2.28 M aliases) and out/places.db (30.0 M places, 5.3 GB)
+are built. Desktop tools need `tools/native/build/fts_rank.so`:
+`export PATH=$HOME/Android/Sdk/cmake/3.31.6/bin:$PATH; cmake -S tools/native -B tools/native/build -G Ninja && ninja -C tools/native/build`.
 Done: 7 candidate models in ~/models; llama-server for the PC at ~/llama-pc/bin.
 Eval: eval/questions.jsonl (60, 48 with gold articles), eval/baseline_frontier_web.jsonl
 (frontier + web answers, done), tools/answer_proto.py (PC harness), tools/grade.py (blind).
 
 Next steps, in order:
-1. When out/wiki.db exists: `tools/.venv/bin/python tools/eval_retrieval.py out/wiki.db --show-misses`,
-   fix misses (e.g. weight rare terms in the relevance gate), re-measure.
+1. Retrieval: 85% hit@6 (`tools/.venv/bin/python tools/eval_retrieval.py tools/out/wiki.db --show-misses`).
+   Remaining misses are semantic ("why did the USSR collapse" -> Dissolution of the Soviet Union) or
+   disambiguation pages FineWiki lacks (TCP, UDP, CFS). Possible next: a disambiguation-free acronym
+   table, or a small embedding reranker. Good enough to move on.
 2. Model quality per RAM tier: for each model in ~/models start
    `~/llama-pc/bin/llama-server -m <gguf> -c 8192 -t 16 --port 8088 --jinja`, run
    `tools/answer_proto.py --db out/wiki.db --name <model>`, then `tools/grade.py packet ...`,
    have a grader agent fill eval/grading/<name>.scores.jsonl (GRADER_INSTRUCTIONS.txt), `grade.py score`.
-3. Places: `tools/.venv/bin/python tools/places_proto.py out/places.db --wiki out/wiki.db --questions eval/questions.jsonl`
-   (desktop mirror of PlaceIntent/Places). Without --wiki, English exonyms fail ("Rome", "Florence",
-   "Venice" -> US towns, since Overture uses local names). Check that the Wikipedia geocoder fixes them; if
-   not, add English names from Overture divisions to the locality table. Then Redmi end-to-end + on-phone eval.
+3. Places: desktop-tested (`tools/.venv/bin/python tools/places_proto.py tools/out/places.db --wiki tools/out/wiki.db
+   --questions eval/questions.jsonl`); exonyms fixed via aliases. Next: Redmi end-to-end + on-phone eval
+   (copy both packs to the phone: ~24 GB).
 4. Low-RAM work: code done, **needs a device test** (see status log). On the Redmi: load each model, check
    the "auto: ctx …" line in Library, watch PSS vs estimate (`adb shell dumpsys meminfo io.github.wolverr.bivouac`),
    force an OOM (load the 9B) to check the crash notice and the smaller settings on the next load.
@@ -51,7 +52,7 @@ See docs/COMPETITORS.md for what the other entries do.
 
 - [x] M0: toolchain (JDK 17 via mise, Android SDK/NDK r29, CMake 3.31.6), llama.cpp v0.5.0 submodule
 - [x] M1: app runs a GGUF on the phone: import, load, streaming answer, prefill progress, benchmark
-- [ ] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks); measure size
+- [x] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks): 18.3 GB, 6.49 M articles
 - [~] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
   (code done and building; needs a real pack + device test)
 - [~] M4: model selection **per RAM tier** (6 / 8 / 12 GB): quality ranked on the PC harness,
@@ -120,6 +121,18 @@ See docs/COMPETITORS.md for what the other entries do.
   model's budget by 25% (floor 40%), regained 5% per good answer. Prompt budget follows the context
   (`Settings.forContext`). "Automatic memory settings" switch in Library (on by default). APK builds;
   not yet run on a phone.
+
+- 2026-09-30: **full wiki.db built** (6,492,540 articles, 34.2 M chunks, 26.4 GB text -> 7.1 GB zstd,
+  18.1 GB db, 24 min with a 9 GB memory cap; 3 GB was OOM-killed). FineWiki has several revisions of
+  66k pages; the builder keeps the first. fetch_pageviews.sh no longer fails on bzip2's expected broken pipe.
+  **Found: bm25() returned 0 for every row** (contentless + detail=column can't count term hits), so ranking
+  had been prior + titles only. New `fts_rank.c` colrank() = BM25 with tf=1 from column presence and
+  column sizes; same C in the app and as tools/native/build/fts_rank.so for Python.
+  Retrieval hit@6: BM25 alone 0% -> 75%; with titles 69% -> 85% after also: everyday-word titles need
+  >= 3,000 views/month ("Determine", "Broad Strokes" skipped; "Season" kept), and an alias table
+  (`tools/build_aliases.py`: redirects + pageview titles, 2.28 M names, +180 MB): GPS -> Global Positioning
+  System, Treaty of Westphalia -> Peace of Westphalia, WW2, Obama. Aliases also geocode places by local name
+  (Florence -> firenze, Rome -> "roma, italy" -> roma, Moscow -> москва). Search ~1.5 s/question on the PC.
 
 ## Dev notes
 
