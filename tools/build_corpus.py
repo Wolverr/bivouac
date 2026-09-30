@@ -89,7 +89,7 @@ def split_long(par: str):
 
 
 def chunk_section(body: str):
-    pieces = [p for par in re.split(r"\n\s*\n", body) if (p := par.strip()) for p in split_long(p)]
+    pieces = [piece for par in re.split(r"\n\s*\n", body) if par.strip() for piece in split_long(par.strip())]
     cur = ""
     for p in pieces:
         if cur and len(cur) + len(p) + 2 > CHUNK_TARGET:

@@ -19,7 +19,8 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 ## Milestones
 
 - [x] M0: toolchain (JDK 17 via mise, Android SDK/NDK r29, CMake 3.31.6), llama.cpp v0.5.0 submodule
-- [ ] M1: app runs a GGUF on the phone: import, load, streaming answer, prefill progress, benchmark
+- [~] M1: app runs a GGUF on the phone: import, load, streaming answer, prefill progress, benchmark
+  (APK builds; waiting for on-device test)
 - [ ] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks); measure size
 - [ ] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
 - [ ] M4: model selection on real hardware (Qwen3.6-35B-A3B vs Gemma 4 26B-A4B vs smaller MoEs)
@@ -33,6 +34,12 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - 2026-09-30: toolchain installed; app skeleton (Compose UI + JNI engine with
   prefix snapshot caching and a big-core threadpool) written; first build in progress.
   FineWiki download started (`tools/fetch_finewiki.py`, text columns only, ~13 GB).
+
+- 2026-09-30: APK builds (69 MB debug; 7 ggml CPU variants armv8.0 → armv9.2).
+  Corpus reader verified on desktop (`tools/native/corpus_cli`, 20–75 ms/query on a 50k-article sample).
+  FTS5 index size vs raw text on the sample: detail=full 54%, column 32%, none 15%.
+  Projected full English pack: ~19 GB (none) / ~25 GB (column) / ~33 GB (full).
+  Plan: detail=column (keeps title/section weighting) unless storage gets tight.
 
 ## Dev notes
 

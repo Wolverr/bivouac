@@ -9,10 +9,15 @@
 #include <string>
 #include <vector>
 
+#include "corpus.h"
 #include "engine.h"
+#include "json_util.h"
 
 static Engine g_engine;
 static std::mutex g_mutex;  // serializes load/complete/unload; cancel() stays lock-free
+
+static Corpus g_corpus;
+static std::mutex g_corpus_mutex;
 
 static std::string to_string(JNIEnv * env, jbyteArray arr) {
     if (!arr) return "";
@@ -118,6 +123,67 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(nativeComplete)(JNIEnv * env, jobject, jbyte
              st.n_reused, st.n_prefill, st.n_gen, st.t_prefill_us / 1000.0, st.t_first_token_us / 1000.0,
              st.t_gen_us / 1000.0, st.cancelled ? "true" : "false", st.stop_reason.c_str(), st.error.c_str());
     return to_bytes(env, buf);
+}
+
+// ---- Knowledge pack -------------------------------------------------------
+
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusOpen)(JNIEnv * env, jobject, jbyteArray path) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    return to_bytes(env, g_corpus.open(to_string(env, path)));
+}
+
+JNIEXPORT void JNICALL JNI_FN(corpusClose)(JNIEnv *, jobject) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    g_corpus.close();
+}
+
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusMeta)(JNIEnv * env, jobject, jbyteArray key) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    return to_bytes(env, g_corpus.meta(to_string(env, key)));
+}
+
+// Returns [{"chunk":..,"article":..,"title":"..","section":"..","score":..,"text":".."}] as JSON.
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusSearch)(JNIEnv * env, jobject, jbyteArray query, jint limit,
+                                                  jdouble prior_weight, jboolean with_text) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    const auto hits = g_corpus.search(to_string(env, query), limit, prior_weight);
+    std::string out = "[";
+    for (size_t i = 0; i < hits.size(); i++) {
+        const auto & h = hits[i];
+        std::string text, section;
+        int64_t article = 0;
+        if (with_text) g_corpus.chunk_text(h.chunk, text, section, article);
+        char head[96];
+        snprintf(head, sizeof(head), "{\"chunk\":%lld,\"article\":%lld,\"score\":%.4f,", (long long) h.chunk,
+                 (long long) h.article, h.score);
+        out += head;
+        out += "\"title\":\"" + json_escape(h.title) + "\",\"section\":\"" + json_escape(h.section) +
+               "\",\"text\":\"" + json_escape(text) + "\"}";
+        if (i + 1 < hits.size()) out += ",";
+    }
+    out += "]";
+    return to_bytes(env, out);
+}
+
+// Returns {"id":..,"title":"..","first_chunk":..,"n_chunks":..} or {} if missing.
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusFindArticle)(JNIEnv * env, jobject, jbyteArray title) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    ArticleRef a;
+    if (!g_corpus.find_article(to_string(env, title), a)) return to_bytes(env, "{}");
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"id\":%lld,\"first_chunk\":%lld,\"n_chunks\":%d,\"prior\":%.3f,",
+             (long long) a.id, (long long) a.first_chunk, a.n_chunks, a.prior);
+    return to_bytes(env, std::string(buf) + "\"title\":\"" + json_escape(a.title) + "\"}");
+}
+
+// Returns {"article":..,"section":"..","text":".."} or {} if missing.
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusChunk)(JNIEnv * env, jobject, jlong chunk) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    std::string text, section;
+    int64_t article = 0;
+    if (!g_corpus.chunk_text(chunk, text, section, article)) return to_bytes(env, "{}");
+    return to_bytes(env, "{\"article\":" + std::to_string(article) + ",\"section\":\"" + json_escape(section) +
+                             "\",\"text\":\"" + json_escape(text) + "\"}");
 }
 
 }  // extern "C"

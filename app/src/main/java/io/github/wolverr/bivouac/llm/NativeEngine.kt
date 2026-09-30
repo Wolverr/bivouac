@@ -31,4 +31,12 @@ internal object NativeEngine {
         maxTokens: Int,
         listener: Listener,
     ): ByteArray
+
+    // Knowledge pack (wiki.db); JSON results, see jni_bridge.cpp.
+    external fun corpusOpen(path: ByteArray): ByteArray
+    external fun corpusClose()
+    external fun corpusMeta(key: ByteArray): ByteArray
+    external fun corpusSearch(query: ByteArray, limit: Int, priorWeight: Double, withText: Boolean): ByteArray
+    external fun corpusFindArticle(title: ByteArray): ByteArray
+    external fun corpusChunk(chunk: Long): ByteArray
 }

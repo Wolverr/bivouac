@@ -9,6 +9,7 @@
 #include "common.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
+#include "json_util.h"
 #include "sampling.h"
 
 #define TAG "bivouac-engine"
@@ -35,34 +36,11 @@ void Engine::init_backends(const std::string & native_lib_dir) {
     LOGI("backends loaded from %s", native_lib_dir.c_str());
 }
 
-static std::string json_escape(const std::string & s) {
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (char c : s) {
-        switch (c) {
-            case '"':  out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n";  break;
-            case '\r': out += "\\r";  break;
-            case '\t': out += "\\t";  break;
-            default:
-                if ((unsigned char) c < 0x20) {
-                    char buf[8];
-                    snprintf(buf, sizeof(buf), "\\u%04x", c);
-                    out += buf;
-                } else {
-                    out += c;
-                }
-        }
-    }
-    return out;
-}
-
 std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & cpus) {
     unload();
 
     llama_model_params mp = llama_model_default_params();
-    mp.use_mmap = true;
+    mp.load_mode = LLAMA_LOAD_MODE_MMAP;  // weights stay in the page cache, not the app heap
     mp.n_gpu_layers = 0;
     model_ = llama_model_load_from_file(path.c_str(), mp);
     if (!model_) {

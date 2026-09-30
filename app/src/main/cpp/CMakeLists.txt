@@ -11,8 +11,11 @@ endif()
 set(LLAMA_SRC ${CMAKE_CURRENT_LIST_DIR}/../../../../third_party/llama.cpp)
 add_subdirectory(${LLAMA_SRC} build-llama)
 
+include(${CMAKE_CURRENT_LIST_DIR}/third_party.cmake)
+
 add_library(bivouac SHARED
         engine.cpp
+        corpus.cpp
         jni_bridge.cpp)
 
 target_include_directories(bivouac PRIVATE
@@ -21,6 +24,8 @@ target_include_directories(bivouac PRIVATE
         ${LLAMA_SRC}/ggml/include)
 
 target_link_libraries(bivouac
+        bivouac_sqlite
+        bivouac_zstd
         llama
         llama-common
         android
