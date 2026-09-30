@@ -18,6 +18,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+from places_proto import Places, parse_intent
 from retrieve_proto import Pack, compress, fts_query, keywords, title_matches
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -80,6 +81,45 @@ def retrieve(pack: Pack, q: str):
     return [(i + 1, title, sec, compress(pack.text(cid), words, EVIDENCE_CHARS)) for i, (cid, title, sec) in enumerate(picked)]
 
 
+# ResearchPipeline.PLACES_HEADER
+PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend from this list using the labels like [P1] and say how far each is; never invent places that aren't listed. The list may be incomplete, so for dietary needs also point out places whose cuisine usually suits them."
+
+
+def format_distance(m: float) -> str:
+    return f"{int(m / 10) * 10} m" if m < 1000 else f"{m / 1000:.1f} km"
+
+
+def find_places(places: Places, q: str):
+    """ResearchPipeline.findPlaces for questions with a written location (no GPS on the desktop).
+    Returns None when the question isn't about places."""
+    intent = parse_intent(q, places.place_nouns)
+    if intent is None:
+        return None
+    if intent["location"] is None:
+        return []
+    center = places.geocode(intent["location"])
+    if not center:
+        return []
+    found, _ = places.nearby(center[0], center[1], places.categories_for(intent))
+    return found
+
+
+def build_places_prompt(q: str, found) -> str:
+    if not found:
+        return q
+    lines = [PLACES_HEADER]
+    for i, p in enumerate(found):
+        name = p["name"] + (f" ({p['name_en']})" if p["name_en"] else "")
+        line = f"[P{i + 1}] {name} — {p['cat'].replace('_', ' ')} — {format_distance(p['dist'])}"
+        where = ", ".join(x for x in (p["street"], p["locality"]) if x)
+        if where:
+            line += f" — {where}"
+        if p["phone"]:
+            line += f" — {p['phone']}"
+        lines.append(line)
+    return "\n".join(lines) + "\n\nQuestion: " + q
+
+
 def build_prompt(q: str, sources) -> str:
     if not sources:
         return q
@@ -109,9 +149,13 @@ def main():
     ap.add_argument("--name", required=True, help="label for the results file, e.g. qwen3.5-2b")
     ap.add_argument("--port", type=int, default=8088)
     ap.add_argument("--only", default="", help="comma-separated question ids")
+    ap.add_argument("--places", default="out/places.db", help="places pack ('' to skip, like an app without one)")
     args = ap.parse_args()
 
     pack = Pack(args.db)
+    places = Places(args.places) if args.places else None
+    if places:
+        places.wiki = pack  # geocoding by Wikipedia title / aliases, as in the app
     qs = [json.loads(l) for l in open(ROOT / "eval/questions.jsonl")]
     if args.only:
         keep = set(args.only.split(","))
@@ -123,10 +167,17 @@ def main():
             continue
         t0 = time.time()
         r = route(q["q"])
-        sources = retrieve(pack, q["q"]) if r == "lookup" else []
-        answer, usage = generate(args.port, build_prompt(q["q"], sources))
+        found = find_places(places, q["q"]) if places else None
+        if found is not None:
+            r, sources = "places", []
+            prompt = build_places_prompt(q["q"], found)
+        else:
+            sources = retrieve(pack, q["q"]) if r == "lookup" else []
+            prompt = build_prompt(q["q"], sources)
+        answer, usage = generate(args.port, prompt)
         rec = {"id": q["id"], "question": q["q"], "answer": answer, "route": r,
-               "sources": [f"{t} — {s}" if s else t for _, t, s, _ in sources],
+               "sources": [f"{t} — {s}" if s else t for _, t, s, _ in sources] +
+                          [f"[P{i + 1}] {p['name']} ({p['cat']}, {format_distance(p['dist'])})" for i, p in enumerate(found or [])],
                "model": args.name, "device": "pc-harness", "total_ms": int((time.time() - t0) * 1000), "usage": usage}
         with open(out, "a") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")

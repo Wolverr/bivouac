@@ -6,3 +6,4 @@ local.properties
 /corpus/
 /tools/.venv/
 .idea/
+eval/old-prompt-v1/

@@ -94,7 +94,9 @@ class ResearchPipeline(
 
         val prompt = buildString {
             if (nearby.isNotEmpty()) {
-                appendLine("Places from the offline map (straight-line distances):")
+                // Place instructions travel with the list: in the system prompt, small models
+                // leaked them ("cuisine notes") into unrelated answers.
+                appendLine(PLACES_HEADER)
                 nearby.forEachIndexed { i, p ->
                     append("[P${i + 1}] ${p.displayName} — ${p.categoryLabel} — ${formatDistance(p.distanceM)}")
                     listOfNotNull(p.street, p.locality).joinToString(", ").takeIf { it.isNotEmpty() }?.let { append(" — $it") }
@@ -230,6 +232,8 @@ class ResearchPipeline(
     }
 
     companion object {
+        /** Mirrored in tools/answer_proto.py. */
+        const val PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend from this list using the labels like [P1] and say how far each is; never invent places that aren't listed. The list may be incomplete, so for dietary needs also point out places whose cuisine usually suits them."
         private const val COMMON_DF = 20_000
         private val COMMON_MIN_PRIOR = kotlin.math.ln(1.0 + 3_000)  // prior = ln(1 + monthly views)
 
