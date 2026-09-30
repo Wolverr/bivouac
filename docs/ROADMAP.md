@@ -19,8 +19,7 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 ## Milestones
 
 - [x] M0: toolchain (JDK 17 via mise, Android SDK/NDK r29, CMake 3.31.6), llama.cpp v0.5.0 submodule
-- [~] M1: app runs a GGUF on the phone: import, load, streaming answer, prefill progress, benchmark
-  (APK builds; waiting for on-device test)
+- [x] M1: app runs a GGUF on the phone: import, load, streaming answer, prefill progress, benchmark
 - [ ] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks); measure size
 - [~] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
   (code done and building; needs a real pack + device test)
@@ -48,6 +47,16 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
   Wikimedia into tools/data/pageviews_en.tsv; FineWiki shards downloading (2/15 done).
   NEXT: device test of the APK with Qwen3.5-2B; when downloads finish, build full pack:
   `python build_corpus.py --pageviews data/pageviews_en.tsv --full-top 2000000 --out out/wiki.db`
+
+- 2026-09-30: **first on-device run** — Redmi Note 15 Pro (MediaTek MT6789, 2×A76 @2.2 GHz +
+  6×A55, 8 GB RAM, Android 16). ggml picked the armv8.2_2 variant (dotprod+fp16).
+  Qwen3.5-2B Q4_K_M: load ~6 s, bench pp256 25.5 tok/s, tg 6.8 tok/s (2 threads);
+  real question: 76-token prompt 22.5 tok/s, answer 7.6 tok/s, first token 3.4 s.
+  App PSS 2.7 GB = 1.24 GB mmapped weights + 1.39 GB native heap (CPU repack copy of
+  weights — test use_extra_bufts=false for big models).
+  TODO: markdown rendering, thread-count setting (try using little cores for prefill),
+  repack toggle, quieter llama.cpp logs, log bench/completion stats to logcat.
+  Xiaomi notes: needs "Install via USB" in developer options; `adb shell input` blocked.
 
 ## Dev notes
 
