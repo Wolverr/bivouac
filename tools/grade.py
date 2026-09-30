@@ -4,12 +4,19 @@
   (a grader fills eval/grading/<name>.scores.jsonl, see GRADER_INSTRUCTIONS)
   python grade.py score   eval/results-pc-qwen3.5-9b.jsonl   -> summary + eval/grading/<name>.summary.json
 
+Paired mode compares two runs of our own pipeline (e.g. before/after a fix) in one blind
+packet, which cancels most of the grader's run-to-run drift:
+
+  python grade.py pair       eval/results-pc-qwen3.5-4b.jsonl eval/results-pc-qwen3.5-4b-v2.jsonl
+  python grade.py pairscore  eval/results-pc-qwen3.5-4b.jsonl eval/results-pc-qwen3.5-4b-v2.jsonl
+
 The packet shows each question with answers "A" and "B" in random order; the key
 mapping A/B to system is kept in a separate file the grader never sees.
 """
 
 import argparse
 import json
+import math
 import random
 import statistics
 from collections import defaultdict
@@ -88,12 +95,100 @@ def score(results_path: Path):
         print(f"  {qid:12s} bivouac {b:>2} vs {f:>2}  {note}")
 
 
+def pair_name(old: Path, new: Path) -> str:
+    return f"pair-{old.stem.replace('results-', '')}--{new.stem.replace('results-', '')}"
+
+
+def pair_packet(old_path: Path, new_path: Path):
+    name = pair_name(old_path, new_path)
+    old, new = load(old_path), load(new_path)
+    questions = {q["id"]: q for q in map(json.loads, open(ROOT / "eval/questions.jsonl"))}
+    rng = random.Random(name)
+    GRADING.mkdir(parents=True, exist_ok=True)
+    key, lines = {}, []
+    for qid, q in questions.items():
+        if qid not in old or qid not in new:
+            continue
+        if old[qid]["answer"].strip() == new[qid]["answer"].strip():
+            key[qid] = "same"  # counted as a tie, not shown to the grader
+            continue
+        pair = [("old", old[qid]["answer"]), ("new", new[qid]["answer"])]
+        rng.shuffle(pair)
+        key[qid] = {"A": pair[0][0], "B": pair[1][0]}
+        lines.append({"id": qid, "category": q.get("cat", ""), "question": q["q"], "A": pair[0][1], "B": pair[1][1]})
+    (GRADING / f"{name}.packet.jsonl").write_text("".join(json.dumps(l, ensure_ascii=False) + "\n" for l in lines))
+    (GRADING / f"{name}.key.json").write_text(json.dumps(key, indent=1))
+    (GRADING / "GRADER_INSTRUCTIONS.txt").write_text(GRADER_INSTRUCTIONS + "\n")
+    same = sum(1 for v in key.values() if v == "same")
+    print(f"{len(lines)} questions ({same} identical answers skipped) -> {GRADING / (name + '.packet.jsonl')}")
+
+
+def sign_test_p(wins: int, losses: int) -> float:
+    """Two-sided exact binomial test, ties dropped."""
+    n = wins + losses
+    if n == 0:
+        return 1.0
+    k = min(wins, losses)
+    tail = sum(math.comb(n, i) for i in range(k + 1)) / 2 ** n
+    return min(1.0, 2 * tail)
+
+
+def pair_score(old_path: Path, new_path: Path):
+    name = pair_name(old_path, new_path)
+    key = json.loads((GRADING / f"{name}.key.json").read_text())
+    questions = {q["id"]: q for q in map(json.loads, open(ROOT / "eval/questions.jsonl"))}
+    scores = {s["id"]: s for s in map(json.loads, open(GRADING / f"{name}.scores.jsonl"))}
+    rows = []  # (id, cat, old, new, note)
+    for qid, k in key.items():
+        cat = questions[qid].get("cat", "")
+        if k == "same":
+            rows.append((qid, cat, None, None, "identical answers"))
+            continue
+        s = scores[qid]
+        o, n = s[[l for l in "AB" if k[l] == "old"][0]], s[[l for l in "AB" if k[l] == "new"][0]]
+        rows.append((qid, cat, o["overall"], n["overall"], s.get("note", "")))
+    diffs = [0 if r[2] is None else r[3] - r[2] for r in rows]
+    mean = statistics.mean(diffs)
+    se = statistics.stdev(diffs) / math.sqrt(len(diffs)) if len(diffs) > 1 else 0.0
+    wins, losses = sum(d > 0 for d in diffs), sum(d < 0 for d in diffs)
+    per_cat = defaultdict(list)
+    for r, d in zip(rows, diffs):
+        per_cat[r[1]].append(d)
+    graded = [r for r in rows if r[2] is not None]
+    summary = {
+        "old": old_path.name,
+        "new": new_path.name,
+        "questions": len(rows),
+        "identical": len(rows) - len(graded),
+        "old_mean": round(statistics.mean(r[2] for r in graded), 2) if graded else None,
+        "new_mean": round(statistics.mean(r[3] for r in graded), 2) if graded else None,
+        "mean_diff": round(mean, 2),
+        "ci95": [round(mean - 1.96 * se, 2), round(mean + 1.96 * se, 2)],
+        "new_better": wins,
+        "old_better": losses,
+        "ties": len(diffs) - wins - losses,
+        "sign_test_p": round(sign_test_p(wins, losses), 3),
+        "by_category": {c: round(statistics.mean(v), 2) for c, v in sorted(per_cat.items())},
+    }
+    (GRADING / f"{name}.summary.json").write_text(json.dumps(summary, indent=1))
+    print(json.dumps(summary, indent=1))
+    print("\nbiggest changes:")
+    for qid, _, o, n, note in sorted(graded, key=lambda r: abs(r[3] - r[2]), reverse=True)[:10]:
+        print(f"  {qid:12s} old {o:>2} -> new {n:>2}  {note}")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["packet", "score"])
+    ap.add_argument("cmd", choices=["packet", "score", "pair", "pairscore"])
     ap.add_argument("results", type=Path)
+    ap.add_argument("new", type=Path, nargs="?", help="second results file (pair modes)")
     a = ap.parse_args()
-    (packet if a.cmd == "packet" else score)(a.results)
+    if a.cmd in ("pair", "pairscore"):
+        if not a.new:
+            ap.error(f"{a.cmd} needs two results files: old new")
+        (pair_packet if a.cmd == "pair" else pair_score)(a.results, a.new)
+    else:
+        (packet if a.cmd == "packet" else score)(a.results)
 
 
 if __name__ == "__main__":

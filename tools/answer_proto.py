@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 from places_proto import Places, parse_intent
-from retrieve_proto import Pack, compress, fts_query, keywords, named_articles
+from retrieve_proto import Pack, compress, fts_query, is_namesake, keywords, named_articles
 
 ROOT = Path(__file__).resolve().parent.parent
 SYSTEM = (ROOT / "app/src/main/assets/prompts/system.txt").read_text().strip()
@@ -36,7 +36,12 @@ PERSONAL = re.compile(
 
 # ResearchPipeline.Settings defaults.
 MAX_SOURCES, PER_ARTICLE, EVIDENCE_CHARS, PRIOR_WEIGHT, NAMED_BOOST = 6, 2, 450, 0.5, 4.0
+INFOBOX_FACT_CHARS = 200
 SAMPLING = dict(temperature=0.4, top_p=0.95, top_k=20, min_p=0.0, repeat_penalty=1.05, max_tokens=700)
+# Fixed seed: an unchanged prompt gives an unchanged answer, so a before/after comparison
+# (grade.py pair) measures the change instead of sampling luck. Unseeded reruns of identical
+# prompts moved the 4B's paired mean by -0.48 on their own.
+SEED = 1234
 
 
 def overlap(text: str, words) -> int:
@@ -57,28 +62,68 @@ def retrieve(pack: Pack, q: str):
         return []
     named = named_articles(pack, q)
     named_ids = {a[0] for a in named}
-    cands = []
-    for art_id, title, first_chunk, _ in named:
-        sec = pack.db.execute("SELECT section FROM chunk WHERE id = ?", (first_chunk,)).fetchone()[0]
-        cands.append((first_chunk, art_id, title, sec))
+    cands, facts, seen = [], {}, set()
+    for art_id, title, first_chunk, n_chunks in named:
+        cid, sec, fact_line, infobox = lead(pack, title, first_chunk, n_chunks, words)
+        cands.append((cid, art_id, title, sec))
+        facts[cid] = fact_line
+        if infobox is not None:
+            seen.add(infobox)  # its useful lines are already in the lead
     for score, cid, title, sec in pack.search(fts_query(words), limit=MAX_SOURCES * 4, per_article=99,
                                               prior_weight=PRIOR_WEIGHT, boost_articles=named_ids, boost=NAMED_BOOST):
         art = pack.db.execute("SELECT article FROM chunk WHERE id = ?", (cid,)).fetchone()[0]
         cands.append((cid, art, title, sec))
     needed = (len(words) + 1) // 2
-    picked, per, seen = [], {}, set()
+    picked, per = [], {}
     for i, (cid, art, title, sec) in enumerate(cands):
         if cid in seen or per.get(art, 0) >= PER_ARTICLE:
             continue
         # Relevance gate (Evidence.overlap): named articles' leads always pass.
-        if i >= len(named) and overlap(f"{title} {sec} {pack.text(cid)}", words) < needed:
+        if i >= len(named) and (overlap(f"{title} {sec} {pack.text(cid)}", words) < needed
+                                or is_namesake(title, q)):
             continue
         seen.add(cid)
         per[art] = per.get(art, 0) + 1
         picked.append((cid, title, sec))
         if len(picked) >= MAX_SOURCES:
             break
-    return [(i + 1, title, sec, compress(pack.text(cid), words, EVIDENCE_CHARS)) for i, (cid, title, sec) in enumerate(picked)]
+    out = []
+    for i, (cid, title, sec) in enumerate(picked):
+        f = facts.get(cid, "")
+        ev = compress(pack.text(cid), words, EVIDENCE_CHARS - len(f))
+        out.append((i + 1, title, sec, f"{f}\n{ev}" if f else ev))
+    return out
+
+
+def infobox_facts(infobox: str, words, max_chars: int = INFOBOX_FACT_CHARS) -> str:
+    """Evidence.infoboxFacts: the infobox lines that mention a question word. Stricter than overlap():
+    words must match at a word start ("roughly" must not match "through")."""
+    pats = [re.compile(r"\b" + re.escape(w[:5] if len(w) > 5 else w)) for w in words]
+    out = []
+    for line in infobox.splitlines():
+        line = line.strip().lstrip("• ").strip()
+        if not line or not any(p.search(line.lower()) for p in pats):
+            continue
+        if sum(len(l) + 2 for l in out) + len(line) > max_chars:
+            break
+        out.append(line)
+    return "; ".join(out)
+
+
+def lead(pack: Pack, title: str, first_chunk: int, n_chunks: int, words):
+    """ResearchPipeline.lead: a named article's intro, led by its relevant infobox lines. The infobox
+    chunk alone is cut before what matters (Napoleon's never reaches his birth and death dates).
+    Infobox lines count when they mention a question word other than the article's own name.
+    Returns (chunk_id, section, facts line or "", infobox_chunk_id or None)."""
+    sec = pack.db.execute("SELECT section FROM chunk WHERE id = ?", (first_chunk,)).fetchone()[0]
+    if sec != "Infobox" or n_chunks < 2:
+        return first_chunk, sec, "", None
+    intro_sec = pack.db.execute("SELECT section FROM chunk WHERE id = ?", (first_chunk + 1,)).fetchone()[0]
+    if intro_sec == "Infobox":
+        return first_chunk, sec, "", None
+    own = set(keywords(title))
+    facts = infobox_facts(pack.text(first_chunk), [w for w in words if w not in own])
+    return first_chunk + 1, intro_sec, facts, first_chunk
 
 
 # ResearchPipeline.PLACES_HEADER / placesHeader(): the diet sentence only for diet requests.
@@ -139,7 +184,7 @@ def generate(port: int, user: str):
     body = json.dumps({
         "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
         "chat_template_kwargs": {"enable_thinking": False},
-        **SAMPLING,
+        **SAMPLING, "seed": SEED,
     }).encode()
     req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions", body, {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=900) as r:

@@ -185,25 +185,49 @@ class ResearchPipeline(
         val named = (listOfNotNull(listArticle(corpus, question)) + titleMatches(corpus, question))
             .distinctBy { it.id }.take(3)
         val namedIds = named.map { it.id }.toSet()
-        val leads = named.mapNotNull { corpus.chunk(it, 0) }
+        val seen = HashSet<Long>()
+        val facts = HashMap<Long, String>()
+        val leads = named.mapNotNull { lead(corpus, it, words, seen, facts) }
         val candidates = corpus.search(query, limit = settings.maxSources * 4, priorWeight = settings.priorWeight)
             .map { if (it.article in namedIds) it.copy(score = it.score + settings.namedBoost) else it }
             .sortedByDescending { it.score }
 
         val perArticle = HashMap<Long, Int>()
-        val seen = HashSet<Long>()
         // Relevance gate: a passage that shares few of the question's words is noise, and
         // small models tend to answer "the excerpts don't cover this" instead of answering.
         val needed = (words.size + 1) / 2
-        val relevant = candidates.filter { Evidence.overlap("${it.title} ${it.section} ${it.text}", words) >= needed }
+        val relevant = candidates.filter {
+            Evidence.overlap("${it.title} ${it.section} ${it.text}", words) >= needed && !Evidence.isNamesake(it.title, question)
+        }
         val picked = (leads + relevant).filter { p ->
             val n = perArticle.getOrDefault(p.article, 0)
             if (n >= settings.perArticle || !seen.add(p.chunk)) false else { perArticle[p.article] = n + 1; true }
         }.take(settings.maxSources)
 
-        val sources = picked.mapIndexed { i, p -> Source(i + 1, p, Evidence.compress(p.text, words, settings.evidenceChars)) }
+        val sources = picked.mapIndexed { i, p ->
+            val f = facts[p.chunk].orEmpty()
+            val evidence = Evidence.compress(p.text, words, settings.evidenceChars - f.length)
+            Source(i + 1, p, if (f.isEmpty()) evidence else "$f\n$evidence")
+        }
         emit(ResearchEvent.Sources(sources, System.currentTimeMillis() - t0))
         return sources
+    }
+
+    /**
+     * A named article's intro, led by its relevant infobox lines (into [facts], by chunk). The
+     * infobox chunk alone is cut before what matters: Napoleon's never reaches his birth and
+     * death dates. Infobox lines count when they mention a question word other than the
+     * article's own name; the infobox chunk goes into [skip]. Mirrors tools/answer_proto.py.
+     */
+    private suspend fun lead(corpus: Corpus, article: Article, words: List<String>, skip: MutableSet<Long>, facts: MutableMap<Long, String>): Passage? {
+        val first = corpus.chunk(article, 0) ?: return null
+        if (first.section != "Infobox") return first
+        val intro = corpus.chunk(article, 1)?.takeIf { it.section != "Infobox" } ?: return first
+        skip += first.chunk
+        val own = Evidence.keywords(article.title).toSet()
+        Evidence.infoboxFacts(first.text, words.filterNot { it in own }, INFOBOX_FACT_CHARS)
+            .takeIf { it.isNotEmpty() }?.let { facts[intro.chunk] = it }
+        return intro
     }
 
     /**
@@ -212,25 +236,39 @@ class ResearchPipeline(
      */
     private suspend fun titleMatches(corpus: Corpus, question: String, maxN: Int = 5): List<Article> {
         val toks = Evidence.titleTokens(question)
+        val starts = Evidence.sentenceStarts(question)
         val used = BooleanArray(toks.size)
         val found = LinkedHashMap<Long, Article>()
+        val plain = HashSet<Long>()  // everyday-word matches ("North", "Time"), kept only if nothing specific matched
         for (n in minOf(maxN, toks.size) downTo 1) {
             for (i in 0..toks.size - n) {
                 if ((i until i + n).any { used[it] }) continue
                 val words = toks.subList(i, i + n)
                 if (words.all(Evidence::isStop) || (n == 1 && words[0].length < 3)) continue
                 val phrase = words.joinToString(" ")
-                val candidates = if (phrase.length > 3 && phrase.endsWith("s", ignoreCase = true)) {
-                    listOf(phrase, phrase.dropLast(1))  // "tardigrades" -> "tardigrade"
-                } else {
-                    listOf(phrase)
+                val candidates = when {
+                    phrase.endsWith("'s", ignoreCase = true) -> listOf(phrase.dropLast(2))  // "Ethereum's" -> "Ethereum"
+                    phrase.length > 3 && phrase.endsWith("s", ignoreCase = true) ->
+                        listOf(phrase, phrase.dropLast(1))  // "tardigrades" -> "tardigrade"
+                    else -> listOf(phrase)
                 }
-                val hit = candidates.firstNotNullOfOrNull { corpus.findArticle(it) } ?: continue
-                if (hit.prior < COMMON_MIN_PRIOR && everyday(corpus, words, i == 0)) continue
-                if (found.putIfAbsent(hit.id, hit) == null) (i until i + n).forEach { used[it] = true }
+                for (c in candidates) {
+                    val hit = corpus.findArticle(c) ?: continue
+                    if (hit.id in found) continue
+                    val common = everyday(corpus, words, starts.subList(i, i + n))
+                    val obscure = hit.prior < COMMON_MIN_PRIOR
+                    if (common && obscure) continue
+                    found[hit.id] = hit
+                    // Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
+                    if (common || (n == 1 && obscure && !isNamed(words[0], starts[i]))) plain += hit.id
+                    (i until i + n).forEach { used[it] = true }
+                    break
+                }
             }
         }
-        return found.values.toList()
+        // "Which is further north: Rome or New York?" is about Rome and New York, not "North";
+        // "why do we have seasons" has nothing else, so "Season" stays.
+        return if (plain.size < found.size) found.values.filterNot { it.id in plain } else found.values.toList()
     }
 
     /**
@@ -261,13 +299,14 @@ class ResearchPipeline(
      * common. Such a title counts only for a real topic ("Season", "Age of the universe"),
      * not an obscure one ("Determine", "Broad Strokes"). Mirrors tools/retrieve_proto.py.
      */
-    private suspend fun everyday(corpus: Corpus, words: List<String>, atStart: Boolean): Boolean {
-        val named = words.withIndex().any { (k, w) ->
-            w.drop(1).any(Char::isUpperCase) || (w.first().isUpperCase() && !(atStart && k == 0))
-        }
-        if (named) return false
+    private suspend fun everyday(corpus: Corpus, words: List<String>, starts: List<Boolean>): Boolean {
+        if (words.indices.any { isNamed(words[it], starts[it]) }) return false
         return words.filterNot(Evidence::isStop).all { corpus.docFreq(it, COMMON_DF + 1) > COMMON_DF }
     }
+
+    /** Written as a name: capitalized mid-sentence, or any inner capital ("GPS", "mRNA"). */
+    private fun isNamed(word: String, sentenceStart: Boolean) =
+        word.drop(1).any(Char::isUpperCase) || (word.first().isUpperCase() && !sentenceStart)
 
     companion object {
         /** Mirrored in tools/answer_proto.py. */
@@ -285,6 +324,7 @@ class ResearchPipeline(
         private val EXPLAIN_QUERY = Regex("^\\s*(why|how)\\b|\\bcaus", RegexOption.IGNORE_CASE)
         private val PLACE_STOP = setOf("and", "or", "for", "with", "that", "which", "what", "to", "is", "are")
         private const val COMMON_DF = 20_000
+        private const val INFOBOX_FACT_CHARS = 200
         private val COMMON_MIN_PRIOR = kotlin.math.ln(1.0 + 3_000)  // prior = ln(1 + monthly views)
 
         fun formatDistance(m: Double): String =

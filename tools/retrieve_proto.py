@@ -25,7 +25,7 @@ where which who whom why will with would you your about tell explain describe gi
 """.split())
 
 WORD_RE = re.compile(r"[\w][\w'\-]*", re.UNICODE)
-SENT_RE = re.compile(r"(?<=[.!?])\s+")
+SENT_RE = re.compile(r"(?<=[.!?])\s+|\s*\n\s*")  # infobox lines are sentences too
 
 
 def keywords(question: str) -> list[str]:
@@ -113,9 +113,9 @@ COMMON_DF = 20_000
 COMMON_MIN_VIEWS = 3_000
 
 
-def everyday(pack: "Pack", words: list[str], at_start: bool) -> bool:
-    """No name-like word and every content word common."""
-    if any(is_named(w, at_start and k == 0) for k, w in enumerate(words)):
+def everyday(pack: "Pack", words: list[str], starts: list[bool]) -> bool:
+    """No name-like word and every content word common. starts[k]: words[k] begins a sentence."""
+    if any(is_named(w, s) for w, s in zip(words, starts)):
         return False
     return all(doc_freq(pack, w) > COMMON_DF for w in words if w.lower() not in STOP)
 
@@ -144,8 +144,10 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
     match aren't tried again ("Roman Empire" beats "Roman" and "Empire").
     """
     toks = [t.strip(".'-") for t in TOKEN_RE.findall(question)]
+    starts = sentence_starts(question)
     used = [False] * len(toks)
     found, seen = [], set()
+    plain = set()  # everyday-word matches ("North", "Time"), kept only if nothing specific matched
     for n in range(min(max_n, len(toks)), 0, -1):
         for i in range(len(toks) - n + 1):
             if any(used[i:i + n]):
@@ -155,19 +157,43 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                 continue
             phrase = " ".join(words)
             cands = [phrase]
-            if phrase.lower().endswith("s") and len(phrase) > 3:
+            if phrase.lower().endswith("'s"):
+                cands = [phrase[:-2]]  # "Ethereum's" -> "Ethereum"
+            elif phrase.lower().endswith("s") and len(phrase) > 3:
                 cands.append(phrase[:-1])  # "tardigrades" -> "tardigrade"
             for c in cands:
                 row = pack.find_article(c)
-                if row and row[4] < math.log1p(COMMON_MIN_VIEWS) and everyday(pack, words, i == 0):
+                if not row or row[0] in seen:
                     continue
-                if row and row[0] not in seen:
-                    found.append(row[:4])
-                    seen.add(row[0])
-                    for j in range(i, i + n):
-                        used[j] = True
-                    break
+                common = everyday(pack, words, starts[i:i + n])
+                obscure = row[4] < math.log1p(COMMON_MIN_VIEWS)
+                if common and obscure:
+                    continue
+                found.append(row[:4])
+                seen.add(row[0])
+                # Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
+                if common or (n == 1 and obscure and not is_named(words[0], starts[i])):
+                    plain.add(row[0])
+                for j in range(i, i + n):
+                    used[j] = True
+                break
+    # "Which is further north: Rome or New York?" is about Rome and New York, not "North";
+    # "why do we have seasons" has nothing else, so "Season" stays.
+    if len(plain) < len(found):
+        found = [r for r in found if r[0] not in plain]
     return found
+
+
+def sentence_starts(question: str) -> list[bool]:
+    """Per TOKEN_RE token: does it begin a sentence? There a capital doesn't make a name
+    ("Could Napoleon have met Beethoven? Check their lifetimes" is not about the film "Check")."""
+    out, prev_end, prev_tok = [], 0, ""
+    for m in TOKEN_RE.finditer(question):
+        gap = question[prev_end:m.start()]
+        out.append(not out or any(c in gap for c in ".!?")
+                   or (prev_tok.endswith(".") and prev_tok.count(".") == 1))  # "cats. Dogs", not "U.S. Army"
+        prev_end, prev_tok = m.end(), m.group()
+    return out
 
 
 LIST_QUERY = re.compile(r"((?:[^\W\d_][\w-]*\s+){0,2}[^\W\d_][\w-]*s)\s+(in|of|near|around)\s+(?:the\s+)?([^\W\d_][\w'\- ]*)")
@@ -209,6 +235,23 @@ def named_articles(pack: "Pack", question: str, k: int = 3):
             out.append(row)
             seen.add(row[0])
     return out[:k]
+
+
+QUALIFIER = re.compile(r"^(.*?)\s*\(([^()]*)\)\s*$")
+NON_WORD = re.compile(r"[^\w]+")
+
+
+def is_namesake(title: str, question: str) -> bool:
+    """Evidence.isNamesake: "Rome, New York" (or "X (Rome, New York)") when the question names
+    Rome and New York separately ("Rome or New York?"): a namesake town, not what was asked."""
+    q = f" {NON_WORD.sub(' ', question.lower())} "
+    m = QUALIFIER.match(title)
+    for part in ([m.group(1), m.group(2)] if m else [title]):
+        names = [NON_WORD.sub(" ", n.lower()).strip() for n in part.split(",")]
+        if (len(names) == 2 and all(n and f" {n} " in q for n in names)
+                and f" {names[0]} {names[1]} " not in q):
+            return True
+    return False
 
 
 def compress(text: str, words: list[str], max_chars=500) -> str:

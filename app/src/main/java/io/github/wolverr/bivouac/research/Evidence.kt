@@ -14,7 +14,7 @@ object Evidence {
     """.trim().split(Regex("\\s+")).toHashSet()
 
     private val WORD = Regex("[\\p{L}\\p{N}][\\p{L}\\p{N}'\\-]*")
-    private val SENTENCE_END = Regex("(?<=[.!?])\\s+")
+    private val SENTENCE_END = Regex("(?<=[.!?])\\s+|\\s*\\n\\s*")  // infobox lines are sentences too
 
     fun keywords(question: String): List<String> =
         WORD.findAll(question.lowercase())
@@ -45,6 +45,42 @@ object Evidence {
      */
     fun titleTokens(question: String): List<String> = TOKEN.findAll(question).map { it.value.trim('.', '\'', '-') }.toList()
 
+    /**
+     * Per [titleTokens] token: does it begin a sentence? There a capital doesn't make a name
+     * ("Could Napoleon have met Beethoven? Check their lifetimes" is not about the film "Check").
+     */
+    fun sentenceStarts(question: String): List<Boolean> {
+        val out = ArrayList<Boolean>()
+        var prevEnd = 0
+        var prev = ""
+        for (m in TOKEN.findAll(question)) {
+            val gap = question.substring(prevEnd, m.range.first)
+            out += out.isEmpty() || gap.any { it in ".!?" } ||
+                (prev.endsWith('.') && prev.count { it == '.' } == 1)  // "cats. Dogs", not "U.S. Army"
+            prevEnd = m.range.last + 1
+            prev = m.value
+        }
+        return out
+    }
+
+    /**
+     * The infobox lines that mention a question word, joined with "; ", at most [maxChars].
+     * Stricter than [overlap]: words match at a word start ("roughly" must not match "through").
+     */
+    fun infoboxFacts(infobox: String, words: List<String>, maxChars: Int): String {
+        val patterns = words.map { Regex("\\b" + Regex.escape(if (it.length > 5) it.take(5) else it)) }
+        val out = ArrayList<String>()
+        var used = 0
+        for (raw in infobox.lines()) {
+            val line = raw.trim().trimStart('•', ' ')
+            if (line.isEmpty() || patterns.none { it.containsMatchIn(line.lowercase()) }) continue
+            if (used + line.length > maxChars) break
+            out += line
+            used += line.length + 2
+        }
+        return out.joinToString("; ")
+    }
+
     fun isStop(word: String) = word.lowercase() in STOP
 
     /** A token's word parts ("don't" -> don, t): punctuated tokens would be FTS phrase queries. */
@@ -57,6 +93,24 @@ object Evidence {
     fun overlap(text: String, words: List<String>): Int {
         val low = text.lowercase()
         return words.count { w -> low.contains(if (w.length > 5) w.take(5) else w) }
+    }
+
+    private val QUALIFIER = Regex("^(.*?)\\s*\\(([^()]*)\\)\\s*$")
+
+    /**
+     * "Rome, New York" (or "Capitol Theatre (Rome, New York)") when the question names Rome
+     * and New York separately, as in "Rome or New York?": a namesake town, not what was asked.
+     * Such articles mention both names, so BM25 ranks them high. Mirrors tools/retrieve_proto.py.
+     */
+    fun isNamesake(title: String, question: String): Boolean {
+        val q = " ${question.lowercase().replace(NON_WORD, " ")} "
+        val m = QUALIFIER.find(title)
+        val parts = if (m != null) listOf(m.groupValues[1], m.groupValues[2]) else listOf(title)
+        return parts.any { part ->
+            val names = part.split(",").map { it.lowercase().replace(NON_WORD, " ").trim() }
+            names.size == 2 && names.all { it.isNotEmpty() && " $it " in q } &&
+                " ${names[0]} ${names[1]} " !in q  // asked about "Rome, New York" itself
+        }
     }
 
     /** Keeps the sentences that mention the most question words, in their original order. */
