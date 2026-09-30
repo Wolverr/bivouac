@@ -34,7 +34,10 @@ def keywords(question: str) -> list[str]:
 
 def fts_query(words: list[str]) -> str:
     # Quote every term so FTS5 syntax characters in user text can't break the query.
-    return " OR ".join(f'"{w}"' for w in words)
+    # Split on punctuation first: "heat-pump" or "kazakhstan's" would otherwise be a
+    # phrase query, which FTS5 rejects when the index has detail=column.
+    terms = [t for w in words for t in re.split(r"[^\w]+", w) if len(t) > 1 and t not in STOP]
+    return " OR ".join(f'"{t}"' for t in dict.fromkeys(terms))
 
 
 class Pack:
@@ -51,15 +54,15 @@ class Pack:
             self.cache[block] = self.dctx.decompress(data)
         return self.cache[block][off:off + ln].decode()
 
-    def search(self, q: str, limit=8, per_article=2, prior_weight=0.5, candidates=200):
+    def search(self, q: str, limit=8, per_article=2, prior_weight=0.5, candidates=200, boost_articles=frozenset(), boost=4.0):
         rows = self.db.execute(
             "SELECT f.id, f.s, c.article, c.section, a.title, a.prior FROM "
             "(SELECT rowid AS id, bm25(fts, 6.0, 2.0, 1.0) AS s FROM fts WHERE fts MATCH ? ORDER BY s LIMIT ?) f "
             "JOIN chunk c ON c.id=f.id JOIN article a ON a.id=c.article",
             (q, candidates),
         ).fetchall()
-        scored = sorted(((-s + prior_weight * prior, cid, title, sec) for cid, s, art, sec, title, prior in rows),
-                        reverse=True)
+        scored = sorted(((-s + prior_weight * prior + (boost if art in boost_articles else 0.0), cid, title, sec)
+                         for cid, s, art, sec, title, prior in rows), reverse=True)
         out, per = [], {}
         for score, cid, title, sec in scored:
             if per.get(title, 0) >= per_article:
@@ -69,6 +72,43 @@ class Pack:
             if len(out) >= limit:
                 break
         return out
+
+
+TOKEN_RE = re.compile(r"[\w][\w'\-.]*", re.UNICODE)
+
+
+def title_matches(pack: "Pack", question: str, max_n: int = 5):
+    """Articles whose title equals a phrase of the question, longest phrases first.
+
+    Returns [(article_id, title, first_chunk, n_chunks)]. Words inside a longer
+    match aren't tried again ("Roman Empire" beats "Roman" and "Empire").
+    """
+    toks = [t.strip(".'-") for t in TOKEN_RE.findall(question)]
+    used = [False] * len(toks)
+    found, seen = [], set()
+    for n in range(min(max_n, len(toks)), 0, -1):
+        for i in range(len(toks) - n + 1):
+            if any(used[i:i + n]):
+                continue
+            words = toks[i:i + n]
+            if all(w.lower() in STOP for w in words) or (n == 1 and len(words[0]) < 3):
+                continue
+            phrase = " ".join(words)
+            cands = [phrase]
+            if phrase.lower().endswith("s") and len(phrase) > 3:
+                cands.append(phrase[:-1])  # "tardigrades" -> "tardigrade"
+            for c in cands:
+                row = pack.db.execute(
+                    "SELECT id, title, first_chunk, n_chunks FROM article WHERE norm_title = ? ORDER BY prior DESC LIMIT 1",
+                    (" ".join(c.casefold().split()),),
+                ).fetchone()
+                if row and row[0] not in seen:
+                    found.append(row)
+                    seen.add(row[0])
+                    for j in range(i, i + n):
+                        used[j] = True
+                    break
+    return found
 
 
 def compress(text: str, words: list[str], max_chars=500) -> str:

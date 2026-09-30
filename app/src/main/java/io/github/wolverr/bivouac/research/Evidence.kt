@@ -23,8 +23,29 @@ object Evidence {
             .distinct()
             .toList()
 
-    /** Quoted OR-query: FTS5 syntax in user text can't break it, and BM25 rewards matching more terms. */
-    fun ftsQuery(words: List<String>): String = words.joinToString(" OR ") { "\"${it.replace("\"", "")}\"" }
+    private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
+
+    /**
+     * Quoted OR-query: FTS5 syntax in user text can't break it, and BM25 rewards
+     * matching more terms. Words are split on punctuation first: "heat-pump" or
+     * "kazakhstan's" would otherwise be phrase queries, which FTS5 rejects when
+     * the index has detail=column.
+     */
+    fun ftsQuery(words: List<String>): String =
+        words.flatMap { it.split(NON_WORD) }
+            .filter { it.length > 1 && it !in STOP }
+            .distinct()
+            .joinToString(" OR ") { "\"$it\"" }
+
+    private val TOKEN = Regex("[\\p{L}\\p{N}][\\p{L}\\p{N}'\\-.]*")
+
+    /**
+     * Phrases of the question to try as exact article titles, longest first,
+     * as index ranges into [titleTokens].
+     */
+    fun titleTokens(question: String): List<String> = TOKEN.findAll(question).map { it.value.trim('.', '\'', '-') }.toList()
+
+    fun isStop(word: String) = word.lowercase() in STOP
 
     /** Keeps the sentences that mention the most question words, in their original order. */
     fun compress(text: String, words: List<String>, maxChars: Int): String {

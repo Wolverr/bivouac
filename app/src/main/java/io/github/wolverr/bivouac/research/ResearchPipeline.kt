@@ -40,6 +40,8 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
         val perArticle: Int = 2,
         val evidenceChars: Int = 450,
         val priorWeight: Double = 0.5,
+        /** Score bonus for passages from articles named in the question. */
+        val namedBoost: Double = 4.0,
         /** Rough prompt budget in characters (~4 chars/token) for history + new turn. */
         val historyChars: Int = 9_000,
         val sampling: Sampling = Sampling(temperature = 0.4f, maxTokens = 700),
@@ -110,17 +112,51 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
         val query = Evidence.ftsQuery(words)
         emit(ResearchEvent.Searching(query))
         val t0 = System.currentTimeMillis()
+
+        // Articles named in the question lead with their intro: that's where definitions live.
+        val named = titleMatches(corpus, question).take(3)
+        val namedIds = named.map { it.id }.toSet()
+        val leads = named.mapNotNull { corpus.chunk(it, 0) }
         val candidates = corpus.search(query, limit = settings.maxSources * 4, priorWeight = settings.priorWeight)
+            .map { if (it.article in namedIds) it.copy(score = it.score + settings.namedBoost) else it }
+            .sortedByDescending { it.score }
 
         val perArticle = HashMap<Long, Int>()
-        val picked = candidates.filter { p ->
+        val seen = HashSet<Long>()
+        val picked = (leads + candidates).filter { p ->
             val n = perArticle.getOrDefault(p.article, 0)
-            if (n >= settings.perArticle) false else { perArticle[p.article] = n + 1; true }
+            if (n >= settings.perArticle || !seen.add(p.chunk)) false else { perArticle[p.article] = n + 1; true }
         }.take(settings.maxSources)
 
         val sources = picked.mapIndexed { i, p -> Source(i + 1, p, Evidence.compress(p.text, words, settings.evidenceChars)) }
         emit(ResearchEvent.Sources(sources, System.currentTimeMillis() - t0))
         return sources
+    }
+
+    /**
+     * Articles whose title is a phrase of the question, longest phrases first;
+     * words inside a longer match aren't tried again ("Roman Empire" beats "Roman").
+     */
+    private suspend fun titleMatches(corpus: Corpus, question: String, maxN: Int = 5): List<Article> {
+        val toks = Evidence.titleTokens(question)
+        val used = BooleanArray(toks.size)
+        val found = LinkedHashMap<Long, Article>()
+        for (n in minOf(maxN, toks.size) downTo 1) {
+            for (i in 0..toks.size - n) {
+                if ((i until i + n).any { used[it] }) continue
+                val words = toks.subList(i, i + n)
+                if (words.all(Evidence::isStop) || (n == 1 && words[0].length < 3)) continue
+                val phrase = words.joinToString(" ")
+                val candidates = if (phrase.length > 3 && phrase.endsWith("s", ignoreCase = true)) {
+                    listOf(phrase, phrase.dropLast(1))  // "tardigrades" -> "tardigrade"
+                } else {
+                    listOf(phrase)
+                }
+                val hit = candidates.firstNotNullOfOrNull { corpus.findArticle(it) } ?: continue
+                if (found.putIfAbsent(hit.id, hit) == null) (i until i + n).forEach { used[it] = true }
+            }
+        }
+        return found.values.toList()
     }
 
     companion object {
