@@ -63,9 +63,21 @@ class ResearchPipeline(
         /** Rough prompt budget in characters (~4 chars/token) for history + new turn. */
         val historyChars: Int = 9_000,
         val sampling: Sampling = Sampling(temperature = 0.4f, maxTokens = 700),
-    )
+    ) {
+        companion object {
+            /**
+             * Fits the prompt to the loaded context: the answer (700) and system prompt
+             * (~400 tokens) come first, the rest at ~3 chars/token goes to history + excerpts.
+             * 4096 gives the defaults; small contexts also read fewer sources.
+             */
+            fun forContext(nCtx: Int) = Settings(
+                maxSources = if (nCtx < 3072) 3 else 6,
+                historyChars = maxOf(0, (nCtx - 1100) * 3),
+            )
+        }
+    }
 
-    fun answer(question: String, conversation: Conversation, settings: Settings = Settings()): Flow<ResearchEvent> = flow {
+    fun answer(question: String, conversation: Conversation, settings: Settings = Settings.forContext(llm.contextSize)): Flow<ResearchEvent> = flow {
         val decision = Router.decide(question, !conversation.isEmpty)
         emit(ResearchEvent.Routed(decision))
 

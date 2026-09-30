@@ -18,6 +18,12 @@ data class DeviceProfile(
     val totalRamGb: Double get() = totalRamBytes / 1e9
 
     companion object {
+        /** RAM Android could hand out right now without killing foreground work. */
+        fun availRamBytes(context: Context): Long {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            return ActivityManager.MemoryInfo().also(am::getMemoryInfo).availMem
+        }
+
         fun detect(context: Context): DeviceProfile {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             val mem = ActivityManager.MemoryInfo().also(am::getMemoryInfo)

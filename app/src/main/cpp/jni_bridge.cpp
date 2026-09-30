@@ -12,6 +12,7 @@
 #include "corpus.h"
 #include "engine.h"
 #include "json_util.h"
+#include "model_probe.h"
 #include "sql_pack.h"
 
 static Engine g_engine;
@@ -89,6 +90,11 @@ JNIEXPORT void JNICALL JNI_FN(nativeCancel)(JNIEnv *, jobject) {
 JNIEXPORT jbyteArray JNICALL JNI_FN(nativeModelInfo)(JNIEnv * env, jobject) {
     std::lock_guard<std::mutex> lock(g_mutex);
     return to_bytes(env, g_engine.model_info_json());
+}
+
+// Header-only read, safe while another model is loaded.
+JNIEXPORT jbyteArray JNICALL JNI_FN(nativeProbe)(JNIEnv * env, jobject, jbyteArray path) {
+    return to_bytes(env, probe_model_json(to_string(env, path)));
 }
 
 JNIEXPORT jbyteArray JNICALL JNI_FN(nativeBench)(JNIEnv * env, jobject, jint n_prompt, jint n_gen) {

@@ -59,6 +59,14 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         Button(onClick = { picker.launch(arrayOf("*/*")) }, enabled = s.busy == null) {
             Text("Add downloaded files (.gguf, .db)")
         }
+        s.notice?.let { msg ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text(msg, style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = vm::dismissNotice) { Text("OK") }
+                }
+            }
+        }
         s.busy?.let { Text(it) }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
@@ -84,6 +92,7 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                         ),
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    s.loadNote?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     Text(info.system, style = MaterialTheme.typography.labelSmall)
                     OutlinedButton(onClick = vm::bench, enabled = s.busy == null) { Text("Benchmark (256 prompt / 64 gen)") }
                     s.benchResult?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
@@ -93,7 +102,10 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 
         Text("Performance (applies on next Load)", style = MaterialTheme.typography.titleMedium)
         SettingRow("Use all cores for reading", "Faster reading of sources; answers still use the fast cores", s.allCores, vm::setAllCores)
-        SettingRow("Repack weights", "Faster math, but uses extra RAM about the model's size", s.repack, vm::setRepack)
+        SettingRow("Automatic memory settings", "Chooses context length and repacking from the RAM free when loading", s.autoMemory, vm::setAutoMemory)
+        if (!s.autoMemory) {
+            SettingRow("Repack weights", "Faster math, but uses extra RAM about the model's size", s.repack, vm::setRepack)
+        }
 
         Text("Knowledge packs", style = MaterialTheme.typography.titleMedium)
         if (s.packs.isEmpty()) {

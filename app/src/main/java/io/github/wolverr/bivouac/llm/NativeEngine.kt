@@ -31,6 +31,7 @@ internal object NativeEngine {
     ): ByteArray
     external fun nativeCancel()
     external fun nativeModelInfo(): ByteArray
+    external fun nativeProbe(path: ByteArray): ByteArray
     external fun nativeBench(nPrompt: Int, nGen: Int): ByteArray
     external fun nativeComplete(
         prefix: ByteArray,

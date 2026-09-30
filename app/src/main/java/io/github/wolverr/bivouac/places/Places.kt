@@ -42,7 +42,10 @@ class Places {
     private val json = Json { ignoreUnknownKeys = true }
     private var categories: List<Pair<Int, String>> = emptyList()
 
-    /** Last word of every common category ("restaurant", "pharmacy"): what makes a question about places. */
+    /**
+     * Last word of every common category ("restaurant", "pharmacy"): what makes a question
+     * about places. For generic endings the word before counts too: grocery_store -> "grocery".
+     */
     var placeNouns: Set<String> = emptySet()
         private set
 
@@ -55,8 +58,7 @@ class Places {
         val rows = query("SELECT id, name, n FROM category")
         categories = rows.map { (it[0] as Number).toInt() to it[1] as String }
         placeNouns = rows.filter { (it[2] as Number).toInt() >= 200 }
-            .map { (it[1] as String).substringAfterLast('_') }
-            .filter { it.length > 2 }
+            .flatMap { placeNounsOf(it[1] as String) }
             .toSet()
         this@Places.path = path
         Result.success(Unit)
@@ -95,9 +97,12 @@ class Places {
      * named that way in the places data ("Firenze").
      */
     suspend fun geocode(phrase: String, corpus: Corpus?): GeoPoint? {
+        // "Shinjuku Station that is open late" -> also try "Shinjuku Station".
+        val core = phrase.split(CLAUSE, limit = 2)[0].trim()
         val candidates = buildList {
             add(phrase)
-            phrase.split(Regex("\\s+in\\s+|,\\s*")).map { it.trim() }.filter { it.isNotEmpty() }.reversed().forEach(::add)
+            add(core)
+            core.split(Regex("\\s+in\\s+|,\\s*")).map { it.trim() }.filter { it.isNotEmpty() }.reversed().forEach(::add)
         }.distinct()
         for (c in candidates) {
             val article = corpus?.findArticle(c) ?: continue
@@ -178,6 +183,16 @@ class Places {
     }
 
     companion object {
+        private val GENERIC_ENDINGS = setOf("store", "shop", "station", "center", "centre", "office")
+        private val CLAUSE = Regex("\\s+(?:and|that|which|where|with|for|so|because|to)\\s+|[;:]")
+
+        fun placeNounsOf(category: String): List<String> {
+            val parts = category.split('_')
+            val last = parts.last()
+            val before = if (last in GENERIC_ENDINGS && parts.size >= 2) listOf(parts[parts.size - 2]) else emptyList()
+            return (listOf(last) + before).filter { it.length > 2 }
+        }
+
         private val DECIMAL_COORDS = Regex("(\\d+(?:\\.\\d+)?)°\\s*([NS])\\s+(\\d+(?:\\.\\d+)?)°\\s*([EW])")
 
         /** "Coordinates: 43°46′23″N 11°15′22″E / 43.77306°N 11.25611°E" -> (43.77306, 11.25611). */

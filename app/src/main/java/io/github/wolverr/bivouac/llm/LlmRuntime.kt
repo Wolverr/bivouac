@@ -70,6 +70,12 @@ class LlmRuntime private constructor(context: Context) {
     private val llmThread: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val json = Json { ignoreUnknownKeys = true }
     val device: DeviceProfile = DeviceProfile.detect(context)
+    val crashGuard = CrashGuard(context)
+    private val appContext = context.applicationContext
+
+    /** Context size of the loaded model, for sizing prompts. */
+    @Volatile var contextSize: Int = 4096
+        private set
 
     init {
         NativeEngine.nativeInit(context.applicationInfo.nativeLibraryDir.toByteArray())
@@ -92,11 +98,31 @@ class LlmRuntime private constructor(context: Context) {
         val err = NativeEngine.nativeLoad(
             path.toByteArray(), opts.nCtx, opts.nBatch, device.bigCores, batchCpus, opts.repack,
         ).decodeToString()
-        if (err.isNotEmpty()) Result.failure(IllegalStateException(err))
-        else Result.success(json.decodeFromString<ModelInfo>(NativeEngine.nativeModelInfo().decodeToString()))
+        if (err.isNotEmpty()) return@withContext Result.failure(IllegalStateException(err))
+        val info = json.decodeFromString<ModelInfo>(NativeEngine.nativeModelInfo().decodeToString())
+        contextSize = info.n_ctx
+        Result.success(info)
     }
 
     suspend fun unload() = withContext(llmThread) { NativeEngine.nativeUnload() }
+
+    /** Reads only the model's header; fast, and fine while another model is loaded. */
+    suspend fun probe(path: String): ModelProbe = withContext(Dispatchers.IO) {
+        json.decodeFromString<ModelProbe>(NativeEngine.nativeProbe(path.toByteArray()).decodeToString())
+    }
+
+    /**
+     * Unloads the current model, then picks settings for [path] from the RAM free now.
+     * Fails with a readable message when the model can't fit.
+     */
+    suspend fun planLoad(path: String, fileBytes: Long, safety: Double): Result<MemoryPlanner.Plan> {
+        val probe = probe(path)
+        if (probe.error.isNotEmpty()) return Result.failure(IllegalStateException(probe.error))
+        unload()
+        val avail = DeviceProfile.availRamBytes(appContext)
+        return MemoryPlanner.plan(fileBytes, probe, avail, safety)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException(MemoryPlanner.tooBig(fileBytes, probe, avail)))
+    }
 
     suspend fun formatChat(system: String, turns: List<ChatTurn>, thinking: Boolean = false): String =
         withContext(llmThread) {

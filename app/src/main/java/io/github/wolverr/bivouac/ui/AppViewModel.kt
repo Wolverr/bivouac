@@ -44,6 +44,12 @@ data class LibraryState(
     val benchResult: String? = null,
     val allCores: Boolean = true,
     val repack: Boolean = true,
+    /** Pick context size and repacking from free RAM at load time. */
+    val autoMemory: Boolean = true,
+    /** How the loaded model was configured (auto mode). */
+    val loadNote: String? = null,
+    /** Shown once after Android killed the app while it was busy with a model. */
+    val notice: String? = null,
 )
 
 /** One question and its answer in the conversation. */
@@ -94,6 +100,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             packs = packs.list(),
             allCores = prefs.getBoolean("all_cores_reading", true),
             repack = prefs.getBoolean("repack", true),
+            autoMemory = prefs.getBoolean("auto_memory", true),
+            notice = runtime.crashGuard.previous?.let { c ->
+                "Bivouac was stopped while ${c.phase}${if (c.lowMemory) ", probably because the phone ran out of memory" else ""}. " +
+                    "The next load of that model uses smaller memory settings."
+            },
         ),
     )
     val library: StateFlow<LibraryState> = _library.asStateFlow()
@@ -127,9 +138,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun loadModel(file: LibFile) = viewModelScope.launch {
         _library.update { it.copy(busy = "Loading ${file.name}…", error = null, benchResult = null) }
         val lib = _library.value
-        runtime.load(models.path(file), LlmRuntime.LoadOptions(allCores = lib.allCores, repack = lib.repack))
-            .onSuccess { info -> _library.update { it.copy(loadedModel = file.id, modelInfo = info) } }
-            .onFailure { e -> _library.update { it.copy(loadedModel = null, modelInfo = null, error = e.message) } }
+        val path = models.path(file)
+        var opts = LlmRuntime.LoadOptions(allCores = lib.allCores, repack = lib.repack)
+        var note: String? = null
+        if (lib.autoMemory) {
+            val plan = runtime.planLoad(path, file.size, runtime.crashGuard.safety(file.id)).getOrElse { e ->
+                _library.update { it.copy(busy = null, loadedModel = null, modelInfo = null, error = e.message) }
+                return@launch
+            }
+            opts = opts.copy(nCtx = plan.nCtx, repack = plan.repack)
+            note = plan.note
+        }
+        runtime.crashGuard.begin(file.id, "loading ${file.name}", note ?: "manual: repack=${opts.repack}")
+        runtime.load(path, opts)
+            .onSuccess { info -> _library.update { it.copy(loadedModel = file.id, modelInfo = info, loadNote = note) } }
+            .onFailure { e -> _library.update { it.copy(loadedModel = null, modelInfo = null, loadNote = null, error = e.message) } }
+        runtime.crashGuard.end()
         _library.update { it.copy(busy = null) }
     }
 
@@ -178,6 +202,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _library.update { it.copy(allCores = on) }
     }
 
+    fun setAutoMemory(on: Boolean) {
+        prefs.edit().putBoolean("auto_memory", on).apply()
+        _library.update { it.copy(autoMemory = on) }
+    }
+
+    fun dismissNotice() = _library.update { it.copy(notice = null) }
+
     fun setRepack(on: Boolean) {
         prefs.edit().putBoolean("repack", on).apply()
         _library.update { it.copy(repack = on) }
@@ -208,7 +239,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         _ask.update { it.copy(input = "", running = true, error = null, turns = it.turns + TurnUi(q, status = "Thinking…")) }
+        val modelId = _library.value.loadedModel!!
         askJob = viewModelScope.launch {
+            runtime.crashGuard.begin(modelId, "answering", "ctx ${runtime.contextSize}")
             try {
                 pipeline.answer(q, conversation).collect { ev ->
                     when (ev) {
@@ -227,8 +260,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         is ResearchEvent.Llm -> when (val g = ev.event) {
                             is GenEvent.Prefill -> updateLast { it.copy(prefill = g.done to g.total) }
                             is GenEvent.Token -> updateLast { it.copy(answer = it.answer + g.text, status = null) }
-                            is GenEvent.Done -> updateLast {
-                                it.copy(stats = g.stats, error = g.stats.error.ifEmpty { null }, status = null)
+                            is GenEvent.Done -> {
+                                if (g.stats.error.isEmpty()) runtime.crashGuard.recovered(modelId)
+                                updateLast { it.copy(stats = g.stats, error = g.stats.error.ifEmpty { null }, status = null) }
                             }
                         }
                     }
@@ -238,6 +272,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 updateLast { it.copy(error = e.message) }
             } finally {
+                runtime.crashGuard.end()
                 _ask.update { it.copy(running = false) }
                 if (_ask.value.turns.isNotEmpty()) updateLast { it.copy(status = null) }
             }

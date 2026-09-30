@@ -22,9 +22,9 @@ Dev machine: home Windows PC, WSL2 Ubuntu-24.04, repo /home/nicolas/bivouac (Cla
 the Windows side and reaches WSL with `wsl -e bash -lc ...`; editing through
 \\\\wsl.localhost drops the exec bit on .sh files, so re-run `chmod +x tools/*.sh`).
 
-Running as systemd user services (check `tools/status.sh`):
-- bivouac-wiki: FineWiki download -> pageviews -> build out/wiki.db (full pack)
-- bivouac-places: Overture download -> build out/places.db
+Running as a systemd user service (check `tools/status.sh`):
+- bivouac-wiki: FineWiki download (done, 13 GB) -> pageviews (5.6 GB dump) -> build out/wiki.db (~2 h)
+Done: out/places.db (30.0 M places, 167,710 localities, 5.3 GB).
 Done: 7 candidate models in ~/models; llama-server for the PC at ~/llama-pc/bin.
 Eval: eval/questions.jsonl (60, 48 with gold articles), eval/baseline_frontier_web.jsonl
 (frontier + web answers, done), tools/answer_proto.py (PC harness), tools/grade.py (blind).
@@ -36,8 +36,13 @@ Next steps, in order:
    `~/llama-pc/bin/llama-server -m <gguf> -c 8192 -t 16 --port 8088 --jinja`, run
    `tools/answer_proto.py --db out/wiki.db --name <model>`, then `tools/grade.py packet ...`,
    have a grader agent fill eval/grading/<name>.scores.jsonl (GRADER_INSTRUCTIONS.txt), `grade.py score`.
-3. places.db: test place questions; then Redmi (8 GB reference phone) end-to-end + on-phone eval.
-4. Low-RAM work: auto repack by free RAM, context sizing, OOM crash marker (8 GB = main tier).
+3. Places: `tools/.venv/bin/python tools/places_proto.py out/places.db --wiki out/wiki.db --questions eval/questions.jsonl`
+   (desktop mirror of PlaceIntent/Places). Without --wiki, English exonyms fail ("Rome", "Florence",
+   "Venice" -> US towns, since Overture uses local names). Check that the Wikipedia geocoder fixes them; if
+   not, add English names from Overture divisions to the locality table. Then Redmi end-to-end + on-phone eval.
+4. Low-RAM work: code done, **needs a device test** (see status log). On the Redmi: load each model, check
+   the "auto: ctx …" line in Library, watch PSS vs estimate (`adb shell dumpsys meminfo io.github.wolverr.bivouac`),
+   force an OOM (load the 9B) to check the crash notice and the smaller settings on the next load.
 5. Host packs (HuggingFace), fill app/src/main/assets/catalog.json URLs; README; M8.
 No 12 GB phone available yet (options in chat: borrow any 12 GB phone, cloud devices, used Pixel 8 Pro).
 See docs/COMPETITORS.md for what the other entries do.
@@ -49,11 +54,11 @@ See docs/COMPETITORS.md for what the other entries do.
 - [ ] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks); measure size
 - [~] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
   (code done and building; needs a real pack + device test)
-- [ ] M4: model selection **per RAM tier** (6 / 8 / 12 GB): quality ranked on the PC harness,
+- [~] M4: model selection **per RAM tier** (6 / 8 / 12 GB): quality ranked on the PC harness,
   speed on phones. 8 GB is the main target (most phones; the Redmi is the 8 GB reference
   device); 12 GB is the ceiling, not the requirement. Auto repack/context sizing by free RAM.
 - [~] M5: install UX: catalog + browser download + link-in-place (done); host packs, fill catalog URLs (todo)
-- [~] M6: places (Overture Maps) + "near me" queries: app side done; places.db build pending download
+- [~] M6: places (Overture Maps) + "near me" queries: app side done; places.db built; desktop-tested
 - [ ] M7: eval harness vs frontier + web, published results
 - [ ] M8: README, demo video, public repo, poidh claim
 
@@ -100,9 +105,27 @@ See docs/COMPETITORS.md for what the other entries do.
   (tools/build_full.log), places fetch (tools/places_fetch.log), then `python build_places.py`.
   Jobs must be started with `setsid nohup … &` — plain nohup died when the terminal closed.
 
+- 2026-09-30: places.db built (30.0 M places, 5.3 GB, 4.3 min). Place questions tested on the PC with
+  tools/places_proto.py: city queries work (Lisbon hotels, Paris restaurants, Kathmandu hospitals, 15–50 ms).
+  Fixed: generic category endings (grocery_store -> "grocery", "supermarket"), knowledge questions
+  ("must-see museums in Berlin", "history of …") now go to Wikipedia, trailing clauses cut from locations.
+  Open: exonyms without the wiki pack (see Resume here, step 3); Overture's pharmacy category has some junk.
+- 2026-09-30: low-RAM work (M4). `model_probe.cpp` reads the GGUF header and computes KV bytes per token
+  (full / sliding-window layers, hybrid attention intervals, Gemma shared-KV layers); matches llama.cpp's
+  own KV allocation exactly for all 7 candidate models at ctx 8192. KV at 8192: Qwen3.5-2B / LFM2.5 96 MB,
+  Qwen3.5-4B/9B 256 MB, Qwen3.6-35B 160 MB, Gemma-4-26B 410 MB, Gemma-4-E4B 158 MB (hybrids are cheap).
+  `MemoryPlanner`: need = file × (2 if repack) + KV + 160 MB, budget = availMem × safety − 450 MB; prefers
+  repack at ctx ≥ 4096, then the largest context without repack, else a clear "not enough memory" error.
+  `CrashGuard`: marker file around load/answer + ApplicationExitInfo (Android 11+); a memory kill cuts that
+  model's budget by 25% (floor 40%), regained 5% per good answer. Prompt budget follows the context
+  (`Settings.forContext`). "Automatic memory settings" switch in Library (on by default). APK builds;
+  not yet run on a phone.
+
 ## Dev notes
 
-- Build: `export JAVA_HOME=$(mise where java@temurin-17.0.20+8); ./gradlew assembleDebug`
+- Build: `export JAVA_HOME=$HOME/.local/opt/jdk-17.0.20+8; ./gradlew assembleDebug` (mise isn't on PATH in
+  non-interactive `wsl -e bash -lc` shells)
+- adb: `~/Android/Sdk/platform-tools/adb` (WSL needs usbipd to see a USB phone)
 - Test phone: Redmi Note 15 Pro (mid-range MediaTek). Final numbers come from a borrowed Pixel.
 - Don't copy code from other entries; ideas only (plagiarism disqualifies).
 - Long jobs: run as memory-capped systemd user services, not from a terminal. On this 8 GB

@@ -31,6 +31,7 @@ data class PlaceIntent(
             "wc" to listOf("toilet"),
             "grocery" to listOf("grocery", "supermarket"),
             "groceries" to listOf("grocery", "supermarket"),
+            "supermarket" to listOf("grocery", "supermarket"),
             "cash" to listOf("atm"),
             "doctor" to listOf("doctor", "clinic", "medical"),
             "er" to listOf("emergency", "hospital"),
@@ -43,6 +44,8 @@ data class PlaceIntent(
             "wifi" to listOf("internet", "cafe"),
         )
 
+        /** Questions about what a place is or means belong to Wikipedia, not the map. */
+        private val KNOWLEDGE = Regex("\\b(must[- ]see|famous|known for|history|worth (?:a )?visit|most important)\\b")
         private val NEAR_ME = Regex("\\b(near me|nearby|near here|around here|close by|closest|nearest|around me)\\b")
         private val LOCATION = Regex("\\b(?:near|around|close to|in|at|by|next to)\\s+(?:the\\s+)?(.+?)\\s*[?.!]*$", RegexOption.IGNORE_CASE)
         private val WORD = Regex("[\\p{L}][\\p{L}'\\-]*")
@@ -59,6 +62,7 @@ data class PlaceIntent(
             val nounAt = singular.indexOfFirst { it in placeNouns || SYNONYMS[it]?.any { s -> s in placeNouns } == true }
             if (nounAt < 0) return null
 
+            if (KNOWLEDGE.containsMatchIn(lower)) return null
             val nearMe = NEAR_ME.containsMatchIn(lower)
             val loc = if (nearMe) null else LOCATION.find(q.substring(textIndexAfter(q, words, nounAt)))?.groupValues?.get(1)
             if (!nearMe && loc.isNullOrBlank()) return null

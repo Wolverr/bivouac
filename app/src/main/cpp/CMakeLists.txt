@@ -15,6 +15,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/third_party.cmake)
 
 add_library(bivouac SHARED
         engine.cpp
+        model_probe.cpp
         corpus.cpp
         sql_pack.cpp
         jni_bridge.cpp)
