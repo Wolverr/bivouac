@@ -23,7 +23,9 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - [ ] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks); measure size
 - [~] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
   (code done and building; needs a real pack + device test)
-- [ ] M4: model selection on real hardware (Qwen3.6-35B-A3B vs Gemma 4 26B-A4B vs smaller MoEs)
+- [ ] M4: model selection **per RAM tier** (6 / 8 / 12 GB): quality ranked on the PC harness,
+  speed on phones. 8 GB is the main target (most phones; the Redmi is the 8 GB reference
+  device); 12 GB is the ceiling, not the requirement. Auto repack/context sizing by free RAM.
 - [~] M5: install UX: catalog + browser download + link-in-place (done); host packs, fill catalog URLs (todo)
 - [~] M6: places (Overture Maps) + "near me" queries: app side done; places.db build pending download
 - [ ] M7: eval harness vs frontier + web, published results
