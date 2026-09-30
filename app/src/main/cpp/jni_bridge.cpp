@@ -189,10 +189,10 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(corpusSearch)(JNIEnv * env, jobject, jbyteAr
 }
 
 // Returns {"id":..,"title":"..","first_chunk":..,"n_chunks":..} or {} if missing.
-JNIEXPORT jbyteArray JNICALL JNI_FN(corpusFindArticle)(JNIEnv * env, jobject, jbyteArray title) {
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusFindArticle)(JNIEnv * env, jobject, jbyteArray title, jbyteArray context) {
     std::lock_guard<std::mutex> lock(g_corpus_mutex);
     ArticleRef a;
-    if (!g_corpus.find_article(to_string(env, title), a)) return to_bytes(env, "{}");
+    if (!g_corpus.find_article(to_string(env, title), a, to_string(env, context))) return to_bytes(env, "{}");
     char buf[128];
     snprintf(buf, sizeof(buf), "{\"id\":%lld,\"first_chunk\":%lld,\"n_chunks\":%d,\"prior\":%.3f,",
              (long long) a.id, (long long) a.first_chunk, a.n_chunks, a.prior);

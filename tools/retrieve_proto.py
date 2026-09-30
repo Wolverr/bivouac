@@ -25,6 +25,8 @@ where which who whom why will with would you your about tell explain describe gi
 """.split())
 
 WORD_RE = re.compile(r"[\w][\w'\-]*", re.UNICODE)
+# looks_like_acronym() in corpus.cpp: "TCP", "PoS"; not "L2" (one capital) or "AC/DC".
+ACRONYM_RE = re.compile(r"^(?=(?:[^A-Z]*[A-Z]){2})[A-Z][A-Za-z0-9&\-]{1,9}$")
 SENT_RE = re.compile(r"(?<=[.!?])\s+|\s*\n\s*")  # infobox lines are sentences too
 
 
@@ -39,6 +41,13 @@ def fts_query(words: list[str]) -> str:
     # phrase query, which FTS5 rejects when the index has detail=column.
     terms = [t for w in words for t in re.split(r"[^\w]+", w) if len(t) > 1 and t not in STOP]
     return " OR ".join(f'"{t}"' for t in dict.fromkeys(terms))
+
+
+def shares_word(title: str, context: str) -> bool:
+    """corpus.cpp shares_word(): a 4+ letter word of the title, by its first five letters,
+    starts a word of the context ("Completely Fair Scheduler" / "how does Linux schedule")."""
+    ctx = re.findall(r"\w+", context.lower())
+    return any(c.startswith(t[:5]) for t in re.findall(r"\w+", title.lower()) if len(t) >= 4 for c in ctx)
 
 
 class Pack:
@@ -58,17 +67,39 @@ class Pack:
         self.cache: dict[int, bytes] = {}
         self.has_alias = self.db.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='alias'").fetchone() is not None
+        self.has_acronym = self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='acronym'").fetchone() is not None
 
-    def find_article(self, title: str):
+    def find_article(self, title: str, context: str = ""):
         """(id, title, first_chunk, n_chunks, prior) by exact title, else by alias ("GPS"), else the
         popular "X (...)" / "X City" article for disambiguation pages ("New York"); like Corpus::find_article."""
         norm = " ".join(title.replace("_", " ").casefold().split())
-        row = self.db.execute("SELECT id, title, first_chunk, n_chunks, prior FROM article WHERE norm_title = ? "
-                              "ORDER BY prior DESC LIMIT 1", (norm,)).fetchone()
-        if row is None and self.has_alias:
-            row = self.db.execute(
-                "SELECT a.id, a.title, a.first_chunk, a.n_chunks, a.prior FROM alias l JOIN article a "
-                "ON a.id = l.article WHERE l.norm_title = ? ORDER BY l.views DESC LIMIT 1", (norm,)).fetchone()
+        by_title = lambda: self.db.execute(  # noqa: E731
+            "SELECT id, title, first_chunk, n_chunks, prior FROM article WHERE norm_title = ? "
+            "ORDER BY prior DESC LIMIT 1", (norm,)).fetchone()
+        by_alias = lambda: self.db.execute(  # noqa: E731
+            "SELECT a.id, a.title, a.first_chunk, a.n_chunks, a.prior FROM alias l JOIN article a "
+            "ON a.id = l.article WHERE l.norm_title = ? ORDER BY l.views DESC LIMIT 1", (norm,)).fetchone() \
+            if self.has_alias else None
+        # Acronyms (Corpus::find_article): exact spelling as a title wins ("NATO"), else the most
+        # viewed of title / alias / acronym match ("TCP" -> Transmission Control Protocol).
+        if self.has_acronym and ACRONYM_RE.match(title):
+            row = self.db.execute("SELECT id, title, first_chunk, n_chunks, prior FROM article "
+                                  "WHERE norm_title = ? AND title = ? ORDER BY prior DESC LIMIT 1", (norm, title)).fetchone()
+            if row:
+                return row
+            meanings = self.db.execute(
+                "SELECT a.id, a.title, a.first_chunk, a.n_chunks, a.prior FROM acronym x JOIN article a "
+                "ON a.id = x.article WHERE x.abbr = ? ORDER BY x.views DESC LIMIT 5", (title,)).fetchall()
+            for m in meanings:
+                if context and shares_word(m[1], context):
+                    return m  # "CFS" in a Linux scheduling question
+            found = [r for r in (by_title(), by_alias(), meanings[0] if meanings else None) if r]
+            if found:
+                return max(found, key=lambda r: r[4])
+        row = by_title()
+        if row is None:
+            row = by_alias()
         # Only for names as written ("New York", not "broad" -> "Broad City").
         if row is None and all(w[:1].isupper() for w in title.split() if w.lower() not in STOP):
             row = self.db.execute(
@@ -162,13 +193,25 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
             elif phrase.lower().endswith("s") and len(phrase) > 3:
                 cands.append(phrase[:-1])  # "tardigrades" -> "tardigrade"
             for c in cands:
-                row = pack.find_article(c)
+                row = pack.find_article(c, question)
                 if not row or row[0] in seen:
                     continue
                 common = everyday(pack, words, starts[i:i + n])
                 obscure = row[4] < math.log1p(COMMON_MIN_VIEWS)
                 if common and obscure:
                     continue
+                # A name and the lowercase noun after it: "Soviet Union collapse" -> "Collapse of the
+                # Soviet Union", "UK parliament" -> "Parliament of the UK"; ahead of the bare name.
+                k = i + n
+                if (k < len(toks) and not used[k] and toks[k].islower() and len(toks[k]) > 3
+                        and toks[k] not in STOP and any(is_named(w, s) for w, s in zip(words, starts[i:i + n]))):
+                    for form in (f"{toks[k]} of the {c}", f"{toks[k]} of {c}"):
+                        about = pack.find_article(form)
+                        if about and about[0] not in seen:
+                            found.append(about[:4])
+                            seen.add(about[0])
+                            used[k] = True
+                            break
                 found.append(row[:4])
                 seen.add(row[0])
                 # Also a lone lowercase word naming something obscure ("whereabouts" -> an album).

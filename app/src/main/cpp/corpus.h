@@ -44,8 +44,9 @@ public:
     // chunks ranked by colrank (BM25, see fts_rank.c) blended with the article popularity prior.
     std::vector<ChunkHit> search(const std::string & fts_query, int limit, double prior_weight);
 
-    // Exact (case-insensitive, whitespace-normalized) title lookup, then the alias table.
-    bool find_article(const std::string & title, ArticleRef & out);
+    // Exact (case-insensitive, whitespace-normalized) title lookup, then the alias table;
+    // acronyms also via the acronym table, where `context` (the question) picks the meaning.
+    bool find_article(const std::string & title, ArticleRef & out, const std::string & context = "");
     // Chunks matching the query, counted up to `cap`: cheap test for "is this an everyday word".
     int doc_freq(const std::string & fts_query, int cap);
     // Other names of an article from the alias table, most viewed first ("firenze" for Florence).
@@ -64,6 +65,7 @@ private:
     ZSTD_DDict_s * ddict_ = nullptr;
     std::string error_;
     bool has_alias_ = false;  // packs built before build_aliases.py have no alias table
+    bool has_acronym_ = false;  // nor before build_acronyms.py an acronym table
 
     // Small LRU of decompressed blocks: neighbouring chunks share blocks.
     static constexpr size_t kCacheBlocks = 64;

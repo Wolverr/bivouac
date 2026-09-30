@@ -56,8 +56,9 @@ class Corpus {
             json.decodeFromString(NativeEngine.corpusSearch(ftsQuery.toByteArray(), limit, priorWeight, true).decodeToString())
         }
 
-    suspend fun findArticle(title: String): Article? = withContext(Dispatchers.IO) {
-        json.decodeFromString<Article>(NativeEngine.corpusFindArticle(title.toByteArray()).decodeToString())
+    /** [context]: the question, to pick among acronym meanings ("CFS" in a Linux question). */
+    suspend fun findArticle(title: String, context: String = ""): Article? = withContext(Dispatchers.IO) {
+        json.decodeFromString<Article>(NativeEngine.corpusFindArticle(title.toByteArray(), context.toByteArray()).decodeToString())
             .takeIf { it.id != 0L }
     }
 

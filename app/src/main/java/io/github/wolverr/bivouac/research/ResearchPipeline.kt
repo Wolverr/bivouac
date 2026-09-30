@@ -253,11 +253,25 @@ class ResearchPipeline(
                     else -> listOf(phrase)
                 }
                 for (c in candidates) {
-                    val hit = corpus.findArticle(c) ?: continue
+                    val hit = corpus.findArticle(c, question) ?: continue
                     if (hit.id in found) continue
                     val common = everyday(corpus, words, starts.subList(i, i + n))
                     val obscure = hit.prior < COMMON_MIN_PRIOR
                     if (common && obscure) continue
+                    // A name and the lowercase noun after it: "Soviet Union collapse" -> "Collapse of the
+                    // Soviet Union", "UK parliament" -> "Parliament of the UK"; ahead of the bare name.
+                    val k = i + n
+                    if (k < toks.size && !used[k] && toks[k].length > 3 && toks[k].any(Char::isLetter) && toks[k] == toks[k].lowercase() &&
+                        !Evidence.isStop(toks[k]) && words.indices.any { isNamed(words[it], starts[i + it]) }
+                    ) {
+                        for (form in listOf("${toks[k]} of the $c", "${toks[k]} of $c")) {
+                            val about = corpus.findArticle(form) ?: continue
+                            if (about.id in found) continue
+                            found[about.id] = about
+                            used[k] = true
+                            break
+                        }
+                    }
                     found[hit.id] = hit
                     // Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
                     if (common || (n == 1 && obscure && !isNamed(words[0], starts[i]))) plain += hit.id

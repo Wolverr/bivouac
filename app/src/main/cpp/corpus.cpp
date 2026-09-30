@@ -43,6 +43,47 @@ bool looks_like_name(const std::string & title) {
     return any;
 }
 
+// "TCP", "PoS", "AC/DC" no, "L2" no: a capital first, at least two capitals, and only
+// ASCII letters, digits, '&' and '-'. Must match ACRONYM_RE in tools/retrieve_proto.py.
+bool looks_like_acronym(const std::string & s) {
+    if (s.size() < 2 || s.size() > 10 || !std::isupper((unsigned char) s[0])) return false;
+    int caps = 0;
+    for (unsigned char c : s) {
+        if (std::isupper(c)) caps++;
+        else if (!std::isalnum(c) && c != '&' && c != '-') return false;
+    }
+    return caps >= 2;
+}
+
+// Does a word of `title` (4+ letters, compared by its first five) start a word of `context`?
+// "Completely Fair Scheduler" and "how does Linux schedule processes": yes. Must match
+// shares_word() in tools/retrieve_proto.py.
+bool shares_word(const std::string & title, const std::string & context) {
+    auto words = [](const std::string & s) {
+        std::vector<std::string> out;
+        std::string w;
+        for (size_t i = 0; i <= s.size(); i++) {
+            const unsigned char c = i < s.size() ? s[i] : ' ';
+            if (std::isalnum(c) || c >= 0x80) {
+                w += (char) (c < 0x80 ? std::tolower(c) : c);
+            } else if (!w.empty()) {
+                out.push_back(w);
+                w.clear();
+            }
+        }
+        return out;
+    };
+    const auto ctx = words(context);
+    for (const auto & t : words(title)) {
+        if (t.size() < 4) continue;
+        const std::string p = t.substr(0, 5);
+        for (const auto & c : ctx) {
+            if (c.compare(0, p.size(), p) == 0) return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 // Must match norm_title() in tools/build_corpus.py for ASCII; Python's casefold
@@ -81,6 +122,10 @@ std::string Corpus::open(const std::string & path) {
     {
         Stmt a(db_, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'alias'");
         has_alias_ = a.ok() && sqlite3_step(a.s) == SQLITE_ROW;
+    }
+    {
+        Stmt a(db_, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'acronym'");
+        has_acronym_ = a.ok() && sqlite3_step(a.s) == SQLITE_ROW;
     }
 
     Stmt st(db_, "SELECT data FROM dict WHERE id = 1");
@@ -152,31 +197,77 @@ std::vector<ChunkHit> Corpus::search(const std::string & fts_query, int limit, d
     return hits;
 }
 
-bool Corpus::find_article(const std::string & title, ArticleRef & out) {
+bool Corpus::find_article(const std::string & title, ArticleRef & out, const std::string & context) {
     if (!db_) return false;
     const std::string norm = normalize_title(title);
-    auto lookup = [&](const char * sql) {
+    // ?1 = normalized title, ?2 = title as written.
+    auto lookup_into = [&](const char * sql, ArticleRef & r) {
         Stmt st(db_, sql);
         if (!st.ok()) return false;
         sqlite3_bind_text(st.s, 1, norm.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_bind_parameter_count(st.s) >= 2) sqlite3_bind_text(st.s, 2, title.c_str(), -1, SQLITE_TRANSIENT);
         if (sqlite3_step(st.s) != SQLITE_ROW) return false;
-        out.id = sqlite3_column_int64(st.s, 0);
-        out.title = st.text(1);
-        out.prior = sqlite3_column_double(st.s, 2);
-        out.first_chunk = sqlite3_column_int64(st.s, 3);
-        out.n_chunks = sqlite3_column_int(st.s, 4);
+        r.id = sqlite3_column_int64(st.s, 0);
+        r.title = st.text(1);
+        r.prior = sqlite3_column_double(st.s, 2);
+        r.first_chunk = sqlite3_column_int64(st.s, 3);
+        r.n_chunks = sqlite3_column_int(st.s, 4);
         return true;
     };
-    if (lookup("SELECT id, title, prior, first_chunk, n_chunks FROM article WHERE norm_title = ?1 "
-               "ORDER BY prior DESC LIMIT 1")) {
-        return true;
+    auto lookup = [&](const char * sql) { return lookup_into(sql, out); };
+    static const char * kByTitle =
+        "SELECT id, title, prior, first_chunk, n_chunks FROM article WHERE norm_title = ?1 ORDER BY prior DESC LIMIT 1";
+    // Other names for articles ("GPS"), from Wikipedia redirects; see tools/build_aliases.py.
+    static const char * kByAlias =
+        "SELECT a.id, a.title, a.prior, a.first_chunk, a.n_chunks FROM alias l "
+        "JOIN article a ON a.id = l.article WHERE l.norm_title = ?1 ORDER BY l.views DESC LIMIT 1";
+
+    // Acronyms: many are disambiguation pages on Wikipedia ("TCP", "BMI"), so they are in no
+    // title or alias; tools/build_acronyms.py mines them from intros. A title spelled exactly
+    // so wins ("NATO", "DNA"); otherwise the most viewed of the title, alias and acronym
+    // matches ("PoW": Prisoner of war over People of Walmart). An acronym meaning that shares
+    // a word with the question beats both ("CFS" in a Linux scheduling question).
+    if (has_acronym_ && looks_like_acronym(title)) {
+        if (lookup("SELECT id, title, prior, first_chunk, n_chunks FROM article WHERE norm_title = ?1 AND title = ?2 "
+                   "ORDER BY prior DESC LIMIT 1")) {
+            return true;
+        }
+        std::vector<ArticleRef> meanings;
+        {
+            Stmt st(db_, "SELECT a.id, a.title, a.prior, a.first_chunk, a.n_chunks FROM acronym x "
+                         "JOIN article a ON a.id = x.article WHERE x.abbr = ?1 ORDER BY x.views DESC LIMIT 5");
+            if (st.ok()) {
+                sqlite3_bind_text(st.s, 1, title.c_str(), -1, SQLITE_TRANSIENT);
+                while (sqlite3_step(st.s) == SQLITE_ROW) {
+                    ArticleRef r;
+                    r.id = sqlite3_column_int64(st.s, 0);
+                    r.title = st.text(1);
+                    r.prior = sqlite3_column_double(st.s, 2);
+                    r.first_chunk = sqlite3_column_int64(st.s, 3);
+                    r.n_chunks = sqlite3_column_int(st.s, 4);
+                    meanings.push_back(std::move(r));
+                }
+            }
+        }
+        for (const auto & m : meanings) {
+            if (!context.empty() && shares_word(m.title, context)) {
+                out = m;
+                return true;
+            }
+        }
+        bool found = !meanings.empty();
+        if (found) out = meanings[0];
+        for (const char * sql : {kByTitle, has_alias_ ? kByAlias : nullptr}) {
+            ArticleRef r;
+            if (sql && lookup_into(sql, r) && (!found || r.prior > out.prior)) {
+                out = r;
+                found = true;
+            }
+        }
+        if (found) return true;
     }
-    // Other names for articles ("GPS", "TCP"), from Wikipedia redirects; see tools/build_aliases.py.
-    if (has_alias_ &&
-        lookup("SELECT a.id, a.title, a.prior, a.first_chunk, a.n_chunks FROM alias l "
-               "JOIN article a ON a.id = l.article WHERE l.norm_title = ?1 ORDER BY l.views DESC LIMIT 1")) {
-        return true;
-    }
+    if (lookup(kByTitle)) return true;
+    if (has_alias_ && lookup(kByAlias)) return true;
     // Disambiguation pages aren't in the pack ("New York", "Mercury"): take the most viewed
     // "X (...)" or "X City" article, if it is popular enough (>= 10,000 views/month) to be
     // what people mean. Without the floor, "need" would become "Need (album)". Only for
