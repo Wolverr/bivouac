@@ -15,26 +15,38 @@ Output is a single SQLite file (`wiki.db`) that the app opens read-only:
 Infoboxes become their own chunk (section "Infobox") because that's where the
 quick facts (capital, population, birth date, ...) live.
 
+Article popularity comes from Wikimedia pageviews (tools/fetch_pageviews.sh).
+With --full-top N, only the N most-viewed articles keep their full text; the
+rest keep their infobox and lead section, which is what people look up about
+obscure topics anyway and saves a lot of space.
+
+Chunking and compression run in worker processes; SQLite writes stay in the
+main process.
+
 Usage:
-  python build_corpus.py --src data/finewiki_en --out out/wiki.db [--limit-shards 1] [--fts-detail full]
+  python build_corpus.py --src data/finewiki_en --out out/wiki.db \
+      [--pageviews data/pageviews_en.tsv] [--full-top 2000000] [--fts-detail column]
 """
 
 import argparse
 import json
 import math
+import multiprocessing as mp
+import os
 import re
 import sqlite3
 import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pyarrow.parquet as pq
 import zstandard as zstd
 
 CHUNK_TARGET = 1200   # characters; ~250-300 tokens
 CHUNK_MAX = 1800
 BLOCK_TARGET = 32 * 1024
-ZSTD_LEVEL = 12
+ZSTD_LEVEL = 9
 DICT_SIZE = 112 * 1024
 
 # Sections that are mostly lists of links or bibliography, not knowledge.
@@ -159,8 +171,71 @@ def train_dictionary(shard: Path) -> bytes:
     return zstd.train_dictionary(DICT_SIZE, samples).as_bytes()
 
 
+def load_pageviews(path: str | None) -> np.ndarray | None:
+    """page_id -> monthly views, as a dense array indexed by page id."""
+    if not path:
+        return None
+    ids, views = [], []
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            parts = line.split("\t", 2)
+            if len(parts) >= 2 and parts[0].isdigit():
+                ids.append(int(parts[0]))
+                views.append(int(parts[1]))
+    arr = np.zeros(max(ids) + 1, dtype=np.int64)
+    np.add.at(arr, np.array(ids), np.array(views))
+    print(f"pageviews: {len(ids):,} pages, {int(arr.sum()):,} views", flush=True)
+    return arr
+
+
+# ---- worker side ----------------------------------------------------------
+
+_cctx = None
+
+
+def _init_worker(zdict: bytes):
+    global _cctx
+    _cctx = zstd.ZstdCompressor(level=ZSTD_LEVEL, dict_data=zstd.ZstdCompressionDict(zdict))
+
+
+def process_batch(articles):
+    """articles: [(page_id, title, text, infobox_json, full_text)].
+    Returns (blocks, fts_rows, article_rows) with chunk numbers local to the batch:
+      blocks:       [(compressed, [(local_chunk, page_id, section, off, len), ...])]
+      fts_rows:     [(local_chunk, title, section, body)]
+      article_rows: [(page_id, title, local_first_chunk, n_chunks)]
+    """
+    blocks, fts_rows, article_rows = [], [], []
+    buf, pending, n = bytearray(), [], 0
+
+    def flush():
+        nonlocal buf, pending
+        if buf:
+            blocks.append((_cctx.compress(bytes(buf)), pending))
+            buf, pending = bytearray(), []
+
+    for page_id, title, text, infobox_raw, full in articles:
+        first = n
+        for sec, c in article_chunks(title, text, infobox_text(infobox_raw)):
+            if not full and sec not in ("", "Infobox"):
+                continue
+            enc = c.encode()
+            pending.append((n, page_id, sec, len(buf), len(enc)))
+            buf += enc
+            fts_rows.append((n, title, sec, c))
+            n += 1
+            if len(buf) >= BLOCK_TARGET:
+                flush()
+        if n > first:
+            article_rows.append((page_id, title, first, n - first))
+    flush()
+    return blocks, fts_rows, article_rows
+
+
+# ---- main side --------------------------------------------------------------
+
 class Builder:
-    def __init__(self, out: Path, fts_detail: str, zdict: bytes):
+    def __init__(self, out: Path, fts_detail: str, zdict: bytes, views: np.ndarray | None):
         out.parent.mkdir(parents=True, exist_ok=True)
         if out.exists():
             out.unlink()
@@ -174,58 +249,40 @@ class Builder:
         self.db.execute("PRAGMA synchronous = OFF")
         self.db.execute("PRAGMA cache_size = -262144")  # 256 MB
         self.db.execute("INSERT INTO dict VALUES (1, ?)", (zdict,))
-        self.cctx = zstd.ZstdCompressor(level=ZSTD_LEVEL, dict_data=zstd.ZstdCompressionDict(zdict))
+        self.views = views
         self.next_chunk = 1
         self.next_block = 1
-        self.block_buf = bytearray()
-        self.pending_chunks = []   # chunk rows waiting for their block to be written
-        self.fts_rows = []
-        self.article_rows = []
         self.n_articles = 0
         self.raw_bytes = 0
         self.comp_bytes = 0
 
-    def flush_block(self):
-        if not self.block_buf:
-            return
-        data = self.cctx.compress(bytes(self.block_buf))
-        self.db.execute("INSERT INTO block VALUES (?, ?)", (self.next_block, data))
-        self.db.executemany("INSERT INTO chunk VALUES (?,?,?,?,?,?)", self.pending_chunks)
-        self.raw_bytes += len(self.block_buf)
-        self.comp_bytes += len(data)
-        self.next_block += 1
-        self.block_buf = bytearray()
-        self.pending_chunks = []
+    def prior(self, page_id: int, size_hint: int) -> float:
+        if self.views is not None:
+            v = int(self.views[page_id]) if page_id < len(self.views) else 0
+            return math.log1p(v)
+        return math.log1p(size_hint) / 2  # rough stand-in: longer articles tend to be more important
 
-    def add_article(self, page_id: int, title: str, text: str, infobox: str, size_hint: int):
-        first = self.next_chunk
-        for sec, c in article_chunks(title, text, infobox):
-            enc = c.encode()
-            self.pending_chunks.append((self.next_chunk, page_id, sec, self.next_block, len(self.block_buf), len(enc)))
-            self.block_buf += enc
-            self.fts_rows.append((self.next_chunk, title, sec, c))
-            self.next_chunk += 1
-            if len(self.block_buf) >= BLOCK_TARGET:
-                self.flush_block()
-        n = self.next_chunk - first
-        if n == 0:
-            return
-        # Popularity prior; replaced by real pageviews in a later pass when available.
-        prior = math.log1p(size_hint)
-        self.article_rows.append((page_id, title, norm_title(title), prior, first, n))
-        self.n_articles += 1
-        if len(self.fts_rows) >= 20_000:
-            self.flush_rows()
-
-    def flush_rows(self):
-        self.db.executemany("INSERT INTO fts(rowid, title, section, body) VALUES (?,?,?,?)", self.fts_rows)
-        self.db.executemany("INSERT INTO article VALUES (?,?,?,?,?,?)", self.article_rows)
-        self.fts_rows = []
-        self.article_rows = []
+    def add_batch(self, result, size_hints: dict[int, int]):
+        blocks, fts_rows, article_rows = result
+        base = self.next_chunk
+        chunk_rows = []
+        for data, chunks in blocks:
+            for local, pid, sec, off, ln in chunks:
+                chunk_rows.append((base + local, pid, sec, self.next_block, off, ln))
+                self.raw_bytes += ln
+            self.db.execute("INSERT INTO block VALUES (?, ?)", (self.next_block, data))
+            self.comp_bytes += len(data)
+            self.next_block += 1
+        self.db.executemany("INSERT INTO chunk VALUES (?,?,?,?,?,?)", chunk_rows)
+        self.db.executemany("INSERT INTO fts(rowid, title, section, body) VALUES (?,?,?,?)",
+                            [(base + l, t, s, b) for l, t, s, b in fts_rows])
+        self.db.executemany("INSERT INTO article VALUES (?,?,?,?,?,?)",
+                            [(pid, t, norm_title(t), self.prior(pid, size_hints.get(pid, 0)), base + first, n)
+                             for pid, t, first, n in article_rows])
+        self.next_chunk = base + (max((l for l, *_ in fts_rows), default=-1) + 1)
+        self.n_articles += len(article_rows)
 
     def finish(self, meta: dict):
-        self.flush_block()
-        self.flush_rows()
         self.db.execute("CREATE INDEX article_norm ON article(norm_title)")
         self.db.execute("CREATE INDEX chunk_article ON chunk(article)")
         for k, v in meta.items():
@@ -234,6 +291,7 @@ class Builder:
         print("optimizing FTS index…", flush=True)
         self.db.execute("INSERT INTO fts(fts) VALUES ('optimize')")
         self.db.commit()
+        print("vacuum…", flush=True)
         self.db.execute("VACUUM")
         self.db.close()
 
@@ -242,9 +300,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default="data/finewiki_en")
     ap.add_argument("--out", default="out/wiki.db")
+    ap.add_argument("--pageviews", default=None)
+    ap.add_argument("--full-top", type=int, default=0, help="only the N most-viewed articles keep full text")
     ap.add_argument("--limit-shards", type=int, default=0)
     ap.add_argument("--limit-articles", type=int, default=0)
-    ap.add_argument("--fts-detail", default="full", choices=["full", "column", "none"])
+    ap.add_argument("--fts-detail", default="column", choices=["full", "column", "none"])
+    ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     args = ap.parse_args()
 
     shards = sorted(Path(args.src).glob("*.parquet"))
@@ -254,25 +315,51 @@ def main() -> None:
         sys.exit(f"no parquet shards in {args.src}")
 
     t0 = time.time()
+    views = load_pageviews(args.pageviews)
+    full_cutoff = -1
+    if args.full_top and views is not None:
+        nz = np.sort(views[views > 0])[::-1]
+        full_cutoff = int(nz[min(args.full_top, len(nz)) - 1]) if len(nz) else 0
+        print(f"full text for articles with >= {full_cutoff} views/month", flush=True)
+
     print("training zstd dictionary…", flush=True)
-    b = Builder(Path(args.out), args.fts_detail, train_dictionary(shards[0]))
-    cols = ["page_id", "title", "text", "infoboxes", "bytes_html"]
-    done = False
-    for shard in shards:
-        for batch in pq.ParquetFile(shard).iter_batches(columns=cols, batch_size=2000):
-            for pid, title, text, ib, size in zip(*(batch.column(i).to_pylist() for i in range(len(cols)))):
-                b.add_article(int(pid), title, text or "", infobox_text(ib), int(size or 0))
-                if args.limit_articles and b.n_articles >= args.limit_articles:
-                    done = True
-                    break
-            if done:
-                break
-            if b.n_articles % 50_000 < 2000:
+    zdict = train_dictionary(shards[0])
+    b = Builder(Path(args.out), args.fts_detail, zdict, views)
+
+    def batches():
+        cols = ["page_id", "title", "text", "infoboxes", "bytes_html"]
+        seen = 0
+        for shard in shards:
+            for batch in pq.ParquetFile(shard).iter_batches(columns=cols, batch_size=1000):
+                rows, hints = [], {}
+                for pid, title, text, ib, size in zip(*(batch.column(i).to_pylist() for i in range(len(cols)))):
+                    pid = int(pid)
+                    v = int(views[pid]) if views is not None and pid < len(views) else 0
+                    full = full_cutoff < 0 or v >= full_cutoff
+                    rows.append((pid, title, text or "", ib, full))
+                    hints[pid] = int(size or 0)
+                    seen += 1
+                    if args.limit_articles and seen >= args.limit_articles:
+                        yield rows, hints
+                        return
+                yield rows, hints
+
+    last_report = 0
+    with mp.Pool(args.workers, initializer=_init_worker, initargs=(zdict,)) as pool:
+        pending = []
+        for rows, hints in batches():
+            pending.append((pool.apply_async(process_batch, (rows,)), hints))
+            # Keep a bounded number of batches in flight to cap memory use.
+            while len(pending) > args.workers * 3 or (pending and pending[0][0].ready()):
+                res, h = pending.pop(0)
+                b.add_batch(res.get(), h)
+            if b.n_articles - last_report >= 100_000:
+                last_report = b.n_articles
                 el = time.time() - t0
                 print(f"{b.n_articles:>9,} articles  {b.next_chunk - 1:>11,} chunks  "
                       f"{b.raw_bytes / 1e9:6.2f} GB text -> {b.comp_bytes / 1e9:5.2f} GB  {el / 60:5.1f} min", flush=True)
-        if done:
-            break
+        for res, h in pending:
+            b.add_batch(res.get(), h)
 
     b.finish({
         "format": 1,
@@ -280,6 +367,8 @@ def main() -> None:
         "articles": b.n_articles,
         "chunks": b.next_chunk - 1,
         "fts_detail": args.fts_detail,
+        "full_top": args.full_top,
+        "pageviews": Path(args.pageviews).name if args.pageviews else "",
         "built": time.strftime("%Y-%m-%d"),
     })
     size = Path(args.out).stat().st_size
