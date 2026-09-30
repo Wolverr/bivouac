@@ -181,11 +181,11 @@ def build_prompt(q: str, sources) -> str:
     return "\n".join(parts) + "\nQuestion: " + q
 
 
-def generate(port: int, user: str, think: bool = False):
+def generate(port: int, user: str, think: bool = False, system: str = ""):
     """think: reasoning on (the proposed "Think harder" button). The budget covers reasoning
     plus answer; usage.completion_tokens tells how long that would take on a phone."""
     body = json.dumps({
-        "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
+        "messages": [{"role": "system", "content": system or SYSTEM}, {"role": "user", "content": user}],
         "chat_template_kwargs": {"enable_thinking": think},
         **SAMPLING, "seed": SEED,
         **({"max_tokens": THINK_MAX_TOKENS} if think else {}),
@@ -210,7 +210,9 @@ def main():
     ap.add_argument("--only", default="", help="comma-separated question ids")
     ap.add_argument("--places", default="out/places.db", help="places pack ('' to skip, like an app without one)")
     ap.add_argument("--think", action="store_true", help="reasoning on (measures a 'Think harder' mode)")
+    ap.add_argument("--system", default="", help="system prompt file to try instead of the app's")
     args = ap.parse_args()
+    system = Path(args.system).read_text().strip() if args.system else ""
 
     pack = Pack(args.db)
     places = Places(args.places) if args.places else None
@@ -236,7 +238,7 @@ def main():
         else:
             sources = retrieve(pack, q["q"]) if r == "lookup" else []
             prompt = build_prompt(q["q"], sources)
-        answer, usage = generate(args.port, prompt, args.think)
+        answer, usage = generate(args.port, prompt, args.think, system)
         rec = {"id": q["id"], "question": q["q"], "answer": answer, "route": r,
                "sources": [f"{t} — {s}" if s else t for _, t, s, _ in sources] +
                           [f"[P{i + 1}] {p['name']} ({p['cat']}, {format_distance(p['dist'])})" for i, p in enumerate(found or [])],
