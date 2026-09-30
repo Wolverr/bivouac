@@ -10,28 +10,21 @@ import java.io.File
 import kotlin.coroutines.coroutineContext
 
 /**
- * Model files live in the app's own folder on shared storage
- * (Android/data/<app>/files/models): no storage permission needed, and
- * big enough for multi-GB GGUFs.
+ * Large files (models, knowledge packs) live in the app's own folder on shared
+ * storage (Android/data/<app>/files/<subdir>): no storage permission needed, and
+ * big enough for multi-GB files.
  */
-class ModelStore(private val context: Context) {
-    val dir: File = File(context.getExternalFilesDir(null) ?: context.filesDir, "models").apply { mkdirs() }
+class FileStore(private val context: Context, subdir: String, private val extension: String) {
+    val dir: File = File(context.getExternalFilesDir(null) ?: context.filesDir, subdir).apply { mkdirs() }
 
     fun list(): List<File> =
-        dir.listFiles { f -> f.isFile && f.name.endsWith(".gguf") }?.sortedBy { it.name }.orEmpty()
+        dir.listFiles { f -> f.isFile && f.name.endsWith(extension) }?.sortedBy { it.name }.orEmpty()
 
     /** Copies a user-picked file (Downloads, USB drive, SD card) into the models folder. */
     suspend fun import(uri: Uri, onProgress: (copied: Long, total: Long) -> Unit): File = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
-        var name = "model.gguf"
-        var size = -1L
-        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
-            if (c.moveToFirst()) {
-                name = c.getString(0) ?: name
-                size = c.getLong(1)
-            }
-        }
-        require(name.endsWith(".gguf")) { "Not a GGUF model file: $name" }
+        val (name, size) = describe(context, uri)
+        require(name.endsWith(extension)) { "Expected a $extension file, got $name" }
         val target = File(dir, name)
         val partial = File(dir, "$name.part")
         resolver.openInputStream(uri).use { input ->
@@ -53,5 +46,19 @@ class ModelStore(private val context: Context) {
         target
     }
 
-    fun delete(file: File) = file.delete()
+    companion object {
+        /** Display name and size (-1 if unknown) of a content URI. */
+        fun describe(context: Context, uri: Uri): Pair<String, Long> {
+            var name = uri.lastPathSegment.orEmpty()
+            var size = -1L
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)
+                ?.use { c ->
+                    if (c.moveToFirst()) {
+                        name = c.getString(0) ?: name
+                        size = c.getLong(1)
+                    }
+                }
+            return name to size
+        }
+    }
 }

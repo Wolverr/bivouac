@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
                             )
                             NavigationBarItem(
                                 selected = tab == 1, onClick = { tab = 1 },
-                                icon = { Icon(Icons.Outlined.Storage, null) }, label = { Text("Models") },
+                                icon = { Icon(Icons.Outlined.Storage, null) }, label = { Text("Library") },
                             )
                         }
                     },
@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                     val m = Modifier.padding(padding)
                     when (tab) {
                         0 -> AskScreen(vm, m)
-                        else -> ModelsScreen(vm, m)
+                        else -> LibraryScreen(vm, m)
                     }
                 }
             }
