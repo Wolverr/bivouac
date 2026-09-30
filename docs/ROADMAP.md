@@ -34,10 +34,14 @@ Next steps, in order:
    Remaining misses are semantic ("why did the USSR collapse" -> Dissolution of the Soviet Union) or
    disambiguation pages FineWiki lacks (TCP, UDP, CFS). Possible next: a disambiguation-free acronym
    table, or a small embedding reranker. Good enough to move on.
-2. Model quality per RAM tier: for each model in ~/models start
-   `~/llama-pc/bin/llama-server -m <gguf> -c 8192 -t 16 --port 8088 --jinja`, run
-   `tools/answer_proto.py --db out/wiki.db --name <model>`, then `tools/grade.py packet ...`,
-   have a grader agent fill eval/grading/<name>.scores.jsonl (GRADER_INSTRUCTIONS.txt), `grade.py score`.
+2. Model quality per RAM tier — **in progress, paused** (2026-09-30 20:50; qwen3.5-2b at 17/60).
+   Resume (resumable, skips answered questions):
+   `cd tools && systemd-run --user --unit=bivouac-models --working-directory=$PWD -p MemoryMax=14G -p MemorySwapMax=1G --collect bash -c './run_model_eval.sh > model_eval.log 2>&1'`
+   (note: `>` truncates the log; the results files are what count). ~3–4 h for all 7 models, smallest first.
+   Per finished model: `tools/.venv/bin/python tools/grade.py packet eval/results-pc-<name>.jsonl`, then a
+   blind grader subagent fills eval/grading/pc-<name>.scores.jsonl (reads only GRADER_INSTRUCTIONS.txt +
+   the packet, never the key), then `grade.py score ...`. Results with the old system prompt (places/diet
+   bullet leaked into answers; harness skipped places.db) are in eval/old-prompt-v1/ (2B: 36.6% parity).
 3. Places: desktop-tested (`tools/.venv/bin/python tools/places_proto.py tools/out/places.db --wiki tools/out/wiki.db
    --questions eval/questions.jsonl`); exonyms fixed via aliases. Next: Redmi end-to-end + on-phone eval
    (copy both packs to the phone: ~24 GB).
