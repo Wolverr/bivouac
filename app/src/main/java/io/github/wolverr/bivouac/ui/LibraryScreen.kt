@@ -133,6 +133,8 @@ private fun GetDataSection(vm: AppViewModel, s: LibraryState) {
     if (items.isEmpty()) return
     val have = (s.models + s.packs).map { it.name }.toSet()
     val ramGb = vm.runtime.device.totalRamGb
+    // The biggest model that fits: the catalog lists them from small to large.
+    val recommended = items.filter { it.kind == "model" && it.min_ram_gb <= ramGb }.maxByOrNull { it.min_ram_gb }?.id
     Text("Get data", style = MaterialTheme.typography.titleMedium)
     Text(
         "1. Tap Download: your browser saves the file to Downloads.  2. Come back and tap \"Add downloaded files\". " +
@@ -144,6 +146,9 @@ private fun GetDataSection(vm: AppViewModel, s: LibraryState) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(item.name, style = MaterialTheme.typography.titleSmall)
+                if (item.id == recommended) {
+                    Text("Recommended for this phone", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
                 Text(
                     String.format(Locale.US, "%.1f GB · %s", item.bytes / 1e9, item.license),
                     style = MaterialTheme.typography.bodySmall,

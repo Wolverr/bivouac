@@ -1,5 +1,5 @@
 {
-  "note": "Files Bivouac can use. The app never downloads anything itself: 'Download' opens the link in the browser, then 'Add downloaded files' links the file in place.",
+  "note": "Files Bivouac can use. The app never downloads anything itself: 'Download' opens the link in the browser, then 'Add downloaded files' links the file in place. min_ram_gb is what Android reports (an '8 GB' phone reports about 7.5).",
   "items": [
     {
       "id": "qwen3.5-2b",
@@ -10,7 +10,29 @@
       "bytes": 1280835840,
       "min_ram_gb": 4,
       "license": "Apache-2.0",
-      "about": "Small and quick on any phone. Good for simple lookups; weak on hard reasoning."
+      "about": "For 6 GB phones. Quick, good for simple lookups; weak on multi-step reasoning."
+    },
+    {
+      "id": "qwen3.5-4b",
+      "kind": "model",
+      "name": "Qwen3.5 4B (balanced)",
+      "file": "Qwen3.5-4B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+      "bytes": 2740937888,
+      "min_ram_gb": 7,
+      "license": "Apache-2.0",
+      "about": "For 8 GB phones. Nearly as good as the 9B at half the size."
+    },
+    {
+      "id": "qwen3.5-9b",
+      "kind": "model",
+      "name": "Qwen3.5 9B (best answers)",
+      "file": "Qwen3.5-9B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf",
+      "bytes": 5680522464,
+      "min_ram_gb": 11,
+      "license": "Apache-2.0",
+      "about": "For 12 GB phones. The most accurate, and the slowest."
     },
     {
       "id": "wiki-en",
@@ -18,10 +40,10 @@
       "name": "Wikipedia (English)",
       "file": "wiki.db",
       "url": "",
-      "bytes": 0,
+      "bytes": 18298503168,
       "min_ram_gb": 0,
       "license": "CC BY-SA 4.0",
-      "about": "6.6M articles (2025-08); full text for the 2M most-read, intro + infobox for the rest."
+      "about": "6.49M articles (2025-08); full text for the 2M most-read, intro + infobox for the rest."
     },
     {
       "id": "places-world",
@@ -29,10 +51,10 @@
       "name": "Places (worldwide)",
       "file": "places.db",
       "url": "",
-      "bytes": 0,
+      "bytes": 5316935680,
       "min_ram_gb": 0,
       "license": "CDLA-Permissive-2.0 / Apache-2.0 / CC0-1.0 (Overture Maps)",
-      "about": "Restaurants, pharmacies, hotels, transport, museums and more, for 'near me' questions."
+      "about": "30M restaurants, pharmacies, hotels, stations, museums and more, for 'near me' questions."
     }
   ]
 }
