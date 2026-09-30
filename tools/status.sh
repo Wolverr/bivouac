@@ -13,7 +13,7 @@ state() {
 }
 
 echo "Wikipedia job:  $(state bivouac-wiki)"
-echo "  pageviews:    $(wc -l < data/pageviews_en.tsv 2>/dev/null || echo 0) lines"
+echo "  pageviews:    $( [ -f data/pageviews_en.tsv ] && wc -l < data/pageviews_en.tsv || echo 0) lines"
 echo "  wiki.db:      $(size out/wiki.db)   log: $(tail -1 build_full.log 2>/dev/null)"
 echo "Places job:     $(state bivouac-places)"
 echo "  download:     $(size data/places.parquet)   log: $(tail -1 places_fetch.log 2>/dev/null)"
