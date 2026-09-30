@@ -38,6 +38,12 @@ MAX_SOURCES, PER_ARTICLE, EVIDENCE_CHARS, PRIOR_WEIGHT, NAMED_BOOST = 6, 2, 450,
 SAMPLING = dict(temperature=0.4, top_p=0.95, top_k=20, min_p=0.0, repeat_penalty=1.05, max_tokens=700)
 
 
+def overlap(text: str, words) -> int:
+    """Evidence.overlap: question words mentioned, matched by their first five letters."""
+    low = text.lower()
+    return sum(1 for w in words if (w[:5] if len(w) > 5 else w) in low)
+
+
 def route(q: str) -> str:
     m = q.strip().lower()
     return "chat" if GREETING.match(m) or PERSONAL.search(m) or not keywords(m) else "lookup"
@@ -58,9 +64,13 @@ def retrieve(pack: Pack, q: str):
                                               prior_weight=PRIOR_WEIGHT, boost_articles=named_ids, boost=NAMED_BOOST):
         art = pack.db.execute("SELECT article FROM chunk WHERE id = ?", (cid,)).fetchone()[0]
         cands.append((cid, art, title, sec))
+    needed = (len(words) + 1) // 2
     picked, per, seen = [], {}, set()
-    for cid, art, title, sec in cands:
+    for i, (cid, art, title, sec) in enumerate(cands):
         if cid in seen or per.get(art, 0) >= PER_ARTICLE:
+            continue
+        # Relevance gate (Evidence.overlap): named articles' leads always pass.
+        if i >= len(named) and overlap(f"{title} {sec} {pack.text(cid)}", words) < needed:
             continue
         seen.add(cid)
         per[art] = per.get(art, 0) + 1

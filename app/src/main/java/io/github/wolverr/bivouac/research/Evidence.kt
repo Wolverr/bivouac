@@ -47,6 +47,15 @@ object Evidence {
 
     fun isStop(word: String) = word.lowercase() in STOP
 
+    /**
+     * How many of the question words a text mentions. Words are matched by their first
+     * five letters, a cheap stand-in for stemming ("volcanoes" matches "volcanic").
+     */
+    fun overlap(text: String, words: List<String>): Int {
+        val low = text.lowercase()
+        return words.count { w -> low.contains(if (w.length > 5) w.take(5) else w) }
+    }
+
     /** Keeps the sentences that mention the most question words, in their original order. */
     fun compress(text: String, words: List<String>, maxChars: Int): String {
         if (text.length <= maxChars) return text

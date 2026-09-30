@@ -163,7 +163,11 @@ class ResearchPipeline(
 
         val perArticle = HashMap<Long, Int>()
         val seen = HashSet<Long>()
-        val picked = (leads + candidates).filter { p ->
+        // Relevance gate: a passage that shares few of the question's words is noise, and
+        // small models tend to answer "the excerpts don't cover this" instead of answering.
+        val needed = (words.size + 1) / 2
+        val relevant = candidates.filter { Evidence.overlap("${it.title} ${it.section} ${it.text}", words) >= needed }
+        val picked = (leads + relevant).filter { p ->
             val n = perArticle.getOrDefault(p.article, 0)
             if (n >= settings.perArticle || !seen.add(p.chunk)) false else { perArticle[p.article] = n + 1; true }
         }.take(settings.maxSources)
