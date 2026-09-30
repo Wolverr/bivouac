@@ -16,42 +16,69 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
-## Resume here (handoff, 2026-09-30 evening)
+## Resume here (handoff, 2026-10-01 ~01:00)
+
+Start a new session with: "Continue the Bivouac project. Read docs/ROADMAP.md, Resume here."
 
 Dev machine: home Windows PC, WSL2 Ubuntu-24.04, repo /home/nicolas/bivouac (from the
 Windows side, reach WSL with `wsl -e bash -lc ...`; editing through
 \\\\wsl.localhost drops the exec bit on .sh files, so re-run `chmod +x tools/*.sh`).
+Build: `export JAVA_HOME=$HOME/.local/opt/jdk-17.0.20+8; ./gradlew testDebugUnitTest assembleDebug`.
+Commits: no AI attribution lines, ever (user rule). Commit messages with quotes or apostrophes:
+write them to a file and use `git commit -F file` (heredocs through `wsl -e bash -lc` break).
 
-Data: out/wiki.db (6.49 M articles, 18.3 GB incl. 2.28 M aliases) and out/places.db (30.0 M places, 5.3 GB)
-are built. Desktop tools need `tools/native/build/fts_rank.so`:
+Data (built): tools/out/wiki.db (6.49 M articles, 18.3 GB, 2.28 M aliases) and tools/out/places.db
+(30.0 M places, 5.3 GB). Desktop tools need `tools/native/build/fts_rank.so`:
 `export PATH=$HOME/Android/Sdk/cmake/3.31.6/bin:$PATH; cmake -S tools/native -B tools/native/build -G Ninja && ninja -C tools/native/build`.
-Done: 7 candidate models in ~/models; llama-server for the PC at ~/llama-pc/bin.
-Eval: eval/questions.jsonl (60, 48 with gold articles), eval/baseline_frontier_web.jsonl
-(frontier + web answers, done), tools/answer_proto.py (PC harness), tools/grade.py (blind).
+Models in ~/models; llama-server for the PC at ~/llama-pc/bin.
+
+**Possibly still running** (check `systemctl --user is-active bivouac-models`, `tail tools/model_eval.log`):
+the v2 rerun of Qwen3.5-9B (`eval/results-pc-qwen3.5-9b-v2.jsonl`, resumable). If it stopped before 60
+lines, restart only it:
+`cd tools && systemd-run --user --unit=bivouac-models --working-directory=$PWD -p MemoryMax=12G -p MemorySwapMax=1G --collect --setenv=ONLY=qwen3.5-9b --setenv=SUFFIX=-v2 bash -c './run_model_eval.sh >> model_eval.log 2>&1'`.
+When it has 60 lines: `tools/.venv/bin/python tools/grade.py packet eval/results-pc-qwen3.5-9b-v2.jsonl`,
+then a blind grader subagent (reads only eval/grading/GRADER_INSTRUCTIONS.txt + the packet, never the key
+or other files; same prompt as the earlier graders: place answers with specific real places count as useful,
+longer isn't better) writes eval/grading/pc-qwen3.5-9b-v2.scores.jsonl, then `grade.py score ...`.
+
+Results so far (PC harness, % of the frontier + web baseline's score):
+
+| Model | File | Score | PC s/answer |
+|---|---|---|---|
+| Qwen3.5-9B | 5.3 GB | 57.7 (v2: pending) | 26.5 |
+| Qwen3.5-4B | 2.6 GB | 54.7 (v2: 57.1) | 16.4 |
+| LFM2.5-8B-A1B | 4.9 GB | 46.4 (needs `--reasoning-budget 0`) | ~6 |
+| Gemma-4-E4B | 4.7 GB | 44.1 | 12.6 |
+| Qwen3.5-2B | 1.2 GB | 44.0 | 9.7 |
+
+Gemma-4-26B / Qwen3.6-35B dropped: too big for any phone, and they swap the 16 GB PC.
+Tier picks (in catalog.json): 6 GB -> 2B, 8 GB -> 4B, 12 GB -> 9B. Rival AndroidLM claims 64 %.
+
+**Grader noise:** regrading moves the baseline's mean by ~0.7 (9.83 vs 9.13 on identical frontier
+answers), i.e. ±2–3 points of parity. Small pipeline changes need a *paired* comparison (old vs new
+answers of the same model in one blind packet) — `grade.py` doesn't have that mode yet; add it.
 
 Next steps, in order:
-1. Retrieval: 85% hit@6 (`tools/.venv/bin/python tools/eval_retrieval.py tools/out/wiki.db --show-misses`).
-   Remaining misses are semantic ("why did the USSR collapse" -> Dissolution of the Soviet Union) or
-   disambiguation pages FineWiki lacks (TCP, UDP, CFS). Possible next: a disambiguation-free acronym
-   table, or a small embedding reranker. Good enough to move on.
-2. Model quality per RAM tier — **first ranking done** (PC harness, blind grading vs frontier + web,
-   % of the baseline's score): Qwen3.5-9B 57.7 · Qwen3.5-4B 54.7 · LFM2.5-8B-A1B 46.4 · Gemma-4-E4B 44.1 ·
-   Qwen3.5-2B 44.0. Gemma-4-26B / Qwen3.6-35B dropped (9.9 / 12.3 GB: no phone fits them; swapped the PC).
-   Likely picks: 6 GB -> 2B, 8 GB -> 4B (near the 9B at half the size), 12 GB -> 9B. Confirm on the phone.
-   Running: v2 rerun of Qwen 4B + 9B with the retrieval/prompt fixes (`SUFFIX=-v2`, see
-   tools/run_model_eval.sh). Per finished model: `grade.py packet eval/results-pc-<name>.jsonl`, a blind
-   grader subagent fills eval/grading/pc-<name>.scores.jsonl (only GRADER_INSTRUCTIONS.txt + the packet,
-   never the key), then `grade.py score`. Known model issues: Gemma E4B and LFM2.5 refuse when excerpts
-   miss ("the excerpts don't say"); LFM2.5 needs `--reasoning-budget 0` (template ignores thinking off).
-3. Places: desktop-tested (`tools/.venv/bin/python tools/places_proto.py tools/out/places.db --wiki tools/out/wiki.db
-   --questions eval/questions.jsonl`); exonyms fixed via aliases. Next: Redmi end-to-end + on-phone eval
-   (copy both packs to the phone: ~24 GB).
-4. Low-RAM work: code done, **needs a device test** (see status log). On the Redmi: load each model, check
-   the "auto: ctx …" line in Library, watch PSS vs estimate (`adb shell dumpsys meminfo io.github.wolverr.bivouac`),
-   force an OOM (load the 9B) to check the crash notice and the smaller settings on the next load.
-5. Host packs (HuggingFace), fill app/src/main/assets/catalog.json URLs; README; M8.
-No 12 GB phone available yet (options in chat: borrow any 12 GB phone, cloud devices, used Pixel 8 Pro).
-See docs/COMPETITORS.md for what the other entries do.
+1. Finish/grade 9B v2 (above). Add a paired old-vs-new grading mode to tools/grade.py and use it to
+   check the v2 fixes on 4B and 9B.
+2. Known answer problems (from graded answers): reasoning is the weakest category (28–40 %);
+   "Rome vs New York" still pulls "Rome, New York" articles (idea: drop namesake articles titled
+   "X, Y" when X and Y are both named separately in the question); Gemma E4B / LFM2.5 refuse when
+   excerpts miss. Proposed to the user, not decided: a "Think harder" button that reruns a question
+   with reasoning on (slower, 1–3 min on a phone) — measure on the reasoning questions first.
+3. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
+   (~24 GB), test the automatic memory settings (Library shows "auto: ctx …"; compare
+   `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the estimate; load the 9B to force an OOM and
+   check the crash notice), measure speed of 2B/4B, run the on-phone eval (docs/EVAL.md).
+4. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
+   (uploads, fills catalog URLs). README.md is a draft with TBDs (phone speeds, release link, license).
+   Then demo video (user), make the repo public, poidh claim. Deadline 2026-10-31.
+
+What the user does (only these): connect the phone (`winget install usbipd`, then as admin
+`usbipd list`, `usbipd bind --busid X`, `usbipd attach --wsl --busid X`); choose the app license;
+HuggingFace account; record the demo video; submit the claim. No 12 GB phone yet (borrow one,
+cloud device farm, or used Pixel 8 Pro).
+See docs/COMPETITORS.md for the other entries.
 
 ## Milestones
 
