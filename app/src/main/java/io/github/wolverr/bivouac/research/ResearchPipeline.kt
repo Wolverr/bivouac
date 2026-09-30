@@ -1,5 +1,6 @@
 package io.github.wolverr.bivouac.research
 
+import io.github.wolverr.bivouac.llm.ChatTurn
 import io.github.wolverr.bivouac.llm.GenEvent
 import io.github.wolverr.bivouac.llm.LlmRuntime
 import io.github.wolverr.bivouac.llm.Sampling
@@ -11,9 +12,25 @@ import kotlinx.coroutines.flow.flow
 data class Source(val n: Int, val passage: Passage, val evidence: String)
 
 sealed interface ResearchEvent {
+    data class Routed(val decision: Router.Decision) : ResearchEvent
     data class Searching(val query: String) : ResearchEvent
     data class Sources(val sources: List<Source>, val searchMs: Long) : ResearchEvent
     data class Llm(val event: GenEvent) : ResearchEvent
+}
+
+/**
+ * Conversation memory. Each user turn keeps two renderings: exactly what the
+ * model saw (with excerpts), which lets the engine reuse its cache on the next
+ * turn, and the bare question, used when history has to be compacted.
+ */
+class Conversation {
+    internal data class Turn(val question: String, val prompt: String, var answer: String)
+
+    internal val turns = ArrayList<Turn>()
+    val isEmpty: Boolean get() = turns.isEmpty()
+    val lastQuestion: String? get() = turns.lastOrNull()?.question
+
+    fun clear() = turns.clear()
 }
 
 class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?) {
@@ -23,32 +40,70 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
         val perArticle: Int = 2,
         val evidenceChars: Int = 450,
         val priorWeight: Double = 0.5,
+        /** Rough prompt budget in characters (~4 chars/token) for history + new turn. */
+        val historyChars: Int = 9_000,
         val sampling: Sampling = Sampling(temperature = 0.4f, maxTokens = 700),
     )
 
-    fun answer(question: String, settings: Settings = Settings()): Flow<ResearchEvent> = flow {
-        val sources = if (corpus?.path != null) retrieve(question, settings) else emptyList()
-        val system = if (sources.isEmpty()) SYSTEM_NO_SOURCES else SYSTEM_WITH_SOURCES
-        val user = buildString {
+    fun answer(question: String, conversation: Conversation, settings: Settings = Settings()): Flow<ResearchEvent> = flow {
+        val decision = Router.decide(question, !conversation.isEmpty)
+        emit(ResearchEvent.Routed(decision))
+
+        val sources = if (decision.route == Router.Route.LOOKUP && corpus?.path != null) {
+            // A short follow-up ("and its population?") needs the earlier topic to search well.
+            val query = if (decision.followUp) "${conversation.lastQuestion.orEmpty()} $question" else question
+            retrieve(query, settings)
+        } else {
+            emptyList()
+        }
+
+        val prompt = buildString {
             if (sources.isNotEmpty()) {
-                appendLine("Sources:")
+                appendLine("Wikipedia excerpts:")
                 for (s in sources) {
                     val where = if (s.passage.section.isEmpty()) s.passage.title else "${s.passage.title} — ${s.passage.section}"
                     appendLine("[${s.n}] $where")
                     appendLine(s.evidence)
                     appendLine()
                 }
+                append("Question: ")
             }
-            append("Question: ").append(question)
+            append(question)
         }
-        val (prefix, rest) = llm.chatPrompt(system, user)
-        llm.complete(prefix, rest, settings.sampling).collect { emit(ResearchEvent.Llm(it)) }
+
+        val turns = history(conversation, settings.historyChars - prompt.length) + ChatTurn("user", prompt)
+        val (prefix, rest) = llm.chatPrompt(SYSTEM, turns)
+        val answer = StringBuilder()
+        llm.complete(prefix, rest, settings.sampling).collect { ev ->
+            if (ev is GenEvent.Token) answer.append(ev.text)
+            if (ev is GenEvent.Done && ev.stats.error.isEmpty() && !ev.stats.cancelled) {
+                conversation.turns += Conversation.Turn(question, prompt, answer.toString().trim())
+            }
+            emit(ResearchEvent.Llm(ev))
+        }
     }
 
-    private suspend fun FlowCollector<ResearchEvent>.retrieve(
-        question: String,
-        settings: Settings,
-    ): List<Source> {
+    /**
+     * Earlier turns that fit the budget. Recent turns keep their excerpts so the
+     * engine can reuse its cache; once that doesn't fit, turns shrink to the bare
+     * question, and the oldest ones are dropped.
+     */
+    private fun history(conversation: Conversation, budget: Int): List<ChatTurn> {
+        val full = conversation.turns.flatMap { listOf(ChatTurn("user", it.prompt), ChatTurn("assistant", it.answer)) }
+        if (full.sumOf { it.content.length } <= budget) return full
+        val compact = ArrayList<ChatTurn>()
+        var used = 0
+        for (t in conversation.turns.asReversed()) {
+            val size = t.question.length + t.answer.length
+            if (used + size > budget) break
+            compact.add(0, ChatTurn("assistant", t.answer))
+            compact.add(0, ChatTurn("user", t.question))
+            used += size
+        }
+        return compact
+    }
+
+    private suspend fun FlowCollector<ResearchEvent>.retrieve(question: String, settings: Settings): List<Source> {
         val corpus = corpus ?: return emptyList()
         val words = Evidence.keywords(question)
         if (words.isEmpty()) return emptyList()
@@ -69,20 +124,17 @@ class ResearchPipeline(private val llm: LlmRuntime, private val corpus: Corpus?)
     }
 
     companion object {
-        // Kept identical across questions so the engine's prefix cache is reused.
-        const val SYSTEM_WITH_SOURCES =
-            "You are Bivouac, an offline research assistant running on a phone. You are given numbered " +
-                "excerpts from Wikipedia and a question.\n" +
-                "- Start with a direct answer, then the key supporting details.\n" +
-                "- Cite the excerpts you use with their numbers in brackets, like [1] or [2][3], right after the claim.\n" +
-                "- Use your own knowledge to explain and connect facts, but when a fact comes only from your memory " +
-                "and not the excerpts, don't cite it, and be careful with exact numbers and dates.\n" +
-                "- If the excerpts are irrelevant, ignore them.\n" +
-                "- Be concise: a few short paragraphs or a short list. The screen is small: never use tables or LaTeX."
-
-        const val SYSTEM_NO_SOURCES =
-            "You are Bivouac, an offline research assistant running on a phone. Answer accurately and concisely. " +
-                "Lead with the direct answer, then give the key supporting details. If you are not sure about a " +
-                "fact, say so instead of guessing. The screen is small: use short paragraphs or lists, never tables or LaTeX."
+        // One prompt for every kind of message, so the engine's cached prefix always applies.
+        const val SYSTEM =
+            "You are Bivouac, an assistant that runs fully offline on a phone.\n" +
+                "- Research questions: start with a direct answer, then the key supporting details. When numbered " +
+                "Wikipedia excerpts are provided, cite the ones you use like [1] or [2][3] right after the claim. " +
+                "Don't cite facts that come only from your own memory, and be careful with exact numbers and dates. " +
+                "Ignore excerpts that are irrelevant.\n" +
+                "- Personal or casual messages: reply warmly and naturally, like a thoughtful friend. If something is " +
+                "ambiguous (for example feeling unwell physically or emotionally), ask a short clarifying question. " +
+                "If someone may be in danger, gently encourage them to contact local emergency services or someone they trust.\n" +
+                "- If you're not sure about something, say so instead of guessing.\n" +
+                "- Be concise. The screen is small: use short paragraphs or lists, never tables or LaTeX."
     }
 }

@@ -138,7 +138,9 @@ void Engine::unload() {
     snapshot_.clear();
 }
 
-std::string Engine::format_chat(const std::string & system, const std::string & user, bool enable_thinking) const {
+std::string Engine::format_chat(const std::string & system,
+                                const std::vector<std::pair<std::string, std::string>> & turns,
+                                bool enable_thinking) const {
     if (!templates_) return "";
     common_chat_templates_inputs in;
     if (!system.empty()) {
@@ -147,10 +149,12 @@ std::string Engine::format_chat(const std::string & system, const std::string & 
         sys.content = system;
         in.messages.push_back(sys);
     }
-    common_chat_msg usr;
-    usr.role = "user";
-    usr.content = user;
-    in.messages.push_back(usr);
+    for (const auto & [role, content] : turns) {
+        common_chat_msg m;
+        m.role = role;
+        m.content = content;
+        in.messages.push_back(m);
+    }
     in.add_generation_prompt = true;
     in.use_jinja = true;
     in.enable_thinking = enable_thinking;
@@ -204,25 +208,32 @@ CompletionStats Engine::complete(const std::string & prefix, const std::string &
     auto * mem = llama_get_memory(ctx_);
     const int64_t t0 = ggml_time_us();
 
-    // 1) Get the prefix into the cache as cheaply as possible.
-    bool have_prefix = false;
-    if (!pre.empty() && starts_with(kv_tokens_, pre) &&
-        llama_memory_seq_rm(mem, 0, (llama_pos) pre.size(), -1)) {
-        // Attention-only models can simply drop everything after the prefix.
-        kv_tokens_.resize(pre.size());
-        have_prefix = true;
-    } else if (!pre.empty() && pre == snapshot_tokens_ && !snapshot_.empty()) {
-        // Recurrent/hybrid models can't truncate, so restore the saved state.
-        llama_memory_clear(mem, true);
-        if (llama_state_seq_set_data(ctx_, snapshot_.data(), snapshot_.size(), 0) > 0) {
-            kv_tokens_ = pre;
-            have_prefix = true;
+    // 1) Reuse as much of what is already in memory as possible.
+    std::vector<llama_token> full = pre;
+    full.insert(full.end(), suf.begin(), suf.end());
+    const int total = (int) full.size();
+    size_t reuse = 0;
+    if (!kv_tokens_.empty() && kv_tokens_.size() < full.size() && starts_with(full, kv_tokens_)) {
+        // Follow-up turn: the cache holds the earlier conversation verbatim.
+        reuse = kv_tokens_.size();
+    } else {
+        size_t lcp = 0;
+        while (lcp < kv_tokens_.size() && lcp < full.size() && kv_tokens_[lcp] == full[lcp]) lcp++;
+        if (lcp >= pre.size() && lcp < full.size() && !pre.empty() &&
+            llama_memory_seq_rm(mem, 0, (llama_pos) lcp, -1)) {
+            // Attention-only models can drop everything after the shared part.
+            kv_tokens_.resize(lcp);
+            reuse = lcp;
+        } else if (!pre.empty() && pre == snapshot_tokens_ && !snapshot_.empty()) {
+            // Recurrent/hybrid models can't truncate, so restore the saved prefix state.
+            llama_memory_clear(mem, true);
+            if (llama_state_seq_set_data(ctx_, snapshot_.data(), snapshot_.size(), 0) > 0) {
+                kv_tokens_ = pre;
+                reuse = pre.size();
+            }
         }
     }
-    const int total = (int) (pre.size() + suf.size());
-    if (have_prefix) {
-        st.n_reused = (int) pre.size();
-    } else {
+    if (reuse == 0) {
         llama_memory_clear(mem, true);
         kv_tokens_.clear();
         if (!decode_tokens(pre, 0, false, cb.on_prefill, 0, total)) {
@@ -235,15 +246,19 @@ CompletionStats Engine::complete(const std::string & prefix, const std::string &
         snapshot_.resize(sz);
         llama_state_seq_get_data(ctx_, snapshot_.data(), sz, 0);
         snapshot_tokens_ = pre;
+        reuse = pre.size();
+    } else {
+        st.n_reused = (int) reuse;
     }
 
-    // 2) Evaluate the question-specific part.
-    if (!decode_tokens(suf, (int) kv_tokens_.size(), true, cb.on_prefill, (int) pre.size(), total)) {
+    // 2) Evaluate the new part of the prompt.
+    const std::vector<llama_token> rest_toks(full.begin() + reuse, full.end());
+    if (!decode_tokens(rest_toks, (int) reuse, true, cb.on_prefill, (int) reuse, total)) {
         st.cancelled = cancel_.load();
         st.error = st.cancelled ? "" : "decode failed";
         return st;
     }
-    st.n_prefill += (int) suf.size();
+    st.n_prefill += (int) rest_toks.size();
     const int64_t t1 = ggml_time_us();
     st.t_prefill_us = t1 - t0;
 

@@ -52,8 +52,11 @@ public:
     void unload();
     bool loaded() const { return model_ != nullptr; }
 
-    // Renders a system + user turn with the model's own chat template.
-    std::string format_chat(const std::string & system, const std::string & user, bool enable_thinking) const;
+    // Renders a conversation (system prompt + alternating user/assistant turns,
+    // ending with a user turn) with the model's own chat template.
+    std::string format_chat(const std::string & system,
+                            const std::vector<std::pair<std::string, std::string>> & turns,
+                            bool enable_thinking) const;
 
     // Evaluates prefix + rest and generates a reply. `prefix` should be the
     // stable part of the prompt (system instructions): it is evaluated once

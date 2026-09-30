@@ -23,7 +23,12 @@ internal object NativeEngine {
         repack: Boolean,
     ): ByteArray
     external fun nativeUnload()
-    external fun nativeFormatChat(system: ByteArray, user: ByteArray, thinking: Boolean): ByteArray
+    external fun nativeFormatChat(
+        system: ByteArray,
+        roles: Array<ByteArray>,
+        contents: Array<ByteArray>,
+        thinking: Boolean,
+    ): ByteArray
     external fun nativeCancel()
     external fun nativeModelInfo(): ByteArray
     external fun nativeBench(nPrompt: Int, nGen: Int): ByteArray

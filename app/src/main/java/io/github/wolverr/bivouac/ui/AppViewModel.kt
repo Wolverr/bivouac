@@ -9,6 +9,7 @@ import io.github.wolverr.bivouac.llm.FileStore
 import io.github.wolverr.bivouac.llm.GenEvent
 import io.github.wolverr.bivouac.llm.LlmRuntime
 import io.github.wolverr.bivouac.llm.ModelInfo
+import io.github.wolverr.bivouac.research.Conversation
 import io.github.wolverr.bivouac.research.Corpus
 import io.github.wolverr.bivouac.research.ResearchEvent
 import io.github.wolverr.bivouac.research.ResearchPipeline
@@ -37,15 +38,24 @@ data class LibraryState(
     val repack: Boolean = true,
 )
 
-data class AskState(
-    val question: String = "",
+/** One question and its answer in the conversation. */
+data class TurnUi(
+    val question: String,
     val answer: String = "",
-    val running: Boolean = false,
     val status: String? = null,
     val prefill: Pair<Int, Int>? = null,
     val sources: List<Source> = emptyList(),
     val searchMs: Long? = null,
     val stats: CompletionStats? = null,
+    val error: String? = null,
+    val usedLibrary: Boolean = false,
+    val crisis: Boolean = false,
+)
+
+data class AskState(
+    val input: String = "",
+    val turns: List<TurnUi> = emptyList(),
+    val running: Boolean = false,
     val error: String? = null,
 )
 
@@ -55,6 +65,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val packs = FileStore(app, "packs", ".db")
     private val corpus = Corpus()
     private val pipeline = ResearchPipeline(runtime, corpus)
+    private val conversation = Conversation()
 
     private val prefs = app.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
 
@@ -143,28 +154,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _library.update { it.copy(busy = null, benchResult = r) }
     }
 
-    fun setQuestion(q: String) = _ask.update { it.copy(question = q) }
+    fun setInput(q: String) = _ask.update { it.copy(input = q) }
+
+    fun newChat() {
+        if (_ask.value.running) return
+        conversation.clear()
+        _ask.update { AskState() }
+    }
+
+    private fun updateLast(f: (TurnUi) -> TurnUi) =
+        _ask.update { st -> st.copy(turns = st.turns.dropLast(1) + f(st.turns.last())) }
 
     fun askQuestion() {
-        val q = _ask.value.question.trim()
+        val q = _ask.value.input.trim()
         if (q.isEmpty() || _ask.value.running) return
         if (_library.value.loadedModel == null) {
             _ask.update { it.copy(error = "Load a model first (Library tab).") }
             return
         }
-        _ask.update { AskState(question = q, running = true, status = "Searching…") }
+        _ask.update { it.copy(input = "", running = true, error = null, turns = it.turns + TurnUi(q, status = "Thinking…")) }
         askJob = viewModelScope.launch {
             try {
-                pipeline.answer(q).collect { ev ->
+                pipeline.answer(q, conversation).collect { ev ->
                     when (ev) {
-                        is ResearchEvent.Searching -> _ask.update { it.copy(status = "Searching the library…") }
-                        is ResearchEvent.Sources -> _ask.update {
+                        is ResearchEvent.Routed -> updateLast { it.copy(crisis = ev.decision.crisis) }
+                        is ResearchEvent.Searching -> updateLast { it.copy(status = "Searching the library…", usedLibrary = true) }
+                        is ResearchEvent.Sources -> updateLast {
                             it.copy(sources = ev.sources, searchMs = ev.searchMs, status = "Reading sources…")
                         }
                         is ResearchEvent.Llm -> when (val g = ev.event) {
-                            is GenEvent.Prefill -> _ask.update { it.copy(prefill = g.done to g.total) }
-                            is GenEvent.Token -> _ask.update { it.copy(answer = it.answer + g.text, status = null) }
-                            is GenEvent.Done -> _ask.update {
+                            is GenEvent.Prefill -> updateLast { it.copy(prefill = g.done to g.total) }
+                            is GenEvent.Token -> updateLast { it.copy(answer = it.answer + g.text, status = null) }
+                            is GenEvent.Done -> updateLast {
                                 it.copy(stats = g.stats, error = g.stats.error.ifEmpty { null }, status = null)
                             }
                         }
@@ -173,9 +194,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _ask.update { it.copy(error = e.message) }
+                updateLast { it.copy(error = e.message) }
             } finally {
-                _ask.update { it.copy(running = false, status = null) }
+                _ask.update { it.copy(running = false) }
+                if (_ask.value.turns.isNotEmpty()) updateLast { it.copy(status = null) }
             }
         }
     }

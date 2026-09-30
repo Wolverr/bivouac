@@ -64,10 +64,20 @@ JNIEXPORT void JNICALL JNI_FN(nativeUnload)(JNIEnv *, jobject) {
     g_engine.unload();
 }
 
-JNIEXPORT jbyteArray JNICALL JNI_FN(nativeFormatChat)(JNIEnv * env, jobject, jbyteArray system, jbyteArray user,
-                                                      jboolean thinking) {
+// roles[i] / contents[i] are the conversation turns, oldest first.
+JNIEXPORT jbyteArray JNICALL JNI_FN(nativeFormatChat)(JNIEnv * env, jobject, jbyteArray system, jobjectArray roles,
+                                                      jobjectArray contents, jboolean thinking) {
+    std::vector<std::pair<std::string, std::string>> turns;
+    const jsize n = env->GetArrayLength(roles);
+    for (jsize i = 0; i < n; i++) {
+        auto * r = (jbyteArray) env->GetObjectArrayElement(roles, i);
+        auto * c = (jbyteArray) env->GetObjectArrayElement(contents, i);
+        turns.emplace_back(to_string(env, r), to_string(env, c));
+        env->DeleteLocalRef(r);
+        env->DeleteLocalRef(c);
+    }
     std::lock_guard<std::mutex> lock(g_mutex);
-    return to_bytes(env, g_engine.format_chat(to_string(env, system), to_string(env, user), thinking));
+    return to_bytes(env, g_engine.format_chat(to_string(env, system), turns, thinking));
 }
 
 JNIEXPORT void JNICALL JNI_FN(nativeCancel)(JNIEnv *, jobject) {

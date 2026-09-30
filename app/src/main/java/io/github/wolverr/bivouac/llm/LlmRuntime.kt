@@ -53,6 +53,8 @@ data class Sampling(
     val maxTokens: Int = 1024,
 )
 
+data class ChatTurn(val role: String, val content: String)
+
 sealed interface GenEvent {
     data class Prefill(val done: Int, val total: Int) : GenEvent
     data class Token(val text: String) : GenEvent
@@ -96,19 +98,26 @@ class LlmRuntime private constructor(context: Context) {
 
     suspend fun unload() = withContext(llmThread) { NativeEngine.nativeUnload() }
 
-    suspend fun formatChat(system: String, user: String, thinking: Boolean = false): String = withContext(llmThread) {
-        NativeEngine.nativeFormatChat(system.toByteArray(), user.toByteArray(), thinking).decodeToString()
-    }
+    suspend fun formatChat(system: String, turns: List<ChatTurn>, thinking: Boolean = false): String =
+        withContext(llmThread) {
+            NativeEngine.nativeFormatChat(
+                system.toByteArray(),
+                turns.map { it.role.toByteArray() }.toTypedArray(),
+                turns.map { it.content.toByteArray() }.toTypedArray(),
+                thinking,
+            ).decodeToString()
+        }
 
     /**
-     * Splits a chat prompt into the stable prefix (system instructions, cached
-     * natively across questions) and the question-specific rest.
+     * Renders a conversation (ending with a user turn) and splits it into the
+     * stable prefix (system instructions, snapshotted natively) and the rest.
+     * The engine additionally reuses earlier turns that are still in its cache.
      */
-    suspend fun chatPrompt(system: String, user: String, thinking: Boolean = false): Pair<String, String> {
-        val rendered = formatChat(system, USER_MARKER, thinking)
-        val at = rendered.indexOf(USER_MARKER)
-        check(at >= 0) { "chat template dropped the user message" }
-        return rendered.substring(0, at) to (user + rendered.substring(at + USER_MARKER.length))
+    suspend fun chatPrompt(system: String, turns: List<ChatTurn>, thinking: Boolean = false): Pair<String, String> {
+        val probe = formatChat(system, listOf(ChatTurn("user", USER_MARKER)), thinking)
+        val prefix = probe.substring(0, probe.indexOf(USER_MARKER).also { check(it >= 0) { "chat template dropped the user message" } })
+        val full = formatChat(system, turns, thinking)
+        return if (full.startsWith(prefix)) prefix to full.substring(prefix.length) else "" to full
     }
 
     fun complete(prefix: String, rest: String, sampling: Sampling = Sampling()): Flow<GenEvent> = callbackFlow {
