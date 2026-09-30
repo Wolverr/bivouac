@@ -34,14 +34,15 @@ Next steps, in order:
    Remaining misses are semantic ("why did the USSR collapse" -> Dissolution of the Soviet Union) or
    disambiguation pages FineWiki lacks (TCP, UDP, CFS). Possible next: a disambiguation-free acronym
    table, or a small embedding reranker. Good enough to move on.
-2. Model quality per RAM tier — **in progress, paused** (2026-09-30 20:50; qwen3.5-2b at 17/60).
-   Resume (resumable, skips answered questions):
-   `cd tools && systemd-run --user --unit=bivouac-models --working-directory=$PWD -p MemoryMax=14G -p MemorySwapMax=1G --collect bash -c './run_model_eval.sh > model_eval.log 2>&1'`
-   (note: `>` truncates the log; the results files are what count). ~3–4 h for all 7 models, smallest first.
-   Per finished model: `tools/.venv/bin/python tools/grade.py packet eval/results-pc-<name>.jsonl`, then a
-   blind grader subagent fills eval/grading/pc-<name>.scores.jsonl (reads only GRADER_INSTRUCTIONS.txt +
-   the packet, never the key), then `grade.py score ...`. Results with the old system prompt (places/diet
-   bullet leaked into answers; harness skipped places.db) are in eval/old-prompt-v1/ (2B: 36.6% parity).
+2. Model quality per RAM tier — **first ranking done** (PC harness, blind grading vs frontier + web,
+   % of the baseline's score): Qwen3.5-9B 57.7 · Qwen3.5-4B 54.7 · LFM2.5-8B-A1B 46.4 · Gemma-4-E4B 44.1 ·
+   Qwen3.5-2B 44.0. Gemma-4-26B / Qwen3.6-35B dropped (9.9 / 12.3 GB: no phone fits them; swapped the PC).
+   Likely picks: 6 GB -> 2B, 8 GB -> 4B (near the 9B at half the size), 12 GB -> 9B. Confirm on the phone.
+   Running: v2 rerun of Qwen 4B + 9B with the retrieval/prompt fixes (`SUFFIX=-v2`, see
+   tools/run_model_eval.sh). Per finished model: `grade.py packet eval/results-pc-<name>.jsonl`, a blind
+   grader subagent fills eval/grading/pc-<name>.scores.jsonl (only GRADER_INSTRUCTIONS.txt + the packet,
+   never the key), then `grade.py score`. Known model issues: Gemma E4B and LFM2.5 refuse when excerpts
+   miss ("the excerpts don't say"); LFM2.5 needs `--reasoning-budget 0` (template ignores thinking off).
 3. Places: desktop-tested (`tools/.venv/bin/python tools/places_proto.py tools/out/places.db --wiki tools/out/wiki.db
    --questions eval/questions.jsonl`); exonyms fixed via aliases. Next: Redmi end-to-end + on-phone eval
    (copy both packs to the phone: ~24 GB).
@@ -137,6 +138,13 @@ See docs/COMPETITORS.md for what the other entries do.
   (`tools/build_aliases.py`: redirects + pageview titles, 2.28 M names, +180 MB): GPS -> Global Positioning
   System, Treaty of Westphalia -> Peace of Westphalia, WW2, Obama. Aliases also geocode places by local name
   (Florence -> firenze, Rome -> "roma, italy" -> roma, Moscow -> москва). Search ~1.5 s/question on the PC.
+
+- 2026-10-01: model eval (PC harness). Fixed on the way: place instructions moved from the system
+  prompt into the places list (small models leaked "cuisine notes" into unrelated answers; 2B went
+  36.6% -> 44.0%); the harness now uses places.db like the app. Found by reading graded answers: list
+  questions need the "List of X in Y" article, "New York" is a disambiguation page (fallback to the most
+  viewed "X (...)"/"X City" article, names only), the diet sentence belongs only to diet requests, LFM2.5
+  reasoning must be filtered (research/ThinkFilter.kt). Retrieval hit@6 stays 85%.
 
 ## Dev notes
 
