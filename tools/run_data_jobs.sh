@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Downloads the source data and builds both knowledge packs, as two background
 # jobs that survive closing the terminal:
-#   bivouac-wiki:   FineWiki (~13 GB) + pageviews (5.6 GB) -> out/wiki.db   (~25 GB)
+#   bivouac-wiki:   FineWiki (~13 GB) + pageviews (5.6 GB) -> out/wiki.db   (~25 GB),
+#                   then its alias and acronym tables
 #   bivouac-places: Overture Maps places                    -> out/places.db
 # Every step skips work that's already done, so it's safe to re-run.
 #
@@ -15,7 +16,9 @@ PY=.venv/bin/python
 wiki_cmd="$PY fetch_finewiki.py --out data/finewiki_en > fetch_finewiki.log 2>&1 \
  && { [ -s data/pageviews_en.tsv ] || ./fetch_pageviews.sh 2025-08 > data/pageviews_en.tsv 2> pageviews.log; } \
  && $PY build_corpus.py --src data/finewiki_en --out out/wiki.db --pageviews data/pageviews_en.tsv \
-        --full-top 2000000 --fts-detail column > build_full.log 2>&1"
+        --full-top 2000000 --fts-detail column > build_full.log 2>&1 \
+ && $PY build_aliases.py out/wiki.db > build_aliases.log 2>&1 \
+ && $PY build_acronyms.py out/wiki.db --apply > build_acronyms.log 2>&1"
 places_cmd="{ [ -s data/places.parquet ] && grep -q ' places in ' places_fetch.log 2>/dev/null || $PY fetch_places.py > places_fetch.log 2>&1; } \
  && $PY build_places.py --src data/places.parquet --out out/places.db > build_places.log 2>&1"
 

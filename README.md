@@ -94,7 +94,7 @@ Rebuilding the data packs (downloads ~20 GB; a few hours on a 16 GB PC, mostly d
 tools/setup_dev.sh               # Python venv for the tools
 tools/run_data_jobs.sh           # FineWiki + pageviews -> wiki.db, Overture -> places.db
 tools/status.sh                  # progress
-tools/.venv/bin/python tools/build_aliases.py tools/out/wiki.db   # alternative names
+# (run_data_jobs.sh also adds the alias and acronym tables: tools/build_aliases.py, tools/build_acronyms.py)
 ```
 
 ## Data and licenses
