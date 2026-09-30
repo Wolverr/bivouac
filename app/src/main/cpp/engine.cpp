@@ -18,6 +18,8 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 static void llama_log_to_android(ggml_log_level level, const char * text, void *) {
+    // llama.cpp's debug output is thousands of lines per load; keep info and up.
+    if (level == GGML_LOG_LEVEL_DEBUG || level == GGML_LOG_LEVEL_CONT) return;
     int prio = ANDROID_LOG_DEBUG;
     switch (level) {
         case GGML_LOG_LEVEL_ERROR: prio = ANDROID_LOG_ERROR; break;
@@ -36,12 +38,15 @@ void Engine::init_backends(const std::string & native_lib_dir) {
     LOGI("backends loaded from %s", native_lib_dir.c_str());
 }
 
-std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & cpus) {
+std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & cpus, bool repack) {
     unload();
 
     llama_model_params mp = llama_model_default_params();
     mp.load_mode = LLAMA_LOAD_MODE_MMAP;  // weights stay in the page cache, not the app heap
     mp.n_gpu_layers = 0;
+    // Repacking copies weights into a CPU-friendlier layout: faster matmuls, but
+    // the copy lives on the heap next to the mmapped file (roughly 2x memory).
+    mp.use_extra_bufts = repack;
     model_ = llama_model_load_from_file(path.c_str(), mp);
     if (!model_) {
         return "could not load model file (corrupt, unsupported architecture, or out of memory)";
@@ -92,7 +97,7 @@ std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const
     kv_tokens_.clear();
     snapshot_tokens_.clear();
     snapshot_.clear();
-    LOGI("loaded %s: n_ctx=%d n_batch=%d threads=%d", path.c_str(), n_ctx, n_batch, n_threads_);
+    LOGI("loaded %s: n_ctx=%d n_batch=%d threads=%d repack=%d", path.c_str(), n_ctx, n_batch, n_threads_, repack);
     return "";
 }
 
@@ -288,6 +293,10 @@ CompletionStats Engine::complete(const std::string & prefix, const std::string &
     if (!pending.empty() && cb.on_token) cb.on_token(pending);
     common_sampler_free(smpl);
     st.t_gen_us = ggml_time_us() - t1;
+    LOGI("complete: reused %d, prefill %d tok in %.2f s (%.1f tok/s), gen %d tok in %.2f s (%.1f tok/s), first token %.2f s, stop=%s",
+         st.n_reused, st.n_prefill, st.t_prefill_us / 1e6, st.n_prefill / std::max(1e-9, st.t_prefill_us / 1e6),
+         st.n_gen, st.t_gen_us / 1e6, st.n_gen / std::max(1e-9, st.t_gen_us / 1e6), st.t_first_token_us / 1e6,
+         st.stop_reason.c_str());
     return st;
 }
 
@@ -336,6 +345,8 @@ std::string Engine::bench(int n_prompt, int n_gen) {
     llama_memory_clear(mem, true);
     kv_tokens_.clear();
 
+    LOGI("bench: pp%d %.2f tok/s, tg%d %.2f tok/s, threads=%d", n_prompt, n_prompt / ((t1 - t0) / 1e6),
+         n_gen, n_gen / ((t2 - t1) / 1e6), n_threads_);
     std::ostringstream o;
     o << "{\"pp_tokens\":" << n_prompt << ",\"pp_tps\":" << (n_prompt / ((t1 - t0) / 1e6))
       << ",\"tg_tokens\":" << n_gen << ",\"tg_tps\":" << (n_gen / ((t2 - t1) / 1e6)) << "}";

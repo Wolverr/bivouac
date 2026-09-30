@@ -33,6 +33,8 @@ data class LibraryState(
     val importProgress: Float? = null,
     val error: String? = null,
     val benchResult: String? = null,
+    val allCores: Boolean = false,
+    val repack: Boolean = true,
 )
 
 data class AskState(
@@ -54,7 +56,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val corpus = Corpus()
     private val pipeline = ResearchPipeline(runtime, corpus)
 
-    private val _library = MutableStateFlow(LibraryState(models = models.list(), packs = packs.list()))
+    private val prefs = app.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+
+    private val _library = MutableStateFlow(
+        LibraryState(
+            models = models.list(),
+            packs = packs.list(),
+            allCores = prefs.getBoolean("all_cores", false),
+            repack = prefs.getBoolean("repack", true),
+        ),
+    )
     val library: StateFlow<LibraryState> = _library.asStateFlow()
 
     private val _ask = MutableStateFlow(AskState())
@@ -85,7 +96,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadModel(file: File) = viewModelScope.launch {
         _library.update { it.copy(busy = "Loading ${file.name}…", error = null, benchResult = null) }
-        runtime.load(file.absolutePath)
+        val lib = _library.value
+        runtime.load(file.absolutePath, LlmRuntime.LoadOptions(allCores = lib.allCores, repack = lib.repack))
             .onSuccess { info -> _library.update { it.copy(loadedModel = file.absolutePath, modelInfo = info) } }
             .onFailure { e -> _library.update { it.copy(loadedModel = null, modelInfo = null, error = e.message) } }
         _library.update { it.copy(busy = null) }
@@ -112,6 +124,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         file.delete()
         refresh()
+    }
+
+    /** Changes apply on the next model load. */
+    fun setAllCores(on: Boolean) {
+        prefs.edit().putBoolean("all_cores", on).apply()
+        _library.update { it.copy(allCores = on) }
+    }
+
+    fun setRepack(on: Boolean) {
+        prefs.edit().putBoolean("repack", on).apply()
+        _library.update { it.copy(repack = on) }
     }
 
     fun bench() = viewModelScope.launch {

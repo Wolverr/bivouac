@@ -72,8 +72,18 @@ class LlmRuntime private constructor(context: Context) {
         NativeEngine.nativeInit(context.applicationInfo.nativeLibraryDir.toByteArray())
     }
 
-    suspend fun load(path: String, nCtx: Int = 4096, nBatch: Int = 256): Result<ModelInfo> = withContext(llmThread) {
-        val err = NativeEngine.nativeLoad(path.toByteArray(), nCtx, nBatch, device.bigCores).decodeToString()
+    data class LoadOptions(
+        val nCtx: Int = 4096,
+        val nBatch: Int = 256,
+        /** Also run on the efficiency cores. Helps prompt reading on phones with few big cores. */
+        val allCores: Boolean = false,
+        /** Let llama.cpp copy weights into a faster layout (costs about the model's size in extra RAM). */
+        val repack: Boolean = true,
+    )
+
+    suspend fun load(path: String, opts: LoadOptions = LoadOptions()): Result<ModelInfo> = withContext(llmThread) {
+        val cpus = if (opts.allCores) device.allCores else device.bigCores
+        val err = NativeEngine.nativeLoad(path.toByteArray(), opts.nCtx, opts.nBatch, cpus, opts.repack).decodeToString()
         if (err.isNotEmpty()) Result.failure(IllegalStateException(err))
         else Result.success(json.decodeFromString<ModelInfo>(NativeEngine.nativeModelInfo().decodeToString()))
     }

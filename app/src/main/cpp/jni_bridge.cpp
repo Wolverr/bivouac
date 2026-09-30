@@ -42,7 +42,7 @@ JNIEXPORT void JNICALL JNI_FN(nativeInit)(JNIEnv * env, jobject, jbyteArray lib_
 }
 
 JNIEXPORT jbyteArray JNICALL JNI_FN(nativeLoad)(JNIEnv * env, jobject, jbyteArray path, jint n_ctx, jint n_batch,
-                                                jintArray cpus) {
+                                                jintArray cpus, jboolean repack) {
     std::vector<int> cpu_list;
     if (cpus) {
         const jsize n = env->GetArrayLength(cpus);
@@ -50,7 +50,7 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(nativeLoad)(JNIEnv * env, jobject, jbyteArra
         env->GetIntArrayRegion(cpus, 0, n, cpu_list.data());
     }
     std::lock_guard<std::mutex> lock(g_mutex);
-    return to_bytes(env, g_engine.load(to_string(env, path), n_ctx, n_batch, cpu_list));
+    return to_bytes(env, g_engine.load(to_string(env, path), n_ctx, n_batch, cpu_list, repack));
 }
 
 JNIEXPORT void JNICALL JNI_FN(nativeUnload)(JNIEnv *, jobject) {

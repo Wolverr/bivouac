@@ -29,13 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.wolverr.bivouac.research.Source
@@ -93,7 +87,7 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Card(Modifier.fillMaxWidth()) {
                 SelectionContainer {
                     Text(
-                        withCitations(s.answer, MaterialTheme.colorScheme.primary),
+                        renderAnswer(s.answer, MaterialTheme.colorScheme.primary),
                         modifier = Modifier.padding(16.dp),
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -141,17 +135,4 @@ private fun SourceCard(src: Source) {
             }
         }
     }
-}
-
-private val CITATION = Regex("\\[(\\d{1,2})]")
-
-/** Renders "[3]" citation markers in the accent color. */
-private fun withCitations(text: String, color: Color): AnnotatedString = buildAnnotatedString {
-    var last = 0
-    for (m in CITATION.findAll(text)) {
-        append(text.substring(last, m.range.first))
-        withStyle(SpanStyle(color = color, fontWeight = FontWeight.SemiBold)) { append(m.value) }
-        last = m.range.last + 1
-    }
-    append(text.substring(last))
 }

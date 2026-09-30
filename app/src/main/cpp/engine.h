@@ -45,7 +45,7 @@ public:
     static void init_backends(const std::string & native_lib_dir);
 
     // Returns an empty string on success, otherwise an error message.
-    std::string load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & cpus);
+    std::string load(const std::string & path, int n_ctx, int n_batch, const std::vector<int> & cpus, bool repack);
     void unload();
     bool loaded() const { return model_ != nullptr; }
 

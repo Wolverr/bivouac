@@ -15,6 +15,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -83,6 +84,10 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             }
         }
 
+        Text("Performance (applies on next Load)", style = MaterialTheme.typography.titleMedium)
+        SettingRow("Use efficiency cores too", "More threads; can speed up reading long prompts", s.allCores, vm::setAllCores)
+        SettingRow("Repack weights", "Faster math, but uses extra RAM about the model's size", s.repack, vm::setRepack)
+
         Text("Knowledge packs", style = MaterialTheme.typography.titleMedium)
         if (s.packs.isEmpty()) {
             Text("No knowledge pack. Without one, answers come from the model's memory only.", style = MaterialTheme.typography.bodyMedium)
@@ -92,6 +97,17 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 enabled = s.busy == null, onAction = { vm.openPack(f) }, onDelete = { vm.delete(f) })
         }
         s.packInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    }
+}
+
+@Composable
+private fun SettingRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

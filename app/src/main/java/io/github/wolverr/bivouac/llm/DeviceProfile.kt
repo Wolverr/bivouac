@@ -13,6 +13,8 @@ data class DeviceProfile(
     /** CPU ids of every core outside the slowest cluster. */
     val bigCores: IntArray,
 ) {
+    val allCores: IntArray get() = (0 until Runtime.getRuntime().availableProcessors()).toList().toIntArray()
+
     val totalRamGb: Double get() = totalRamBytes / 1e9
 
     companion object {
