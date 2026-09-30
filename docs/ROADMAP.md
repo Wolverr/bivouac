@@ -16,6 +16,32 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
+## Resume here (handoff, 2026-09-30 evening)
+
+Dev machine: home Windows PC, WSL2 Ubuntu-24.04, repo /home/nicolas/bivouac (Claude runs on
+the Windows side and reaches WSL with `wsl -e bash -lc ...`; editing through
+\\\\wsl.localhost drops the exec bit on .sh files, so re-run `chmod +x tools/*.sh`).
+
+Running as systemd user services (check `tools/status.sh`):
+- bivouac-wiki: FineWiki download -> pageviews -> build out/wiki.db (full pack)
+- bivouac-places: Overture download -> build out/places.db
+Done: 7 candidate models in ~/models; llama-server for the PC at ~/llama-pc/bin.
+Eval: eval/questions.jsonl (60, 48 with gold articles), eval/baseline_frontier_web.jsonl
+(frontier + web answers, done), tools/answer_proto.py (PC harness), tools/grade.py (blind).
+
+Next steps, in order:
+1. When out/wiki.db exists: `tools/.venv/bin/python tools/eval_retrieval.py out/wiki.db --show-misses`,
+   fix misses (e.g. weight rare terms in the relevance gate), re-measure.
+2. Model quality per RAM tier: for each model in ~/models start
+   `~/llama-pc/bin/llama-server -m <gguf> -c 8192 -t 16 --port 8088 --jinja`, run
+   `tools/answer_proto.py --db out/wiki.db --name <model>`, then `tools/grade.py packet ...`,
+   have a grader agent fill eval/grading/<name>.scores.jsonl (GRADER_INSTRUCTIONS.txt), `grade.py score`.
+3. places.db: test place questions; then Redmi (8 GB reference phone) end-to-end + on-phone eval.
+4. Low-RAM work: auto repack by free RAM, context sizing, OOM crash marker (8 GB = main tier).
+5. Host packs (HuggingFace), fill app/src/main/assets/catalog.json URLs; README; M8.
+No 12 GB phone available yet (options in chat: borrow any 12 GB phone, cloud devices, used Pixel 8 Pro).
+See docs/COMPETITORS.md for what the other entries do.
+
 ## Milestones
 
 - [x] M0: toolchain (JDK 17 via mise, Android SDK/NDK r29, CMake 3.31.6), llama.cpp v0.5.0 submodule
