@@ -78,7 +78,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val packs = FileStore(app, "packs", ".db")
     private val corpus = Corpus()
     private val places = Places()
-    private val pipeline = ResearchPipeline(runtime, corpus, places) { DeviceLocation.current(app) }
+    private val pipeline = ResearchPipeline(
+        runtime,
+        system = app.assets.open("prompts/system.txt").use { it.readBytes().decodeToString().trim() },
+        corpus = corpus,
+        places = places,
+    ) { DeviceLocation.current(app) }
     private val conversation = Conversation()
 
     private val prefs = app.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)

@@ -42,6 +42,11 @@ class Conversation {
 
 class ResearchPipeline(
     private val llm: LlmRuntime,
+    /**
+     * One prompt for every kind of message, so the engine's cached prefix always applies.
+     * Lives in assets/prompts/system.txt, shared with the desktop harness (tools/answer_proto.py).
+     */
+    private val system: String,
     private val corpus: Corpus?,
     private val places: Places? = null,
     /** The phone's position for "near me" questions; null when unavailable or not permitted. */
@@ -100,7 +105,7 @@ class ResearchPipeline(
         }
 
         val turns = history(conversation, settings.historyChars - prompt.length) + ChatTurn("user", prompt)
-        val (prefix, rest) = llm.chatPrompt(SYSTEM, turns)
+        val (prefix, rest) = llm.chatPrompt(system, turns)
         val answer = StringBuilder()
         llm.complete(prefix, rest, settings.sampling).collect { ev ->
             if (ev is GenEvent.Token) answer.append(ev.text)
@@ -197,21 +202,5 @@ class ResearchPipeline(
     companion object {
         fun formatDistance(m: Double): String =
             if (m < 1000) "${(m / 10).toInt() * 10} m" else String.format(Locale.US, "%.1f km", m / 1000)
-
-        // One prompt for every kind of message, so the engine's cached prefix always applies.
-        const val SYSTEM =
-            "You are Bivouac, an assistant that runs fully offline on a phone.\n" +
-                "- Research questions: start with a direct answer, then the key supporting details. When numbered " +
-                "Wikipedia excerpts are provided, cite the ones you use like [1] or [2][3] right after the claim. " +
-                "Don't cite facts that come only from your own memory, and be careful with exact numbers and dates. " +
-                "Ignore excerpts that are irrelevant.\n" +
-                "- Personal or casual messages: reply warmly and naturally, like a thoughtful friend. If something is " +
-                "ambiguous (for example feeling unwell physically or emotionally), ask a short clarifying question. " +
-                "If someone may be in danger, gently encourage them to contact local emergency services or someone they trust.\n" +
-                "- When a list of places from the offline map is provided, recommend from it using the labels like " +
-                "[P1], mention how far each is, and never invent places that aren't listed. The list may be incomplete, " +
-                "so for dietary needs, point out places whose cuisine usually suits them too.\n" +
-                "- If you're not sure about something, say so instead of guessing.\n" +
-                "- Be concise. The screen is small: use short paragraphs or lists, never tables or LaTeX."
     }
 }
