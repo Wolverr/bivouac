@@ -13,7 +13,10 @@ url="https://dumps.wikimedia.org/other/pageview_complete/monthly/${month:0:4}/${
 
 dest="$(dirname "$0")/data/$(basename "$url")"
 mkdir -p "$(dirname "$dest")"
-until curl -sSL --retry 10 --retry-all-errors -C - -o "$dest" "$url"; do
+remote_size=$(curl -sSLI "$url" | tr -d '\r' | awk 'tolower($1) == "content-length:" { n = $2 } END { print n }')
+local_size=$(stat -c %s "$dest" 2>/dev/null || echo 0)
+# A complete file makes `curl -C -` fail with "range not satisfiable", so skip it.
+[ "$local_size" = "$remote_size" ] || until curl -sSL --retry 10 --retry-all-errors -C - -o "$dest" "$url"; do
     echo "download interrupted, resuming…" >&2
     sleep 5
 done
