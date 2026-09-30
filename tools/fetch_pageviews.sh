@@ -23,7 +23,11 @@ local_size=$(stat -c %s "$dest" 2>/dev/null || echo 0)
     sleep 5
 done
 
+# awk stops reading after the English block, so bzip2 then fails with "broken
+# pipe"; that's expected. Success is judged by awk having seen the whole block.
+set +o pipefail
 bzip2 -dc "$dest" | awk '
     $1 == "en.wikipedia" { seen = 1; if ($3 != "null") print $3 "\t" $5; next }
-    seen { exit }   # the dump is sorted by wiki; stop after the English block
+    seen { done = 1; exit }   # the dump is sorted by wiki; stop after the English block
+    END { if (!done) exit 3 }  # no English block, or the file ended inside it
 '

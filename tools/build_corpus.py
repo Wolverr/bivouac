@@ -335,11 +335,19 @@ def main() -> None:
     def batches():
         cols = ["page_id", "title", "text", "infoboxes", "bytes_html"]
         seen = 0
+        # FineWiki holds several revisions of ~1% of pages (66k of 6.6M, e.g. "Abraham Lincoln"
+        # four times, nearly identical); keep the first. One byte per page id (~81 MB).
+        done = bytearray()
         for shard in shards:
             for batch in pq.ParquetFile(shard).iter_batches(columns=cols, batch_size=1000):
                 rows, hints = [], {}
                 for pid, title, text, ib, size in zip(*(batch.column(i).to_pylist() for i in range(len(cols)))):
                     pid = int(pid)
+                    if pid >= len(done):
+                        done.extend(bytes(max(pid + 1 - len(done), 1 << 20)))
+                    if done[pid]:
+                        continue
+                    done[pid] = 1
                     v = int(views[pid]) if views is not None and pid < len(views) else 0
                     full = full_cutoff < 0 or v >= full_cutoff
                     rows.append((pid, title, text or "", ib, full))
