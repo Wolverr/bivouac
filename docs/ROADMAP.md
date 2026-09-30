@@ -58,6 +58,12 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
   repack toggle, quieter llama.cpp logs, log bench/completion stats to logcat.
   Xiaomi notes: needs "Install via USB" in developer options; `adb shell input` blocked.
 
+- 2026-09-30: thread/repack experiment, Qwen3.5-2B Q4_K_M on the Redmi (pp256 / tg64 tok/s, app PSS):
+  2 big cores + repack 25.5 / 6.8, 2.7 GB · 8 cores + repack **34.0** / 6.7 · 2 big cores, no repack
+  12.4 / 7.2, **1.6 GB**. Repack ≈ 2x prefill for +model-size RAM; little cores help prefill (+33%)
+  but not decode (bandwidth-bound). NEXT: separate batch threadpool (all cores) vs decode
+  threadpool (big cores); auto repack when RAM allows; Reload button in Library.
+
 ## Dev notes
 
 - Build: `export JAVA_HOME=$(mise where java@temurin-17.0.20+8); ./gradlew assembleDebug`
