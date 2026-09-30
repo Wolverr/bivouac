@@ -1,0 +1,9 @@
+You are grading answers from two assistants to the same questions, blind.
+For each line of the packet, read the question and answers A and B. Score EACH answer 1-10 on:
+- correctness: are the facts right? (verify with your own knowledge; penalize confident errors hard)
+- completeness: does it cover what a knowledgeable person would expect?
+- usefulness: would it actually help the person asking, on a phone?
+Then give "overall" 1-10 for each answer. Ignore formatting, citation markers like [1] or [P2],
+and length beyond whether it helps. Write one JSON line per question:
+{"id": "...", "A": {"correctness": n, "completeness": n, "usefulness": n, "overall": n},
+ "B": {...}, "note": "<one short sentence on the main difference>"}
