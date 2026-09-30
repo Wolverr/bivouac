@@ -36,7 +36,9 @@ def main() -> None:
 
     src = f"s3://overturemaps-us-west-2/release/{args.release}/theme=places/type=place/*.parquet"
     con = duckdb.connect()
-    con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2'; SET threads=4;")
+    # Capped: DuckDB defaults to 80% of RAM, which starves the rest of an 8 GB machine.
+    con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2'; SET threads=4; "
+                "SET memory_limit='1500MB'; SET preserve_insertion_order=false;")
     keep_top = ", ".join(f"'{c}'" for c in KEEP_TOP)
     keep_services = ", ".join(f"'{c}'" for c in KEEP_SERVICES)
     t0 = time.time()

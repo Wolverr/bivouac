@@ -172,18 +172,24 @@ def train_dictionary(shard: Path) -> bytes:
 
 
 def load_pageviews(path: str | None) -> np.ndarray | None:
-    """page_id -> monthly views, as a dense array indexed by page id."""
+    """page_id -> monthly views (summed over access types), as a dense array by page id.
+
+    Aggregated with DuckDB, which spills to disk: the file has tens of millions of lines.
+    """
     if not path:
         return None
-    ids, views = [], []
-    with open(path, encoding="utf-8", errors="replace") as f:
-        for line in f:
-            parts = line.split("\t", 2)
-            if len(parts) >= 2 and parts[0].isdigit():
-                ids.append(int(parts[0]))
-                views.append(int(parts[1]))
-    arr = np.zeros(max(ids) + 1, dtype=np.int64)
-    np.add.at(arr, np.array(ids), np.array(views))
+    import duckdb
+    con = duckdb.connect()
+    con.execute("SET memory_limit='1GB'; SET threads=2;")
+    res = con.sql(f"""
+        SELECT column0::BIGINT AS id, sum(column1::BIGINT) AS v
+        FROM read_csv('{path}', delim='\t', header=false, columns={{'column0': 'VARCHAR', 'column1': 'VARCHAR'}})
+        WHERE regexp_full_match(column0, '[0-9]+')
+        GROUP BY 1
+    """).fetchnumpy()
+    ids, views = res["id"], res["v"]
+    arr = np.zeros(int(ids.max()) + 1, dtype=np.int64)
+    arr[ids] = views
     print(f"pageviews: {len(ids):,} pages, {int(arr.sum()):,} views", flush=True)
     return arr
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Monthly English Wikipedia pageviews (human traffic), summed over desktop and
-# mobile, as "page_id<TAB>views<TAB>title". Used as the popularity prior when
+# Monthly English Wikipedia pageviews (human traffic), one "page_id<TAB>views" line
+# per access type (desktop, mobile-web, mobile-app); build_corpus.py sums them.
+# Streams with O(1) memory: keeping every title in awk took >8 GB and got the
+# terminal OOM-killed. Used as the popularity prior when
 # ranking search results and when choosing which articles get full text.
 #
 # Downloads the ~5.6 GB all-wikis dump (resumable; Wikimedia resets long
@@ -22,7 +24,6 @@ local_size=$(stat -c %s "$dest" 2>/dev/null || echo 0)
 done
 
 bzip2 -dc "$dest" | awk '
-    $1 == "en.wikipedia" { seen = 1; if ($3 != "null") { views[$3] += $5; title[$3] = $2 } next }
+    $1 == "en.wikipedia" { seen = 1; if ($3 != "null") print $3 "\t" $5; next }
     seen { exit }   # the dump is sorted by wiki; stop after the English block
-    END { for (id in views) printf "%s\t%d\t%s\n", id, views[id], title[id] }
 '

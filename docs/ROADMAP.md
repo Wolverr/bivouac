@@ -77,3 +77,8 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - Build: `export JAVA_HOME=$(mise where java@temurin-17.0.20+8); ./gradlew assembleDebug`
 - Test phone: Redmi Note 15 Pro (mid-range MediaTek). Final numbers come from a borrowed Pixel.
 - Don't copy code from other entries; ideas only (plagiarism disqualifies).
+- Long jobs: run as memory-capped systemd user services, not from a terminal. On this 8 GB
+  PC systemd-oomd kills the whole terminal scope (and anything started from it, setsid or
+  not) when RAM+swap pass 90%. Example:
+  `systemd-run --user --unit=bivouac-wiki --working-directory=$PWD/tools -p MemoryMax=3G -p MemorySwapMax=1G --collect bash -c '…'`
+  Check with `tools/status.sh`; stop with `systemctl --user stop bivouac-wiki`.
