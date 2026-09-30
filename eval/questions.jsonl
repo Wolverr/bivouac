@@ -1,0 +1,60 @@
+{"id": "fact-01", "cat": "fact", "q": "What is the capital of Kazakhstan, and when did it move from Almaty?"}
+{"id": "fact-02", "cat": "fact", "q": "Who designed the Sagrada Família and when is it expected to be completed?"}
+{"id": "fact-03", "cat": "fact", "q": "How tall is Mount Kilimanjaro and which country is it in?"}
+{"id": "fact-04", "cat": "fact", "q": "What year did the Berlin Wall fall, and what triggered the opening of the border that night?"}
+{"id": "fact-05", "cat": "fact", "q": "Which element has the highest melting point?"}
+{"id": "fact-06", "cat": "fact", "q": "What currency is used in Montenegro, and why is that unusual?"}
+{"id": "explain-01", "cat": "explain", "q": "Explain how a heat pump can deliver more heat energy than the electricity it consumes."}
+{"id": "explain-02", "cat": "explain", "q": "Why is the sky blue but sunsets are red? Explain the physics."}
+{"id": "explain-03", "cat": "explain", "q": "How do mRNA vaccines work, step by step?"}
+{"id": "explain-04", "cat": "explain", "q": "What is the difference between proof of work and proof of stake, and what problem does each solve?"}
+{"id": "explain-05", "cat": "explain", "q": "Explain what a zero-knowledge proof is to someone with a high-school math background."}
+{"id": "explain-06", "cat": "explain", "q": "Why does altitude sickness happen, and what are the warning signs of HAPE and HACE?"}
+{"id": "explain-07", "cat": "explain", "q": "How does GPS determine your position, and why does it need to account for relativity?"}
+{"id": "explain-08", "cat": "explain", "q": "What causes inflation, according to the main schools of economic thought?"}
+{"id": "compare-01", "cat": "compare", "q": "Compare the Roman Republic and the Roman Empire in how power was organized."}
+{"id": "compare-02", "cat": "compare", "q": "What are the main differences between Theravada and Mahayana Buddhism?"}
+{"id": "compare-03", "cat": "compare", "q": "Compare lithium-ion and lithium iron phosphate (LFP) batteries: energy density, safety, lifespan."}
+{"id": "compare-04", "cat": "compare", "q": "How do the parliamentary systems of the UK and Germany differ?"}
+{"id": "compare-05", "cat": "compare", "q": "Rollups vs sidechains: how do their security models differ?"}
+{"id": "compare-06", "cat": "compare", "q": "Compare the causes of World War I and World War II."}
+{"id": "synth-01", "cat": "synthesis", "q": "Why did the Bronze Age collapse happen? Summarize the leading theories."}
+{"id": "synth-02", "cat": "synthesis", "q": "What made the Dutch Republic so economically successful in the 17th century?"}
+{"id": "synth-03", "cat": "synthesis", "q": "Summarize the history of the Silk Road and its effect on the spread of religions."}
+{"id": "synth-04", "cat": "synthesis", "q": "What are the main arguments for and against nuclear power as a climate solution?"}
+{"id": "synth-05", "cat": "synthesis", "q": "How did the printing press change European society in the century after Gutenberg?"}
+{"id": "synth-06", "cat": "synthesis", "q": "What is known about the causes of the 2008 financial crisis?"}
+{"id": "reason-01", "cat": "reasoning", "q": "If I walk at 5 km/h and need to cover 23 km with a 900 m climb, roughly how long will it take using Naismith's rule?"}
+{"id": "reason-02", "cat": "reasoning", "q": "A train leaves at 14:40 and the trip takes 3 h 55 min, crossing into a time zone one hour ahead. What local time does it arrive?"}
+{"id": "reason-03", "cat": "reasoning", "q": "I have 1.5 liters of water and am hiking 6 hours in 30°C heat. Is that enough? Explain."}
+{"id": "reason-04", "cat": "reasoning", "q": "If Ethereum's block time is 12 seconds, how many blocks are produced in a week?"}
+{"id": "reason-05", "cat": "reasoning", "q": "Which is further north: Rome or New York? By roughly how many degrees of latitude?"}
+{"id": "reason-06", "cat": "reasoning", "q": "Could Napoleon have met Beethoven? Check their lifetimes and whereabouts."}
+{"id": "travel-01", "cat": "travel", "q": "What should I know about visiting Kyoto: best areas to stay, etiquette, and getting around?"}
+{"id": "travel-02", "cat": "travel", "q": "How do I get from Lisbon airport to the city center, and roughly how long does it take?"}
+{"id": "travel-03", "cat": "travel", "q": "What is the best time of year to visit Patagonia and why?"}
+{"id": "travel-04", "cat": "travel", "q": "What are common scams tourists face in Bangkok?"}
+{"id": "travel-05", "cat": "travel", "q": "What vaccinations are usually recommended for travel to Kenya?"}
+{"id": "travel-06", "cat": "travel", "q": "What's the etiquette for tipping in Germany vs the United States?"}
+{"id": "health-01", "cat": "health", "q": "How do I treat a suspected sprained ankle while hiking far from help?"}
+{"id": "health-02", "cat": "health", "q": "What are the symptoms of heat stroke and how is it different from heat exhaustion?"}
+{"id": "health-03", "cat": "health", "q": "How do I recognize and respond to anaphylaxis?"}
+{"id": "health-04", "cat": "health", "q": "What is the safest way to purify stream water when camping?"}
+{"id": "tech-01", "cat": "tech", "q": "How does the Linux kernel schedule processes (CFS/EEVDF), in broad strokes?"}
+{"id": "tech-02", "cat": "tech", "q": "What is a Merkle tree and why do blockchains use them?"}
+{"id": "tech-03", "cat": "tech", "q": "Explain how public-key cryptography lets two strangers communicate securely."}
+{"id": "tech-04", "cat": "tech", "q": "What was The DAO hack and how did the Ethereum community respond?"}
+{"id": "tech-05", "cat": "tech", "q": "What is the difference between TCP and UDP, and when would you use each?"}
+{"id": "tech-06", "cat": "tech", "q": "What is EIP-1559 and how did it change Ethereum transaction fees?"}
+{"id": "science-01", "cat": "science", "q": "How do we know the age of the universe?"}
+{"id": "science-02", "cat": "science", "q": "What is CRISPR and why was it such a breakthrough?"}
+{"id": "science-03", "cat": "science", "q": "Why do we have seasons? Many people think it's distance from the sun — why is that wrong?"}
+{"id": "science-04", "cat": "science", "q": "What are tardigrades and why are they so resilient?"}
+{"id": "history-01", "cat": "history", "q": "What was the Meiji Restoration and why was it significant?"}
+{"id": "history-02", "cat": "history", "q": "What were the Mongols' main military advantages over their enemies?"}
+{"id": "history-03", "cat": "history", "q": "What was the significance of the Treaty of Westphalia?"}
+{"id": "history-04", "cat": "history", "q": "Why did the Soviet Union collapse?"}
+{"id": "places-01", "cat": "places", "q": "Vegetarian restaurants near the Duomo in Florence?"}
+{"id": "places-02", "cat": "places", "q": "Where can I find a pharmacy near Shinjuku Station in Tokyo?"}
+{"id": "places-03", "cat": "places", "q": "What are the must-see museums in Berlin and what is each known for?"}
+{"id": "places-04", "cat": "places", "q": "Recommend hikes near Chamonix for a moderately fit person."}
