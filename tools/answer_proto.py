@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 from places_proto import Places, parse_intent
-from retrieve_proto import Pack, compress, fts_query, keywords, title_matches
+from retrieve_proto import Pack, compress, fts_query, keywords, named_articles
 
 ROOT = Path(__file__).resolve().parent.parent
 SYSTEM = (ROOT / "app/src/main/assets/prompts/system.txt").read_text().strip()
@@ -55,7 +55,7 @@ def retrieve(pack: Pack, q: str):
     words = keywords(q)
     if not words:
         return []
-    named = title_matches(pack, q)[:3]
+    named = named_articles(pack, q)
     named_ids = {a[0] for a in named}
     cands = []
     for art_id, title, first_chunk, _ in named:
@@ -81,8 +81,11 @@ def retrieve(pack: Pack, q: str):
     return [(i + 1, title, sec, compress(pack.text(cid), words, EVIDENCE_CHARS)) for i, (cid, title, sec) in enumerate(picked)]
 
 
-# ResearchPipeline.PLACES_HEADER
-PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend from this list using the labels like [P1] and say how far each is; never invent places that aren't listed. The list may be incomplete, so for dietary needs also point out places whose cuisine usually suits them."
+# ResearchPipeline.PLACES_HEADER / placesHeader(): the diet sentence only for diet requests.
+PLACES_HEADER = ("Places from the offline map (straight-line distances). Recommend from this list "
+                 "using the labels like [P1] and say how far each is; never invent places that aren't listed.")
+DIET_NOTE = "The list may be incomplete, so also point out places whose cuisine usually suits this diet."
+DIET_WORDS = {"vegetarian", "vegan", "halal", "kosher", "gluten", "gluten-free"}  # PlaceIntent.DIET_WORDS
 
 
 def format_distance(m: float) -> str:
@@ -91,23 +94,24 @@ def format_distance(m: float) -> str:
 
 def find_places(places: Places, q: str):
     """ResearchPipeline.findPlaces for questions with a written location (no GPS on the desktop).
-    Returns None when the question isn't about places."""
+    Returns (intent, places) or None when the question isn't about places."""
     intent = parse_intent(q, places.place_nouns)
     if intent is None:
         return None
     if intent["location"] is None:
-        return []
+        return intent, []
     center = places.geocode(intent["location"])
     if not center:
-        return []
+        return intent, []
     found, _ = places.nearby(center[0], center[1], places.categories_for(intent))
-    return found
+    return intent, found
 
 
-def build_places_prompt(q: str, found) -> str:
+def build_places_prompt(q: str, intent, found) -> str:
     if not found:
         return q
-    lines = [PLACES_HEADER]
+    diet = any(w in DIET_WORDS for w in intent["modifiers"] + intent["noun"])
+    lines = [PLACES_HEADER + (" " + DIET_NOTE if diet else "")]
     for i, p in enumerate(found):
         name = p["name"] + (f" ({p['name_en']})" if p["name_en"] else "")
         line = f"[P{i + 1}] {name} — {p['cat'].replace('_', ' ')} — {format_distance(p['dist'])}"
@@ -171,10 +175,12 @@ def main():
             continue
         t0 = time.time()
         r = route(q["q"])
-        found = find_places(places, q["q"]) if places else None
-        if found is not None:
+        hit = find_places(places, q["q"]) if places else None
+        found = None
+        if hit is not None:
+            intent, found = hit
             r, sources = "places", []
-            prompt = build_places_prompt(q["q"], found)
+            prompt = build_places_prompt(q["q"], intent, found)
         else:
             sources = retrieve(pack, q["q"]) if r == "lookup" else []
             prompt = build_prompt(q["q"], sources)

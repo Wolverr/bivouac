@@ -21,6 +21,28 @@ struct Stmt {
     }
 };
 
+// Every word capitalized except small connecting words ("Peace of Westphalia"):
+// how names are written. Non-ASCII first letters count as capitalized.
+bool looks_like_name(const std::string & title) {
+    static const char * kSmall[] = {"of", "the", "and", "de", "du", "la", "le", "in", "on", "upon", "von", "van", "da"};
+    bool any = false;
+    size_t i = 0;
+    while (i < title.size()) {
+        while (i < title.size() && std::isspace((unsigned char) title[i])) i++;
+        const size_t start = i;
+        while (i < title.size() && !std::isspace((unsigned char) title[i])) i++;
+        if (start == i) break;
+        const std::string w = title.substr(start, i - start);
+        const unsigned char c = w[0];
+        if (c >= 0x80 || std::isupper(c) || std::isdigit(c)) {
+            any = true;
+            continue;
+        }
+        if (std::none_of(std::begin(kSmall), std::end(kSmall), [&](const char * s) { return w == s; })) return false;
+    }
+    return any;
+}
+
 }  // namespace
 
 // Must match norm_title() in tools/build_corpus.py for ASCII; Python's casefold
@@ -157,7 +179,9 @@ bool Corpus::find_article(const std::string & title, ArticleRef & out) {
     }
     // Disambiguation pages aren't in the pack ("New York", "Mercury"): take the most viewed
     // "X (...)" or "X City" article, if it is popular enough (>= 10,000 views/month) to be
-    // what people mean. Without the floor, "need" would become "Need (album)".
+    // what people mean. Without the floor, "need" would become "Need (album)". Only for
+    // names as written: "New York" yes, "broad" (-> "Broad City") no.
+    if (!looks_like_name(title)) return false;
     return lookup("SELECT id, title, prior, first_chunk, n_chunks FROM article "
                   "WHERE ((norm_title >= ?1 || ' (' AND norm_title < ?1 || ' )') OR norm_title = ?1 || ' city') "
                   "AND prior >= 9.21 ORDER BY prior DESC LIMIT 1");

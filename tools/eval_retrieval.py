@@ -11,13 +11,13 @@ import json
 import time
 from pathlib import Path
 
-from retrieve_proto import Pack, fts_query, keywords, title_matches
+from retrieve_proto import Pack, fts_query, keywords, named_articles
 
 
 def retrieve(pack: Pack, question: str, k: int, use_titles: bool):
     words = keywords(question)
     hits = []
-    matched = title_matches(pack, question) if use_titles else []
+    matched = named_articles(pack, question, k=99) if use_titles else []
     matched_ids = {a[0] for a in matched}
     # Title-matched articles contribute their lead first: that's where definitions live.
     for art_id, title, first_chunk, n_chunks in matched[:3]:

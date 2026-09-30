@@ -60,7 +60,8 @@ class Pack:
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='alias'").fetchone() is not None
 
     def find_article(self, title: str):
-        """(id, title, first_chunk, n_chunks, prior) by exact title, else by alias ("GPS"); like the app."""
+        """(id, title, first_chunk, n_chunks, prior) by exact title, else by alias ("GPS"), else the
+        popular "X (...)" / "X City" article for disambiguation pages ("New York"); like Corpus::find_article."""
         norm = " ".join(title.replace("_", " ").casefold().split())
         row = self.db.execute("SELECT id, title, first_chunk, n_chunks, prior FROM article WHERE norm_title = ? "
                               "ORDER BY prior DESC LIMIT 1", (norm,)).fetchone()
@@ -68,6 +69,12 @@ class Pack:
             row = self.db.execute(
                 "SELECT a.id, a.title, a.first_chunk, a.n_chunks, a.prior FROM alias l JOIN article a "
                 "ON a.id = l.article WHERE l.norm_title = ? ORDER BY l.views DESC LIMIT 1", (norm,)).fetchone()
+        # Only for names as written ("New York", not "broad" -> "Broad City").
+        if row is None and all(w[:1].isupper() for w in title.split() if w.lower() not in STOP):
+            row = self.db.execute(
+                "SELECT id, title, first_chunk, n_chunks, prior FROM article "
+                "WHERE ((norm_title >= ?1 || ' (' AND norm_title < ?1 || ' )') OR norm_title = ?1 || ' city') "
+                "AND prior >= 9.21 ORDER BY prior DESC LIMIT 1", (norm,)).fetchone()
         return row
 
     def text(self, chunk_id: int) -> str:
@@ -161,6 +168,47 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                         used[j] = True
                     break
     return found
+
+
+LIST_QUERY = re.compile(r"((?:[^\W\d_][\w-]*\s+){0,2}[^\W\d_][\w-]*s)\s+(in|of|near|around)\s+(?:the\s+)?([^\W\d_][\w'\- ]*)")
+EXPLAIN_QUERY = re.compile(r"^\s*(why|how)\b|\bcaus", re.I)
+PLACE_STOP = {"and", "or", "for", "with", "that", "which", "what", "to", "is", "are"}
+
+
+def list_article(pack: "Pack", question: str):
+    """ResearchPipeline.listArticle: "museums in Berlin" -> "List of museums in Berlin" (via aliases:
+    "List of museums and galleries in Berlin"). Returns (id, title, first_chunk, n_chunks) or None."""
+    if EXPLAIN_QUERY.search(question):
+        return None
+    for m in LIST_QUERY.finditer(question):
+        nouns = [w for w in m.group(1).split() if w.lower() not in STOP]
+        place = []
+        for w in m.group(3).split():
+            if w.lower() in PLACE_STOP:
+                break
+            place.append(w)
+        place = place[:4]
+        if not nouns or not place or not place[0][0].isupper():
+            continue
+        for n in range(len(nouns), 0, -1):
+            what = " ".join(nouns[-n:]).lower()
+            for k in range(len(place), 0, -1):
+                where = " ".join(place[:k])
+                for prep in ("in", "of"):
+                    row = pack.find_article(f"List of {what} {prep} {where}")
+                    if row:
+                        return row[:4]
+    return None
+
+
+def named_articles(pack: "Pack", question: str, k: int = 3):
+    """The list article first, then title matches, deduplicated (ResearchPipeline.retrieve)."""
+    out, seen = [], set()
+    for row in [list_article(pack, question)] + title_matches(pack, question):
+        if row and row[0] not in seen:
+            out.append(row)
+            seen.add(row[0])
+    return out[:k]
 
 
 def compress(text: str, words: list[str], max_chars=500) -> str:
