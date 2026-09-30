@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.wolverr.bivouac.eval.EvalRunner
 import io.github.wolverr.bivouac.llm.CompletionStats
 import io.github.wolverr.bivouac.llm.FileStore
 import io.github.wolverr.bivouac.llm.LibFile
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class LibraryState(
     val models: List<LibFile> = emptyList(),
@@ -234,6 +236,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _ask.update { it.copy(running = false) }
                 if (_ask.value.turns.isNotEmpty()) updateLast { it.copy(status = null) }
             }
+        }
+    }
+
+    private val _eval = MutableStateFlow<String?>(null)
+
+    /** Progress text while an adb-started eval runs; null otherwise. */
+    val eval: StateFlow<String?> = _eval.asStateFlow()
+
+    /**
+     * Loads [modelName] (a .gguf in the Library) and answers every question in
+     * [questionsName] (a .jsonl in the app folder's eval/ directory). Results go to
+     * eval/results-<model>.jsonl, resuming if that file exists. See docs/EVAL.md.
+     */
+    fun startEval(questionsName: String, modelName: String) {
+        if (_eval.value?.startsWith("Eval ") == true && !_eval.value!!.startsWith("Eval finished")) return
+        viewModelScope.launch {
+            val dir = File(getApplication<Application>().getExternalFilesDir(null), "eval").apply { mkdirs() }
+            val model = models.list().firstOrNull { it.name == modelName }
+            if (model == null) {
+                _eval.value = "Eval failed: model $modelName not found"
+                android.util.Log.e(EvalRunner.TAG, "model $modelName not found")
+                return@launch
+            }
+            if (_library.value.loadedModel != model.id) loadModel(model).join()
+            val info = _library.value.modelInfo ?: return@launch
+            val device = runtime.device.let { "${it.model} (${it.soc})" }
+            val out = File(dir, "results-${modelName.removeSuffix(".gguf")}.jsonl")
+            _eval.value = "Eval starting…"
+            EvalRunner(pipeline, device, info.desc).run(File(dir, questionsName), out) { done, total ->
+                _eval.value = "Eval $done/$total"
+            }
+            _eval.value = "Eval finished: ${out.name}"
         }
     }
 

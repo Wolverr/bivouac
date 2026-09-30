@@ -1,6 +1,8 @@
 package io.github.wolverr.bivouac.ui
 
+import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,9 +29,23 @@ import androidx.compose.ui.Modifier
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleEval(intent)
+    }
+
+    /** adb shell am start -n <pkg>/.ui.MainActivity --es eval questions.jsonl --es model <file>.gguf */
+    private fun handleEval(intent: Intent?) {
+        val questions = intent?.getStringExtra("eval") ?: return
+        val model = intent.getStringExtra("model") ?: return
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)  // a long run must not sleep
+        vm.startEval(questions, model)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleEval(intent)
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 var tab by rememberSaveable { mutableIntStateOf(0) }

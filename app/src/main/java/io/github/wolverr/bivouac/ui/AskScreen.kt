@@ -55,6 +55,7 @@ import java.util.Locale
 fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val s by vm.ask.collectAsStateWithLifecycle()
     val lib by vm.library.collectAsStateWithLifecycle()
+    val evalStatus by vm.eval.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
     val list = rememberLazyListState()
     val ask = {
@@ -108,6 +109,7 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             }
         }
 
+        evalStatus?.let { Text(it, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 16.dp)) }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
