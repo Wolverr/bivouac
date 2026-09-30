@@ -6,6 +6,7 @@
 #   ONLY="qwen3.5-4b qwen3.5-9b"   only these models (names as below)
 #   SUFFIX=-v2                     separate results files, e.g. after a pipeline change
 #   SERVER_ARGS="--reasoning-budget 0"   extra llama-server flags (needed for LFM2.5)
+#   ANSWER_ARGS="--think --only reason-01,reason-02"   extra answer_proto.py flags
 #
 # Run as a memory-capped service (see docs/ROADMAP.md "Dev notes"):
 #   systemd-run --user --unit=bivouac-models --working-directory=$PWD/tools -p MemoryMax=12G \
@@ -18,6 +19,7 @@ MODELS="${MODELS:-$HOME/models}"
 ONLY="${ONLY:-}"
 SUFFIX="${SUFFIX:-}"
 SERVER_ARGS="${SERVER_ARGS:-}"
+ANSWER_ARGS="${ANSWER_ARGS:-}"
 SERVER="$HOME/llama-pc/bin/llama-server"
 PORT=8088
 
@@ -35,7 +37,7 @@ for gguf in $(ls -S -r "$MODELS"/*.gguf); do
         sleep 1
     done
     if [ $ok = 1 ]; then
-        .venv/bin/python answer_proto.py --db out/wiki.db --name "$name$SUFFIX" --port $PORT || echo "!!! $name: answer_proto failed"
+        .venv/bin/python answer_proto.py --db out/wiki.db --name "$name$SUFFIX" --port $PORT $ANSWER_ARGS || echo "!!! $name: answer_proto failed"
     else
         echo "!!! $name: server did not start (see server-$name.log)"
     fi

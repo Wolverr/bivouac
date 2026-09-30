@@ -42,6 +42,7 @@ SAMPLING = dict(temperature=0.4, top_p=0.95, top_k=20, min_p=0.0, repeat_penalty
 # (grade.py pair) measures the change instead of sampling luck. Unseeded reruns of identical
 # prompts moved the 4B's paired mean by -0.48 on their own.
 SEED = 1234
+THINK_MAX_TOKENS = 4000
 
 
 def overlap(text: str, words) -> int:
@@ -180,20 +181,25 @@ def build_prompt(q: str, sources) -> str:
     return "\n".join(parts) + "\nQuestion: " + q
 
 
-def generate(port: int, user: str):
+def generate(port: int, user: str, think: bool = False):
+    """think: reasoning on (the proposed "Think harder" button). The budget covers reasoning
+    plus answer; usage.completion_tokens tells how long that would take on a phone."""
     body = json.dumps({
         "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
-        "chat_template_kwargs": {"enable_thinking": False},
+        "chat_template_kwargs": {"enable_thinking": think},
         **SAMPLING, "seed": SEED,
+        **({"max_tokens": THINK_MAX_TOKENS} if think else {}),
     }).encode()
     req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions", body, {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=900) as r:
+    with urllib.request.urlopen(req, timeout=1800) as r:
         res = json.load(r)
-    text = res["choices"][0]["message"]["content"]
+    choice = res["choices"][0]
+    usage = dict(res.get("usage", {}), finish_reason=choice.get("finish_reason"))
+    text = choice["message"]["content"] or ""
     # Like the app (research/ThinkFilter.kt): reasoning blocks and stray special tokens are not the answer.
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
     text = re.sub(r"<\|[a-z_]+\|>", "", text)
-    return text.strip(), res.get("usage", {})
+    return text.strip(), usage
 
 
 def main():
@@ -203,6 +209,7 @@ def main():
     ap.add_argument("--port", type=int, default=8088)
     ap.add_argument("--only", default="", help="comma-separated question ids")
     ap.add_argument("--places", default="out/places.db", help="places pack ('' to skip, like an app without one)")
+    ap.add_argument("--think", action="store_true", help="reasoning on (measures a 'Think harder' mode)")
     args = ap.parse_args()
 
     pack = Pack(args.db)
@@ -229,7 +236,7 @@ def main():
         else:
             sources = retrieve(pack, q["q"]) if r == "lookup" else []
             prompt = build_prompt(q["q"], sources)
-        answer, usage = generate(args.port, prompt)
+        answer, usage = generate(args.port, prompt, args.think)
         rec = {"id": q["id"], "question": q["q"], "answer": answer, "route": r,
                "sources": [f"{t} — {s}" if s else t for _, t, s, _ in sources] +
                           [f"[P{i + 1}] {p['name']} ({p['cat']}, {format_distance(p['dist'])})" for i, p in enumerate(found or [])],
