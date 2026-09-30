@@ -1,0 +1,8 @@
+.gradle/
+build/
+local.properties
+.cxx/
+*.gguf
+/corpus/
+/tools/.venv/
+.idea/
