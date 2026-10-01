@@ -48,8 +48,11 @@ Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the boun
 1. **Route:** is this a research question, a place search, or conversation?
 2. **Retrieve:** full-text search over 34 M Wikipedia sections (SQLite FTS5 with a BM25
    ranker that works on a compact index, blended with article popularity from pageviews).
-   Articles named in the question lead: exact titles, 2.3 M alternative names from Wikipedia
-   redirects ("GPS", "WW2"), list articles for list questions ("List of museums in Berlin").
+   Articles named in the question lead with their intro: exact titles, 2.3 M alternative names
+   from Wikipedia redirects ("GPS", "WW2"), 40 k acronyms mined from article intros for the ones
+   Wikipedia only has as disambiguation pages ("TCP", "BMI"; the question picks the meaning), and
+   list articles for list questions, read as their most viewed entries ("must-see museums in
+   Berlin" → Pergamon Museum, …) or in rank order ("tallest buildings in Dubai").
 3. **Compress:** each source is cut down to the sentences that match the question.
 4. **Answer:** llama.cpp on the phone's CPU. The fixed instructions are evaluated once and
    reused from a cache, so only the question and excerpts are read each time.
@@ -60,7 +63,8 @@ then town centroids), and pass the nearest matches with distances to the model.
 ## Evaluation
 
 60 questions across facts, explanations, comparisons, synthesis, reasoning, travel, health,
-tech, science, history and places (`eval/questions.jsonl`). Each Bivouac answer is compared
+tech, science, history and places (`eval/questions.jsonl`), plus 40 held-out questions that were
+never used for tuning (`eval/questions-holdout.jsonl`). Each Bivouac answer is compared
 blind with an answer from a frontier model using live web search, scored 1–10 for correctness,
 completeness and usefulness. Details and how to reproduce: [docs/EVAL.md](docs/EVAL.md).
 
@@ -74,8 +78,11 @@ PC harness (same pipeline and prompt as the app, llama.cpp on a desktop CPU):
 | Gemma-4-E4B | 44.1 % |
 | Qwen3.5-2B | 44.0 % |
 
-On-phone results: *TBD*. Retrieval finds a correct Wikipedia article in the top 6 for 85 %
-of the questions that have one.
+A single run varies by about ±3 points (grader and sampling noise); pipeline changes are
+compared head-to-head in one blind packet instead (`tools/grade.py pair`).
+
+On-phone results: *TBD*. Retrieval finds a correct Wikipedia article in the top 6 for 92 %
+of the questions that have one (44/48), and 94 % on the held-out set (34/36).
 
 ## Build from source
 
