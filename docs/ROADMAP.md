@@ -16,22 +16,50 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
-## Resume here (handoff, 2026-10-01 ~11:15)
+## Resume here (handoff, 2026-10-01 ~13:15)
 
-**Morning session (user decisions):** "Think harder" is built (ac288ef: button under the newest answer,
-1,024-token thinking budget enforced in engine.cpp, tested on the PC with tools/native/engine_test; not yet
-on a phone). The 9B uses tools/prompts/system-calc2.txt via catalog.json "prompt" (ae330a8; the harness
-mirrors it with --model-id). The user leaves model/tier choices to us: optimize speed and quality to beat
-the other entries.
+**Afternoon session, done:**
+- **Tiers** (paired, blind, seeded, 60 main questions vs the 4B Q4_K_M): UD-IQ3_XXS -1.25 (CI -1.71..-0.79,
+  39 worse / 9 better): rejected. Q3_K_M (2.29 GB) -0.38 (CI -0.80..0.03, 27/18): now the **6 GB pick**
+  (catalog id qwen3.5-4b-q3, min_ram_gb 5, ~3.0 GB free needed vs 3.5). The 2B moved to 4 GB phones
+  (min_ram_gb 3). Not faster on the PC (13-16 s/answer for both); phone speed still to measure.
+- **Places, 3 fixes** (app + harness mirrored): (1) `tools/build_coords.py` adds coord(article, lat, lon)
+  to wiki.db from Wikipedia's geo_tags dump (1.22 M articles; FineWiki drops {{coord}} outside infoboxes, so
+  Florence Cathedral, Louvre, Trevi Fountain, Times Square had none); find_article returns lat/lon; a bare
+  "Duomo" also tries "Florence Duomo" / "Duomo of Florence" / "Grand Bazaar, Istanbul". (2) **Bug:**
+  `within()` capped the R-tree box at 4000 rows *before* the category filter; a city centre has more (4488
+  within 800 m of the Duomo), so the nearest matches were cut. Now filtered in SQL. Duomo: vegetarian
+  restaurants 0.8-2 km -> Wegetarian at 150 m; Shibuya Crossing: Starbucks at 38 m. (3) Pharmacies and
+  hospitals whose name says so (farmacia, 薬局, クリニック, ...) rank first: Overture tags law firms and
+  izakayas near Shinjuku as pharmacies (all conf 0.85; that value is fine data in GB/IT/US, so no filter).
+  Paired blind grading of the places questions (before (1)-(3) vs after (1)+(2)): Duomo 5 -> 7 for 4B and
+  9B, Shibuya +1/+2; category mean flat (n = 7, noise; 9B pair also differs by the calc2 prompt).
+- **Sights questions** (0725b6e): the city article's sights sections (any heading level with sights /
+  attractions / landmarks / monuments) as one whole source: opening prose + bullets of the first 3 chunks.
+  Barcelona now gets Sagrada Família, Park Güell, Casa Milà; Prague its castle and bridge; Florence the Duomo.
+  Weak: Bruges's bullets are cinemas. Not yet measured with a model.
+- **Published packs:** https://huggingface.co/datasets/Wolverrr/bivouac-packs (wiki.db 18.33 GB with the
+  coord table, places.db 5.32 GB; public, sizes verified); catalog URLs filled. `hf auth login` done in WSL
+  (user Wolverrr). publish_packs.py works with huggingface_hub 2.0 (upload_file via Xet, resumable).
+- **Phone connected and set up:** the Redmi is attached; the new APK is installed (the laptop build had to be
+  uninstalled: different debug key; its 2B copy was lost). places.db is on the phone; wiki.db and the 2B/4B/
+  4B-Q3/9B models are copying.
 
-**Running (check `systemctl --user is-active bivouac-queue6`, tools/queue6.log):** 6 GB tier test. The
-normal 4B (Q4_K_M, 2.74 GB) needs ~3.5 GB free RAM, too much for most 6 GB phones, and the 2B scores
-41-45 % (< 50 %). ~/bivouac-queue6.sh runs the 4B as Q4_K_M, UD-IQ3_XXS (1.95 GB) and Q3_K_M (2.29 GB)
-on the main 60 questions from the frozen worktree ~/bivouac-q (ac288ef); results in
-~/bivouac-q/eval/results-pc-qwen3.5-4b*-v6-*.jsonl (files in ~/models-quant/<quant>/). Next: copy them to
-eval/, `grade.py pair` Q4_K_M vs each lighter file (blind grader as before), `pairscore`. If a lighter file
-stays close, make it the 6 GB pick in catalog.json (and consider it for 8 GB: smaller files decode faster
-on phones; check speed on the Redmi, IQ quants may be slower on ARM than K-quants).
+**Phone copy, important:** usbipd + WSL adb gave 3 MB/s (USB 2.0 link through usbip). Windows' own adb is
+16x faster (48 MB/s): `%LOCALAPPDATA%\platform-tools-win\platform-tools\adb.exe`, using the WSL adb key
+(copied to %USERPROFILE%\.android, so no new prompt). For big copies: `usbipd detach --busid 1-8`, then push
+from Windows reading `\\wsl.localhost\Ubuntu-24.04\home\nicolas\...` (script in the session scratchpad:
+loop over files, skip same-size). For WSL adb again: `usbipd attach --wsl --busid 1-8` (already bound; the
+WSL udev rule is /etc/udev/rules.d/51-android.rules, written with `wsl -u root`). Xiaomi asks on the phone
+before each `adb install` ("Install via USB" screen). `adb shell svc power stayon usb` keeps it awake.
+
+**Next:** phone tests (see Next steps 4). Then the full on-phone eval (1-2 h per model).
+
+**Ideas measured but not built:** "nearby Wikipedia articles" for non-shop "near X" questions (hikes near
+Chamonix: Lac Blanc, Le Brévent, Aiguilles Rouges are all within 12 km in the coord table). A plain lat/lon
+range on coord + FTS restricted to those articles took 1.2-14 s on the PC: needs a spatial index on coord
+(R-tree, in build_coords.py; changes the pack -> re-upload, Xet makes that cheap, and re-copy to phones) and
+a cheaper restriction than `rowid IN (...)`.
 
 The user asked about storage: total ~25-30 GB (APK ~70 MB; Wikipedia 18 GB, places 5 GB, model). A
 "lite" option (top articles only, places per continent, <10 GB) was offered for later; not started.
@@ -47,7 +75,7 @@ Commits: no AI attribution lines, ever (user rule). Commit messages with quotes 
 write them to a file and use `git commit -F file` (heredocs through `wsl -e bash -lc` break).
 Keep an Ubuntu terminal open when leaving jobs running overnight (WSL can stop the VM otherwise).
 
-Data (built): tools/out/wiki.db (6.49 M articles, 18.3 GB, 2.28 M aliases, 40 k acronyms) and
+Data (built): tools/out/wiki.db (6.49 M articles, 18.33 GB, 2.28 M aliases, 40 k acronyms, 1.22 M coords) and
 tools/out/places.db (30.0 M places, 5.3 GB). Desktop tools need `tools/native/build/fts_rank.so`:
 `export PATH=$HOME/Android/Sdk/cmake/3.31.6/bin:$PATH; cmake -S tools/native -B tools/native/build -G Ninja && ninja -C tools/native/build`.
 Models in ~/models; llama-server for the PC at ~/llama-pc/bin. **Run the 9B with `--no-repack`**
@@ -137,28 +165,24 @@ commit them when publishing the eval. Worktrees ~/bivouac-old (5077db9) and ~/bi
 for tonight's frozen runs (also ~/bivouac-v5 for the 2B): `git worktree remove` them when done.
 
 Next steps, in order:
-1. Done this morning: "Think harder" (1,024-token budget) and calc2 for the 9B. Finish the 6 GB tier test
-   (Running, above).
-2. 6 GB tier: the 2B scores 41-45 % (< 50 %). Check whether the 4B loads on 6 GB phones (MemoryPlanner,
-   no repack, smaller context) and switch the 6 GB pick if it does.
-3. Places are the weakest category and our planned edge: rerun the held-out places questions with the
-   geocoding fix (c080b3b); look at "near X" questions where Overture is thin (hikes: 2 trails near Chamonix).
-4. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
-   (~24 GB; wiki.db now also has the acronym table — copy it again), test the automatic memory settings
+1. Done: "Think harder" (1,024-token budget), calc2 for the 9B, 6 GB tier (4B Q3_K_M), places fixes,
+   sights sources, packs published.
+2. Phone tests (the phone has the new APK; check the copy finished): test the automatic memory settings
    (Library shows "auto: ctx …"; compare `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the
-   estimate; load the 9B to force an OOM and check the crash notice), measure speed of 2B/4B, list-expansion
-   latency (1-3 s on the PC: up to 200 title lookups), run the on-phone eval (docs/EVAL.md).
-5. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
-   (uploads, fills catalog URLs). README.md is a draft with TBDs (phone speeds, release link, license; model
-   table still shows the older single-run scores). Commit the eval results + gradings. Then demo video
-   (user), make the repo public, poidh claim. Deadline 2026-10-31.
+   estimate; the phone had only 3.0 GB MemAvailable at idle, so the 4B Q4_K_M may land on "no repack";
+   load the 9B to force an OOM and check the crash notice), measure speed of 2B/4B/4B-Q3 (if Q3 decodes
+   clearly faster on the phone, consider it for 8 GB too), Think harder timing, list-expansion latency
+   (1-3 s on the PC: up to 200 title lookups), sights latency (reads every chunk of a city article).
+3. On-phone eval (docs/EVAL.md), 4B first; it gives the published numbers.
+4. Measure the sights change with the 4B (h-places-03 and a few new sights questions, paired).
+5. Publish the rest: README.md TBDs (phone speeds, release link, license; model table still shows the older
+   single-run scores and the old tiers). Commit the eval results + gradings. Then demo video (user), make the
+   repo public, poidh claim. Deadline 2026-10-31.
 6. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
-   text, ~7 % of compressed blocks).
+   text, ~7 % of compressed blocks); spatial index on coord for "nearby articles" (above).
 
-What the user does (only these): connect the phone (`winget install usbipd`, then as admin
-`usbipd list`, `usbipd bind --busid X`, `usbipd attach --wsl --busid X`); choose the app license;
-HuggingFace account; record the demo video; submit the claim. No 12 GB phone yet (borrow one,
-cloud device farm, or used Pixel 8 Pro).
+What the user does (only these): choose the app license; record the demo video; submit the claim. Phone
+setup and HuggingFace are done. No 12 GB phone yet (borrow one, cloud device farm, or used Pixel 8 Pro).
 See docs/COMPETITORS.md for the other entries.
 
 ## Milestones
@@ -168,11 +192,13 @@ See docs/COMPETITORS.md for the other entries.
 - [x] M2: Wikipedia pack: `tools/build_corpus.py` → `wiki.db` (FTS5 + zstd blocks): 18.3 GB, 6.49 M articles
 - [~] M3: on-device retrieval (SQLite + zstd in native code), cited answers, sources view
   (code done and building; needs a real pack + device test)
-- [~] M4: model selection **per RAM tier** (6 / 8 / 12 GB): quality ranked on the PC harness,
-  speed on phones. 8 GB is the main target (most phones; the Redmi is the 8 GB reference
-  device); 12 GB is the ceiling, not the requirement. Auto repack/context sizing by free RAM.
-- [~] M5: install UX: catalog + browser download + link-in-place (done); host packs, fill catalog URLs (todo)
-- [~] M6: places (Overture Maps) + "near me" queries: app side done; places.db built; desktop-tested
+- [~] M4: model selection **per RAM tier** (4 / 6 / 8 / 12 GB: 2B, 4B Q3_K_M, 4B Q4_K_M, 9B): quality
+  ranked on the PC harness, speed on phones (todo). 8 GB is the main target (most phones; the Redmi is the
+  8 GB reference device); 12 GB is the ceiling, not the requirement. Auto repack/context sizing by free RAM.
+- [~] M5: install UX: catalog + browser download + link-in-place; packs hosted on HuggingFace, catalog URLs
+  filled (2026-10-01). Left: try a browser download on the phone.
+- [~] M6: places (Overture Maps) + "near me" queries: app side done; places.db built; desktop-tested;
+  landmark coordinates, nearest-first fix, health-place ranking, sights sources (2026-10-01)
 - [~] M7: eval harness vs frontier + web, published results (harness, paired grading, held-out set done; publish)
 - [ ] M8: README, demo video, public repo, poidh claim
 
