@@ -43,10 +43,10 @@ for Android. Download them on the phone, then add them in the app's Library.
 
 | File | Contents | License |
 |---|---|---|
-| `wiki.db` | English Wikipedia, {wiki.get("articles", "?")} articles (FineWiki, Wikipedia dump 2025-08), SQLite + FTS5 + zstd, with {wiki.get("aliases", "?")} alternative names from redirects | CC BY-SA 4.0 |
+| `wiki.db` | English Wikipedia, {wiki.get("articles", "?")} articles (FineWiki, Wikipedia dump 2025-08), SQLite + FTS5 + zstd, with {wiki.get("aliases", "?")} alternative names from redirects, {wiki.get("acronyms", "?")} acronyms and coordinates for {wiki.get("coords", "?")} articles (Wikipedia geo_tags) | CC BY-SA 4.0 |
 | `places.db` | {places.get("places", "?")} places worldwide ({places.get("source", "Overture Maps")}), SQLite + R*Tree | CDLA-Permissive-2.0 / Apache-2.0 / CC0-1.0 (per Overture source) |
 
-Built with `tools/run_data_jobs.sh` and `tools/build_aliases.py` in the Bivouac repo.
+Built with `tools/run_data_jobs.sh` and `tools/build_aliases.py`, `build_acronyms.py` and `build_coords.py` in the Bivouac repo.
 Wikipedia text is © Wikipedia contributors, CC BY-SA 4.0; changes: HTML converted to text,
 split into sections, compressed. Places data © Overture Maps Foundation and its sources.
 """
@@ -78,7 +78,12 @@ def main():
     api.upload_file(path_or_fileobj=readme.encode(), path_in_repo="README.md", repo_id=a.repo, repo_type="dataset")
     for pid, f in files.items():
         print(f"uploading {f.name} ({f.stat().st_size / 1e9:.1f} GB)…", flush=True)
-        # upload_large_folder is resumable and handles multi-GB files.
+        if not hasattr(api, "upload_large_folder"):
+            # huggingface_hub >= 2.0: uploads go through Xet, which skips chunks already on the
+            # Hub, so running the command again resumes an interrupted upload.
+            api.upload_file(path_or_fileobj=str(f), path_in_repo=f.name, repo_id=a.repo, repo_type="dataset")
+            continue
+        # upload_large_folder (huggingface_hub < 2.0) is resumable and handles multi-GB files.
         stage = OUT / f".publish-{pid}"
         stage.mkdir(exist_ok=True)
         link = stage / f.name
