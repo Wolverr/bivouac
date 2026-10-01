@@ -224,6 +224,8 @@ def generate(port: int, user: str, think: bool = False, system: str = ""):
         res = json.load(r)
     choice = res["choices"][0]
     usage = dict(res.get("usage", {}), finish_reason=choice.get("finish_reason"))
+    if "timings" in res:  # llama-server: speeds and, with speculative decoding, draft_n / draft_n_accepted
+        usage["timings"] = res["timings"]
     text = choice["message"]["content"] or ""
     # Like the app (research/ThinkFilter.kt): reasoning blocks and stray special tokens are not the answer.
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
