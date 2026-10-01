@@ -59,6 +59,10 @@ questions: -1.73 (CI -2.43..-1.04, 8 better / 38 worse); it often declines ("exc
 RAM at ctx 4096 (8.1 at 8192), PC 28 tok/s read / 2.6 write vs the 9B's 49 / 12.2. (Run it with
 `--no-repack -c 4096 -np 1` or it thrashes the 12 GB service cap.) Ministral-3-14B only fits at Q3: skipped.
 
+**12 GB precision: Q4_K_M stays.** 9B UD-Q5_K_XL (6.87 GB) vs Q4_K_M (5.6 GB), paired blind, 60 main
+questions: +0.02 (CI -0.31..+0.34, 20 better / 17 worse / 23 ties, p 0.74): no measurable gain. Q5 is
+slower (PC 40 tok/s read / 10.5 write vs 49 / 12.2) and 1.3 GB bigger. Answer length the same (184 vs 183).
+
 **Next (12 GB):** (1) GPU prompt reading once the phone model is known (Snapdragon: OpenCL/Adreno path in
 llama.cpp); (2) pick the 12 GB model by blind eval on the PC: 9B vs a dense ~12-14B standard transformer
 vs a MoE that fits in RAM; (3) Think harder on the 12 GB tier.

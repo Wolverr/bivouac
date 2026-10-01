@@ -27,8 +27,10 @@ for gguf in $(ls -S -r "$MODELS"/*.gguf); do
     name=$(basename "$gguf" .gguf | tr 'A-Z' 'a-z' | sed 's/-q[0-9].*//; s/-ud$//')
     if [ -n "$ONLY" ] && [[ " $ONLY " != *" $name "* ]]; then continue; fi
     echo "=== $name$SUFFIX ($(du -h "$gguf" | cut -f1)) $(date +%T)"
+    # --cache-ram 0: the host prompt cache (default 8 GB) pushes models over ~6.5 GB past the 12 GB cap;
+    # every question has a new prompt, so it saves nothing.
     # shellcheck disable=SC2086
-    "$SERVER" -m "$gguf" -c 8192 -t 16 --port $PORT --jinja $SERVER_ARGS > "server-$name.log" 2>&1 &
+    "$SERVER" -m "$gguf" -c 8192 -t 16 --port $PORT --jinja --cache-ram 0 $SERVER_ARGS > "server-$name.log" 2>&1 &
     pid=$!
     ok=0
     for _ in $(seq 300); do
