@@ -64,7 +64,7 @@ class ResearchPipeline(
     data class Settings(
         val maxSources: Int = 6,
         val perArticle: Int = 2,
-        val evidenceChars: Int = 450,
+        val evidenceChars: Int = 300,  // 450 -> 300 (2026-10-01): same quality (paired +0.02), prompts 16 % shorter
         val priorWeight: Double = 0.5,
         /** Score bonus for passages from articles named in the question. */
         val namedBoost: Double = 4.0,

@@ -36,7 +36,7 @@ PERSONAL = re.compile(
 )
 
 # ResearchPipeline.Settings defaults.
-MAX_SOURCES, PER_ARTICLE, EVIDENCE_CHARS, PRIOR_WEIGHT, NAMED_BOOST = 6, 2, 450, 0.5, 4.0
+MAX_SOURCES, PER_ARTICLE, EVIDENCE_CHARS, PRIOR_WEIGHT, NAMED_BOOST = 6, 2, 300, 0.5, 4.0  # EVIDENCE_CHARS 450 -> 300: same quality, shorter prompts
 INFOBOX_FACT_CHARS = 200
 LIST_SECTION = "Most viewed entries"  # ResearchPipeline.LIST_SECTION
 SIGHTS_SECTION_NAME = "Main sights"  # ResearchPipeline.SIGHTS_SECTION
