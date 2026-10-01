@@ -26,9 +26,10 @@ more than half as good as a frontier AI with web search, on a phone with at most
   casual messages get a normal reply instead of a Wikipedia search.
 - **Think harder.** One tap asks the last question again with the model reasoning first
   (hidden, up to 1,024 tokens). On the reasoning questions of the eval it lifts the 4B from
-  4.2 to 8.7 out of 10 and the 9B from 3.5 to 8.8, for a few minutes more per answer. It stays
-  off by default: over all question types it is no better (the answers get shorter) and about
-  5× slower.
+  4.2 to 8.7 out of 10 and the 9B from 3.5 to 8.8, for a few minutes more per answer. Over all
+  question types it is no better (the answers get shorter) and about 5× slower, so it turns
+  on by itself only for calculations ("23 km with a 900 m climb, how long?"), where it gained
+  or tied in all 9 graded cases, including held-out questions.
 - **Private by construction.** The app has no INTERNET permission. Downloads go through the
   phone's browser; the app only reads the files you add.
 

@@ -1,0 +1,20 @@
+{
+ "old": "results-pc-qwen3.5-4b-v16-holdout-nothink.jsonl",
+ "new": "results-pc-qwen3.5-4b-v16-holdout-auto.jsonl",
+ "questions": 3,
+ "identical": 0,
+ "old_mean": 5,
+ "new_mean": 6.33,
+ "mean_diff": 1.33,
+ "ci95": [
+  -8.93,
+  11.6
+ ],
+ "new_better": 2,
+ "old_better": 1,
+ "ties": 0,
+ "sign_test_p": 1.0,
+ "by_category": {
+  "reasoning": 1.33
+ }
+}

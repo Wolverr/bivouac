@@ -59,20 +59,19 @@ def route(q: str) -> str:
     return "chat" if GREETING.match(m) or PERSONAL.search(m) or not keywords(m) else "lookup"
 
 
-# Router.needsReasoning: calculations, "by how much", timeline overlaps get thinking on.
+# Router.needsReasoning: calculations and "by how much" get thinking on (not timelines).
 R_NUMBER = re.compile(r"\d+(?:[.,:]\d+)*")
 R_CALC = re.compile(r"\b(how (long|many|much|far)|what (local )?time|is (that|it|this) enough|will (it|i|we) (last|need))\b")
 R_RATE = re.compile(r"\b(per|every|each|a (day|week|month|year|hour)|in an? (day|week|month|year|hour))\b|/")
 R_IF = re.compile(r"^\s*if\b")
 R_BY_HOW = re.compile(r"\bby (roughly |about |approximately )?how (many|much)\b")
-R_OVERLAP = re.compile(r"\b(could .{2,40} have met|(was|were) .{2,40} (alive|born) when|lifetimes?)\b")
 
 
 def needs_reasoning(q: str) -> bool:
     m = q.strip().lower()
     n = len(R_NUMBER.findall(m))
     calc = R_CALC.search(m) and (n >= 2 or (n == 1 and (R_RATE.search(m) or R_IF.search(m))))
-    return bool(calc or R_BY_HOW.search(m) or R_OVERLAP.search(m))
+    return bool(calc or R_BY_HOW.search(m))
 
 
 def retrieve(pack: Pack, q: str):

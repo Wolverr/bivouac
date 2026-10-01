@@ -69,12 +69,18 @@ run_model_eval.sh now passes `--cache-ram 0`. The app doesn't use llama-server, 
 blind, all 60 main questions: -0.25 (CI -0.83..+0.33, 18 better / 24 worse / 18 ties, p 0.44), at 1,177
 vs 183 tokens per answer (PC 99 s vs 21 s). It wins reasoning (+1.83) and places (+2.25, 4 questions)
 but loses compare (-1.83), tech/science (-1.3), explain (-0.9): thought-through answers are shorter and
-leave things out (662 vs 810 chars). Idea: turn it on automatically for reasoning questions only (a
-Router class: arithmetic, estimates, "how long/how much"), measured paired on the reasoning set.
+leave things out (662 vs 810 chars).
+
+**Auto Think harder for calculations (2026-10-02, e62ba4b + this):** Router.needsReasoning (numbers + "how
+long/many/much/far", "what time", "is that enough"; one number only with a rate or "if"; "by how much").
+Built on the main set only (the 4 held-out reasoning questions had been seen in a listing, not used).
+Main set, from the v13/v15 grades: 9B +0.25 over all 60 when on for these only (vs -0.25 always on).
+Held-out h-reason-01..03 (v16, paired blind, Sonnet grader): 4B 5.0 -> 6.3, 9B 8.7 -> 9.0. Calculations
+gained or tied in all 9 cases; timelines (Napoleon/Beethoven, Newton/Galileo) lost (-4 9B, -9 4B), so the
+timeline rule was dropped. 0 false alarms on the other 90 questions and on 20 lookups with numbers.
 
 **Next (12 GB):** (1) GPU prompt reading once the phone model is known (Snapdragon: OpenCL/Adreno path in
-llama.cpp); (2) MTP retest on the phone (see above); (3) maybe: automatic Think harder for reasoning
-questions (above).
+llama.cpp); (2) MTP retest on the phone (see above); (3) time an auto-think answer on the phone.
 
 **Earlier this afternoon, done:**
 - **Tiers** (paired, blind, seeded, 60 main questions vs the 4B Q4_K_M): UD-IQ3_XXS -1.25 (CI -1.71..-0.79,

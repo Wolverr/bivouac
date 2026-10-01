@@ -108,7 +108,7 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         }
 
         Text("Answers", style = MaterialTheme.typography.titleMedium)
-        SettingRow("Think harder for calculations", "Reasons first on questions with numbers or dates to work out: right far more often, a few minutes slower", s.autoThink, vm::setAutoThink)
+        SettingRow("Think harder for calculations", "Reasons first on questions with numbers to work out: right far more often, a few minutes slower", s.autoThink, vm::setAutoThink)
 
         Text("Knowledge packs", style = MaterialTheme.typography.titleMedium)
         if (s.packs.isEmpty()) {

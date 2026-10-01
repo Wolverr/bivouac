@@ -8,7 +8,7 @@ package io.github.wolverr.bivouac.research
 object Router {
     enum class Route { LOOKUP, CHAT }
 
-    /** [reasoning]: a calculation or timeline question, answered with thinking on (see [needsReasoning]). */
+    /** [reasoning]: a calculation question, answered with thinking on (see [needsReasoning]). */
     data class Decision(val route: Route, val followUp: Boolean, val crisis: Boolean, val reasoning: Boolean = false)
 
     private val GREETING = Regex(
@@ -36,22 +36,21 @@ object Router {
     private val RATE = Regex("\\b(per|every|each|a (day|week|month|year|hour)|in an? (day|week|month|year|hour))\\b|/")
     private val IF_START = Regex("^\\s*if\\b")
     private val BY_HOW = Regex("\\bby (roughly |about |approximately )?how (many|much)\\b")
-    private val OVERLAP = Regex("\\b(could .{2,40} have met|(was|were) .{2,40} (alive|born) when|lifetimes?)\\b")
 
     /**
-     * Calculations ("23 km with a 900 m climb, how long…", "a 4 GB file at 12 MB/s…"), "by how
-     * much" comparisons and timeline overlaps ("could Napoleon have met Beethoven"). Thinking
-     * lifts the 9B from 3.5 to 8.8 of 10 on these but makes other answers shorter and worse
-     * (paired, all 60 questions: -0.25 when always on, +0.18 when on for these only). One number
-     * counts only with a rate or an "if": "how long did the 100 Years' War last" is a lookup.
-     * Mirrors tools/answer_proto.py.
+     * Calculations ("23 km with a 900 m climb, how long…", "a 4 GB file at 12 MB/s…") and "by how
+     * much" comparisons. Thinking makes other answers shorter and worse (9B, all 60 questions:
+     * -0.25 when always on), but on these it gained or tied in all 9 cases (main + held-out, 4B and
+     * 9B). Not timelines ("could Napoleon have met Beethoven", "was Newton alive when…"): thinking
+     * talked both models into wrong dates (-4, -9). One number counts only with a rate or an "if":
+     * "how long did the 100 Years' War last" is a lookup. Mirrors tools/answer_proto.py.
      */
     fun needsReasoning(message: String): Boolean {
         val m = message.trim().lowercase()
         val numbers = NUMBER.findAll(m).count()
         val calc = CALC.containsMatchIn(m) &&
             (numbers >= 2 || (numbers == 1 && (RATE.containsMatchIn(m) || IF_START.containsMatchIn(m))))
-        return calc || BY_HOW.containsMatchIn(m) || OVERLAP.containsMatchIn(m)
+        return calc || BY_HOW.containsMatchIn(m)
     }
 
     fun decide(message: String, hasHistory: Boolean): Decision {
