@@ -147,9 +147,12 @@ def lead(pack: Pack, title: str, first_chunk: int, n_chunks: int, words):
 
 
 # ResearchPipeline.PLACES_HEADER / placesHeader(): the diet sentence only for diet requests.
-PLACES_HEADER = ("Places from the offline map (straight-line distances). Recommend from this list "
-                 "using the labels like [P1] and say how far each is; never invent places that aren't listed.")
-DIET_NOTE = "The list may be incomplete, so also point out places whose cuisine usually suits this diet."
+PLACES_HEADER = ("Places from the offline map (straight-line distances). Recommend the best 3 to 5 "
+                 "from this list, nearest first, one short line each, using the labels like [P1] and saying how far "
+                 "each is; never invent places that aren't listed.")
+DIET_NOTE = ("The list may be incomplete, so you may add which kinds of cuisine usually suit this diet, "
+             "without naming places that aren't listed.")
+PROMPT_PLACES = 8  # ResearchPipeline.PROMPT_PLACES: the model reads the nearest few, the screen shows all
 DIET_WORDS = {"vegetarian", "vegan", "halal", "kosher", "gluten", "gluten-free"}  # PlaceIntent.DIET_WORDS
 
 
@@ -177,7 +180,7 @@ def build_places_prompt(q: str, intent, found) -> str:
         return q
     diet = any(w in DIET_WORDS for w in intent["modifiers"] + intent["noun"])
     lines = [PLACES_HEADER + (" " + DIET_NOTE if diet else "")]
-    for i, p in enumerate(found):
+    for i, p in enumerate(found[:PROMPT_PLACES]):
         name = p["name"] + (f" ({p['name_en']})" if p["name_en"] else "")
         line = f"[P{i + 1}] {name} — {p['cat'].replace('_', ' ')} — {format_distance(p['dist'])}"
         where = ", ".join(x for x in (p["street"], p["locality"]) if x)

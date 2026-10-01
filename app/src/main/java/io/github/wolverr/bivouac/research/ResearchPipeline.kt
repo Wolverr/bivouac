@@ -121,7 +121,9 @@ class ResearchPipeline(
                 // Place instructions travel with the list: in the system prompt, small models
                 // leaked them ("cuisine notes") into unrelated answers.
                 appendLine(placesHeader(placeIntent!!))
-                nearby.forEachIndexed { i, p ->
+                // The screen shows all of them; the model gets the nearest few (every line costs
+                // reading time on a phone, and it described all 12, 483 tokens, ~3 min on the Redmi).
+                nearby.take(PROMPT_PLACES).forEachIndexed { i, p ->
                     append("[P${i + 1}] ${p.displayName} — ${p.categoryLabel} — ${formatDistance(p.distanceM)}")
                     listOfNotNull(p.street, p.locality).joinToString(", ").takeIf { it.isNotEmpty() }?.let { append(" — $it") }
                     p.phone?.let { append(" — $it") }
@@ -449,9 +451,14 @@ class ResearchPipeline(
 
     companion object {
         /** Mirrored in tools/answer_proto.py. */
-        const val PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend from this list " +
-            "using the labels like [P1] and say how far each is; never invent places that aren't listed."
-        private const val DIET_NOTE = "The list may be incomplete, so also point out places whose cuisine usually suits this diet."
+        const val PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend the best 3 to 5 " +
+            "from this list, nearest first, one short line each, using the labels like [P1] and saying how far each is; " +
+            "never invent places that aren't listed."
+        /** "Point out places" made the model name restaurants that weren't listed ("Osteria del Duomo"). */
+        private const val DIET_NOTE = "The list may be incomplete, so you may add which kinds of cuisine usually suit " +
+            "this diet, without naming places that aren't listed."
+        /** Places the model reads; the screen shows all that were found. Mirrored in tools/answer_proto.py. */
+        const val PROMPT_PLACES = 8
 
         /** The diet sentence only when a diet was asked for: otherwise small models add diet notes to pharmacies. */
         fun placesHeader(intent: PlaceIntent): String =
