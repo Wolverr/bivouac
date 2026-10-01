@@ -17,6 +17,9 @@ import math
 import re
 import sqlite3
 import time
+from pathlib import Path
+
+KNOWN_PLACES = Path(__file__).resolve().parent.parent / "app/src/main/assets/place_names.tsv"  # the app's copy
 
 SYNONYMS = {
     "vegetarian": ["vegetarian", "vegan"], "veggie": ["vegetarian", "vegan"],
@@ -96,8 +99,15 @@ def norm_title(t):
 
 
 class Places:
-    def __init__(self, path, wiki=None):
+    def __init__(self, path, wiki=None, known=KNOWN_PLACES):
         self.db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        # Names the pack alone gets wrong -> the wiki article's coordinates (build_place_names.py).
+        self.known = {}
+        if known and Path(known).exists():
+            for line in Path(known).read_text(encoding="utf-8").splitlines():
+                f = line.split("\t")
+                if len(f) >= 4:
+                    self.known[f[0]] = float(f[1]), float(f[2]), f[3]
         rows = self.db.execute("SELECT id, name, n FROM category").fetchall()
         self.categories = [(i, n) for i, n, _ in rows]
         self.place_nouns = {w for _, n, c in rows if c >= 200 for w in place_nouns_of(n)}
@@ -210,6 +220,10 @@ class Places:
             # article's aliases add "firenze", and the biggest locality wins.
             # "roma, italy" -> also "roma"
             names = list(dict.fromkeys(x for n in [c.lower()] + self.local_names(c) for x in (n, n.split(",")[0].strip())))
+            # Without the wiki pack: "rome" is Rome, Italy (not the bigger Rome, Georgia).
+            hit = next((self.known[n] for n in names if n in self.known), None)
+            if hit:
+                return hit[0], hit[1], f"known:{hit[2]}"
             row = self.db.execute(
                 "SELECT lat, lon, country, n, name FROM locality WHERE name IN (%s) ORDER BY n DESC LIMIT 1"
                 % ",".join("?" * len(names)), names).fetchone()

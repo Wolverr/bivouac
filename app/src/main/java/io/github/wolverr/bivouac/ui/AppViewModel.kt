@@ -87,7 +87,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val models = FileStore(app, "models", ".gguf")
     private val packs = FileStore(app, "packs", ".db")
     private val corpus = Corpus()
-    private val places = Places()
+    private val places = Places(Places.parseKnownPlaces(app.assets.open("place_names.tsv").use { it.readBytes().decodeToString() }))
     private fun prompt(name: String) = getApplication<Application>().assets.open("prompts/$name").use { it.readBytes().decodeToString().trim() }
 
     /** The model's own system prompt from the catalog, else the default one. */

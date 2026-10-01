@@ -16,6 +16,13 @@ class PlacesTest {
     }
 
     @Test
+    fun parsesKnownPlaces() {
+        val known = Places.parseKnownPlaces("rome\t41.89333\t12.48278\tRome\nbad line\nvienna\t48.20830\t16.37250\tVienna\n")
+        assertEquals(setOf("rome", "vienna"), known.keys)
+        assertEquals(GeoPoint(41.89333, 12.48278, "Rome"), known["rome"])
+    }
+
+    @Test
     fun locationAreaIsTheMostSpecificPart() {
         assertEquals("Shibuya", Places.locationArea("Type: Scramble crossing\nLocation: Shibuya, Tokyo, Japan"))
         assertNull(Places.locationArea("Country: United States\nCity: New York"))

@@ -38,8 +38,12 @@ data class Place(
     val categoryLabel: String get() = category.replace('_', ' ')
 }
 
-/** The offline places pack (places.db built by tools/build_places.py). */
-class Places {
+/**
+ * The offline places pack (places.db built by tools/build_places.py). [knownPlaces]: the
+ * names the pack alone gets wrong, with the Wikipedia article's coordinates
+ * (assets/place_names.tsv, tools/build_place_names.py), see [parseKnownPlaces].
+ */
+class Places(private val knownPlaces: Map<String, GeoPoint> = emptyMap()) {
     private val json = Json { ignoreUnknownKeys = true }
     private var categories: List<Pair<Int, String>> = emptyList()
 
@@ -116,6 +120,8 @@ class Places {
             val names = (listOf(c.lowercase()) + (corpus?.findArticle(c)?.let { corpus.otherNames(it) } ?: emptyList()))
                 .flatMap { listOf(it, it.substringBefore(",").trim()) }  // "roma, italy" -> also "roma"
                 .distinct()
+            // Without the wiki pack: "rome" is Rome, Italy (not the bigger Rome, Georgia), "munich" is München.
+            names.firstNotNullOfOrNull { knownPlaces[it] }?.let { return it }
             val row = query(
                 "SELECT lat, lon, name FROM locality WHERE name IN (${names.indices.joinToString(",") { "?${it + 1}" }}) " +
                     "ORDER BY n DESC LIMIT 1",
@@ -279,6 +285,16 @@ class Places {
             val lon = m.groupValues[3].toDouble() * if (m.groupValues[4] == "W") -1 else 1
             return lat to lon
         }
+
+        /** place_names.tsv lines "rome\t41.89333\t12.48278\tRome" -> "rome" to Rome's coordinates. */
+        fun parseKnownPlaces(tsv: String): Map<String, GeoPoint> =
+            tsv.lineSequence().mapNotNull { line ->
+                val f = line.split('\t')
+                if (f.size < 4) return@mapNotNull null
+                val lat = f[1].toDoubleOrNull() ?: return@mapNotNull null
+                val lon = f[2].toDoubleOrNull() ?: return@mapNotNull null
+                f[0] to GeoPoint(lat, lon, f[3])
+            }.toMap()
 
         /** "Location: Shibuya, Tokyo, Japan" -> "Shibuya": the most specific part of an infobox's Location line. */
         fun locationArea(infobox: String): String? =
