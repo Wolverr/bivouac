@@ -67,3 +67,19 @@ tools/.venv/bin/python tools/grade.py pairscore eval/results-OLD.jsonl eval/resu
 
 `pairscore` reports the mean difference with a 95 % confidence interval and a sign test;
 questions with identical answers are counted as ties without being graded.
+
+## Where the published numbers come from
+
+Every answer, blind packet, answer key (`*.key.json`) and grader score is in `eval/` and
+`eval/grading/`, so each number in the README can be checked or regraded:
+
+| README number | Answers | Scores |
+|---|---|---|
+| 9B / 4B / 2B, held-out | `results-pc-qwen3.5-{9b-v4,4b-v4,2b-v5}-holdout.jsonl` | `grading/pc-…-holdout.summary.json` |
+| 9B / 4B / 2B, main set | `results-pc-qwen3.5-{9b-v4,4b-v4,2b-v5}.jsonl` | `grading/pc-….summary.json` |
+| 6 GB tier (Q3_K_M vs Q4_K_M) | `results-pc-qwen3.5-4b-v6-{Q4_K_M,Q3_K_M}.jsonl` | `grading/pair-pc-qwen3.5-4b-v6-Q4_K_M--pc-qwen3.5-4b-v6-Q3_K_M.summary.json` |
+| 12 GB: Gemma-4-12B vs 9B | `results-pc-{qwen3.5-9b,gemma-4-12b-it-qat}-v13.jsonl` | `grading/pair-pc-qwen3.5-9b-v13--pc-gemma-4-12b-it-qat-v13.summary.json` |
+| 12 GB: 9B Q5 vs Q4 | `results-pc-qwen3.5-9b-{v13,v14-q5}.jsonl` | `grading/pair-pc-qwen3.5-9b-v13--pc-qwen3.5-9b-v14-q5.summary.json` |
+| Think harder | `results-pc-qwen3.5-{4b,9b}-v4-think1024.jsonl` | `grading/pair-pc-qwen3.5-{4b,9b}-v4--…-think1024.summary.json` |
+
+Pair gradings without a summary file are scored with `tools/grade.py pairscore`.

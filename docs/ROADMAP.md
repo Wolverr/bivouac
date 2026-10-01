@@ -276,8 +276,8 @@ See docs/COMPETITORS.md for the other entries.
   real question: 76-token prompt 22.5 tok/s, answer 7.6 tok/s, first token 3.4 s.
   App PSS 2.7 GB = 1.24 GB mmapped weights + 1.39 GB native heap (CPU repack copy of
   weights — test use_extra_bufts=false for big models).
-  TODO: markdown rendering, thread-count setting (try using little cores for prefill),
-  repack toggle, quieter llama.cpp logs, log bench/completion stats to logcat.
+  Done since (f3bd14f, 32ab435): markdown rendering, "use efficiency cores" and repack switches,
+  quieter llama.cpp logs, bench/completion stats to logcat.
   Xiaomi notes: needs "Install via USB" in developer options; `adb shell input` blocked.
 
 - 2026-09-30: thread/repack experiment, Qwen3.5-2B Q4_K_M on the Redmi (pp256 / tg64 tok/s, app PSS):
@@ -299,6 +299,13 @@ See docs/COMPETITORS.md for the other entries.
   Fixed: generic category endings (grocery_store -> "grocery", "supermarket"), knowledge questions
   ("must-see museums in Berlin", "history of …") now go to Wikipedia, trailing clauses cut from locations.
   Open: exonyms without the wiki pack (see Resume here, step 3); Overture's pharmacy category has some junk.
+  2026-10-01: both done. Pharmacy junk: names that say what the place is rank first (NAME_HINTS).
+  Exonyms: without the wiki pack "Rome", "Florence", "Athens", "Vienna" found the bigger US towns (both
+  eval place questions with a city were wrong that way: places-01, h-places-01). assets/place_names.tsv
+  (299 names, 16 KB, tools/build_place_names.py) holds the wiki article's coordinates for the names
+  where they differ from the biggest locality, so the app answers as if the pack were there. Rejected:
+  pairing co-located localities (turns suburbs into their city: Greenwich -> London centre) and the
+  biggest neighbouring locality (a Sydney suburb beat Concord, California).
 - 2026-09-30: low-RAM work (M4). `model_probe.cpp` reads the GGUF header and computes KV bytes per token
   (full / sliding-window layers, hybrid attention intervals, Gemma shared-KV layers); matches llama.cpp's
   own KV allocation exactly for all 7 candidate models at ctx 8192. KV at 8192: Qwen3.5-2B / LFM2.5 96 MB,

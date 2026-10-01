@@ -24,6 +24,9 @@ more than half as good as a frontier AI with web search, on a phone with at most
   layout that fit. If Android ever kills it for memory, the next load uses smaller settings.
 - **Conversations.** Follow-up questions ("and its population?") keep the topic; personal or
   casual messages get a normal reply instead of a Wikipedia search.
+- **Think harder.** One tap asks the last question again with the model reasoning first
+  (hidden, up to 1,024 tokens). On the reasoning questions of the eval it lifts the 4B from
+  4.2 to 8.7 out of 10 and the 9B from 3.5 to 8.8, for a few minutes more per answer.
 - **Private by construction.** The app has no INTERNET permission. Downloads go through the
   phone's browser; the app only reads the files you add.
 
@@ -35,11 +38,16 @@ more than half as good as a frontier AI with web search, on a phone with at most
 
 Which model to pick:
 
-| Phone RAM | Model | File | Quality (PC eval, % of frontier + web) | Speed on phone |
+| Phone RAM | Model | File | Quality (% of frontier + web, held-out questions) | Speed on phone (Redmi Note 15 Pro, 8 GB) |
 |---|---|---|---|---|
-| 6 GB | Qwen3.5-2B Q4_K_M | 1.2 GB | 44 % | 25 tok/s reading, 7 tok/s writing (Redmi Note 15 Pro) |
-| 8 GB | Qwen3.5-4B Q4_K_M | 2.6 GB | 55 % | *TBD* |
-| 12 GB | Qwen3.5-9B Q4_K_M | 5.3 GB | 58 % | *TBD* |
+| 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 45 % | 20 tok/s reading, 6 tok/s writing |
+| 6 GB | Qwen3.5-4B Q3_K_M | 2.3 GB | slightly below the 4B Q4_K_M¹ | 6 tok/s reading, 2.8 tok/s writing |
+| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | 54 % | 10–12 tok/s reading, 3.7 tok/s writing; ~3 min per answer in the app |
+| 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 63 % | *TBD (12 GB phone)* |
+
+¹ Graded head-to-head against the 4B Q4_K_M: −0.38 points out of 10 (95 % CI −0.80 to +0.03).
+Reading and writing speeds are llama-bench on the phone's CPU; a warm phone under load runs at
+about half of that (the clocks drop).
 
 Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the bounty's 50 GB limit.
 
@@ -68,18 +76,24 @@ never used for tuning (`eval/questions-holdout.jsonl`). Each Bivouac answer is c
 blind with an answer from a frontier model using live web search, scored 1–10 for correctness,
 completeness and usefulness. Details and how to reproduce: [docs/EVAL.md](docs/EVAL.md).
 
-PC harness (same pipeline and prompt as the app, llama.cpp on a desktop CPU):
+PC harness (same pipeline and prompt as the app, llama.cpp on a desktop CPU), as % of the
+frontier + web answers' score:
 
-| Model | Score vs frontier + web |
-|---|---|
-| Qwen3.5-9B | 57.7 % |
-| Qwen3.5-4B | 54.7 % |
-| LFM2.5-8B-A1B | 46.4 % |
-| Gemma-4-E4B | 44.1 % |
-| Qwen3.5-2B | 44.0 % |
+| Model | Held-out (40 questions, never tuned on) | Main set (60 questions) |
+|---|---|---|
+| Qwen3.5-9B Q4_K_M | **62.7 %** | 60.7 % |
+| Qwen3.5-4B Q4_K_M | **54.0 %** | 60.2 % |
+| Qwen3.5-2B Q4_K_M | 45.2 % | 40.7 % |
 
-A single run varies by about ±3 points (grader and sampling noise); pipeline changes are
-compared head-to-head in one blind packet instead (`tools/grade.py pair`).
+The 4B and the 9B clear the bounty's 50 % bar on questions that were never used for tuning;
+the 2B, for 4 GB phones, does not. A single run varies by about ±3 points (grader and sampling
+noise), so choices are made head-to-head in one blind packet instead (`tools/grade.py pair`):
+
+- **12 GB model:** Gemma-4-12B (QAT) scored 1.73 points out of 10 below the 9B (95 % CI −2.43 to
+  −1.04) and needs more RAM; the 9B at Q5 instead of Q4 was no better (+0.02, CI −0.31 to +0.34)
+  and 15 % slower.
+- **Screened out earlier** (main set, older pipeline): LFM2.5-8B-A1B 46 %, Gemma-4-E4B 44 %, both
+  below the Qwen3.5-4B of the same run (55 %).
 
 On-phone results: *TBD*. Retrieval finds a correct Wikipedia article in the top 6 for 92 %
 of the questions that have one (44/48), and 94 % on the held-out set (34/36).
@@ -114,4 +128,4 @@ tools/status.sh                  # progress
 - Engine: [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT), SQLite (public domain),
   zstd (BSD).
 
-App license: *TBD*.
+App code: [MIT](LICENSE). The data packs and models keep their own licenses (above).
