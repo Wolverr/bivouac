@@ -105,8 +105,15 @@ class Places:
         if wiki:
             from retrieve_proto import Pack
             self.wiki = Pack(wiki)
-            self.has_coord = self.wiki.db.execute(
+
+    @property
+    def has_coord(self):
+        """The wiki pack (also set later, by answer_proto.py) has build_coords.py's table."""
+        if getattr(self, "_coord_pack", None) is not self.wiki:
+            self._coord_pack = self.wiki
+            self._has_coord = self.wiki is not None and self.wiki.db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coord'").fetchone() is not None
+        return self._has_coord
 
     def category_ids(self, keywords):
         out = set()
