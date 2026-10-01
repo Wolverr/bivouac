@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.wolverr.bivouac.eval.EvalRunner
+import io.github.wolverr.bivouac.llm.Catalog
 import io.github.wolverr.bivouac.llm.CompletionStats
 import io.github.wolverr.bivouac.llm.FileStore
 import io.github.wolverr.bivouac.llm.LibFile
@@ -87,6 +88,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val packs = FileStore(app, "packs", ".db")
     private val corpus = Corpus()
     private val places = Places()
+    private fun prompt(name: String) = getApplication<Application>().assets.open("prompts/$name").use { it.readBytes().decodeToString().trim() }
+
+    /** The model's own system prompt from the catalog, else the default one. */
+    private fun promptFor(modelFile: String): String =
+        runCatching { Catalog.load(getApplication()).firstOrNull { it.file == modelFile }?.prompt }.getOrNull()
+            ?.takeIf { it.isNotEmpty() }?.let { runCatching { prompt(it) }.getOrNull() }
+            ?: prompt("system.txt")
+
     private val pipeline = ResearchPipeline(
         runtime,
         system = app.assets.open("prompts/system.txt").use { it.readBytes().decodeToString().trim() },
@@ -154,7 +163,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         runtime.crashGuard.begin(file.id, "loading ${file.name}", note ?: "manual: repack=${opts.repack}")
         runtime.load(path, opts)
-            .onSuccess { info -> _library.update { it.copy(loadedModel = file.id, modelInfo = info, loadNote = note) } }
+            .onSuccess { info ->
+                pipeline.system = promptFor(file.name)
+                _library.update { it.copy(loadedModel = file.id, modelInfo = info, loadNote = note) }
+            }
             .onFailure { e -> _library.update { it.copy(loadedModel = null, modelInfo = null, loadNote = null, error = e.message) } }
         runtime.crashGuard.end()
         _library.update { it.copy(busy = null) }

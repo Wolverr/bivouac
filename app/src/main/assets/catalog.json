@@ -32,7 +32,8 @@
       "bytes": 5680522464,
       "min_ram_gb": 11,
       "license": "Apache-2.0",
-      "about": "For 12 GB phones. The most accurate, and the slowest."
+      "about": "For 12 GB phones. The most accurate, and the slowest.",
+      "prompt": "system-calc2.txt"
     },
     {
       "id": "wiki-en",

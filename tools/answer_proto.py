@@ -192,6 +192,13 @@ def build_prompt(q: str, sources) -> str:
     return "\n".join(parts) + "\nQuestion: " + q
 
 
+def catalog_prompt(model_id: str) -> str:
+    """The model's system prompt from assets/catalog.json ("prompt"), as AppViewModel.promptFor; "" = default."""
+    items = json.loads((ROOT / "app/src/main/assets/catalog.json").read_text())["items"]
+    name = next((i.get("prompt", "") for i in items if i["id"] == model_id), "")
+    return (ROOT / "app/src/main/assets/prompts" / name).read_text().strip() if name else ""
+
+
 def generate(port: int, user: str, think: bool = False, system: str = ""):
     """think: reasoning on (the proposed "Think harder" button). The budget covers reasoning
     plus answer; usage.completion_tokens tells how long that would take on a phone."""
@@ -223,8 +230,9 @@ def main():
     ap.add_argument("--places", default="out/places.db", help="places pack ('' to skip, like an app without one)")
     ap.add_argument("--think", action="store_true", help="reasoning on (measures a 'Think harder' mode)")
     ap.add_argument("--system", default="", help="system prompt file to try instead of the app's")
+    ap.add_argument("--model-id", default="", help="catalog id (qwen3.5-9b): use that model's prompt, like the app")
     args = ap.parse_args()
-    system = Path(args.system).read_text().strip() if args.system else ""
+    system = Path(args.system).read_text().strip() if args.system else catalog_prompt(args.model_id)
 
     pack = Pack(args.db)
     places = Places(args.places) if args.places else None

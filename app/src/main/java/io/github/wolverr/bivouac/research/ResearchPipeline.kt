@@ -51,9 +51,10 @@ class ResearchPipeline(
     private val llm: LlmRuntime,
     /**
      * One prompt for every kind of message, so the engine's cached prefix always applies.
-     * Lives in assets/prompts/system.txt, shared with the desktop harness (tools/answer_proto.py).
+     * Lives in assets/prompts/ (system.txt, or the model's catalog "prompt"), shared with the
+     * desktop harness (tools/answer_proto.py). Set when a model is loaded.
      */
-    private val system: String,
+    var system: String,
     private val corpus: Corpus?,
     private val places: Places? = null,
     /** The phone's position for "near me" questions; null when unavailable or not permitted. */

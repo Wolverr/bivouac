@@ -37,7 +37,7 @@ for gguf in $(ls -S -r "$MODELS"/*.gguf); do
         sleep 1
     done
     if [ $ok = 1 ]; then
-        .venv/bin/python answer_proto.py --db out/wiki.db --name "$name$SUFFIX" --port $PORT $ANSWER_ARGS || echo "!!! $name: answer_proto failed"
+        .venv/bin/python answer_proto.py --db out/wiki.db --name "$name$SUFFIX" --model-id "$name" --port $PORT $ANSWER_ARGS || echo "!!! $name: answer_proto failed"
     else
         echo "!!! $name: server did not start (see server-$name.log)"
     fi
