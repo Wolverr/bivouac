@@ -46,6 +46,19 @@ not taken. Places prompt "best 3 to 5, one short line each", model reads the 8 n
 have no MTP heads. Note: with `-md` this llama-server also needs `--spec-type draft-simple`. Worth
 retrying only with a standard-transformer model (cheap rollback). ~/spec_try.sh runs the quick check.
 
+**MTP (built-in draft heads; unsloth/Qwen3.5-*-MTP-GGUF, +0.1-0.45 GB):** `--spec-type draft-mtp` works
+on the PC: 9B 12.0-12.7 -> 15.6-17.0 tok/s at `--spec-draft-n-max 2` (+30 %), 4B 21 -> 25 at n-max 1
+(+18-20 %), same answers. On the Redmi (llama-speculative-simple cross-built, /data/local/tmp/llama-spec +
+q4b-mtp.gguf, script mtp.sh): no gain (warm, loaded phone: baseline 1.2-2.8, MTP 1.5-1.9 tok/s, 75 %
+accepted); the checkpoint save/restore per round probably costs more than it saves on a weak CPU. Retest on
+the 12 GB phone (1 minute with the same files) before building it into engine.cpp (pattern:
+examples/speculative-simple, 377 lines, handles the hybrid checkpoints).
+
+**12 GB model: Qwen3.5-9B stays.** Gemma-4-12B QAT UD-Q4_K_XL (6.72 GB) vs 9B, paired blind, 60 main
+questions: -1.73 (CI -2.43..-1.04, 8 better / 38 worse); it often declines ("excerpts don't cover"); 7.1 GB
+RAM at ctx 4096 (8.1 at 8192), PC 28 tok/s read / 2.6 write vs the 9B's 49 / 12.2. (Run it with
+`--no-repack -c 4096 -np 1` or it thrashes the 12 GB service cap.) Ministral-3-14B only fits at Q3: skipped.
+
 **Next (12 GB):** (1) GPU prompt reading once the phone model is known (Snapdragon: OpenCL/Adreno path in
 llama.cpp); (2) pick the 12 GB model by blind eval on the PC: 9B vs a dense ~12-14B standard transformer
 vs a MoE that fits in RAM; (3) Think harder on the 12 GB tier.
