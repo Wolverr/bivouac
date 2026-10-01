@@ -57,8 +57,8 @@ Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the boun
 4. **Answer:** llama.cpp on the phone's CPU. The fixed instructions are evaluated once and
    reused from a cache, so only the question and excerpts are read each time.
 
-Place searches parse the kind of place and the location, geocode it (Wikipedia coordinates,
-then town centroids), and pass the nearest matches with distances to the model.
+Place searches parse the kind of place and the location, geocode it (Wikipedia coordinates
+for 1.2 M articles, from the geo_tags dump, then town centroids), and pass the nearest matches with distances to the model.
 
 ## Evaluation
 
@@ -101,7 +101,8 @@ Rebuilding the data packs (downloads ~20 GB; a few hours on a 16 GB PC, mostly d
 tools/setup_dev.sh               # Python venv for the tools
 tools/run_data_jobs.sh           # FineWiki + pageviews -> wiki.db, Overture -> places.db
 tools/status.sh                  # progress
-# (run_data_jobs.sh also adds the alias and acronym tables: tools/build_aliases.py, tools/build_acronyms.py)
+# (run_data_jobs.sh also adds the alias, acronym and coordinate tables: tools/build_aliases.py,
+#  tools/build_acronyms.py, tools/build_coords.py)
 ```
 
 ## Data and licenses

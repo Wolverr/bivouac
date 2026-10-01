@@ -18,7 +18,9 @@ wiki_cmd="$PY fetch_finewiki.py --out data/finewiki_en > fetch_finewiki.log 2>&1
  && $PY build_corpus.py --src data/finewiki_en --out out/wiki.db --pageviews data/pageviews_en.tsv \
         --full-top 2000000 --fts-detail column > build_full.log 2>&1 \
  && $PY build_aliases.py out/wiki.db > build_aliases.log 2>&1 \
- && $PY build_acronyms.py out/wiki.db --apply > build_acronyms.log 2>&1"
+ && $PY build_acronyms.py out/wiki.db --apply > build_acronyms.log 2>&1 \
+ && { [ -s data/geo_tags.sql.gz ] || curl -sSLo data/geo_tags.sql.gz https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-geo_tags.sql.gz; } \
+ && $PY build_coords.py out/wiki.db data/geo_tags.sql.gz --apply > build_coords.log 2>&1"
 places_cmd="{ [ -s data/places.parquet ] && grep -q ' places in ' places_fetch.log 2>/dev/null || $PY fetch_places.py > places_fetch.log 2>&1; } \
  && $PY build_places.py --src data/places.parquet --out out/places.db > build_places.log 2>&1"
 
