@@ -224,17 +224,20 @@ class ResearchPipeline(
         val facts = HashMap<Long, String>()
         val whole = HashMap<Long, String>()  // chunk -> finished evidence of an expanded list article
         val expanded = HashSet<Long>()  // those articles: further chunks would repeat rows
-        val leads = named.mapNotNull { article ->
+        val sightsQuestion = isSightsQuestion(question)
+        val leads = named.flatMap { article ->
             if (article.title.startsWith("List of")) {
                 val entries = listEntries(corpus, article)
                 val first = if (entries.isNotEmpty()) corpus.chunk(article, 0) else null
                 if (first != null) {  // its most viewed entries, not its first rows
                     whole[first.chunk] = entries.joinToString("\n")
                     expanded += article.id
-                    return@mapNotNull first.copy(section = LIST_SECTION)
+                    return@flatMap listOf(first.copy(section = LIST_SECTION))
                 }
             }
-            lead(corpus, article, words, seen, facts)
+            val sights = if (sightsQuestion) sightsEvidence(corpus, article) else null
+            sights?.let { (p, text) -> whole[p.chunk] = text }  // a city's sights list, whole
+            listOfNotNull(lead(corpus, article, words, seen, facts), sights?.first?.copy(section = SIGHTS_SECTION))
         }
         val candidates = corpus.search(query, limit = settings.maxSources * 4, priorWeight = settings.priorWeight)
             .map { if (it.article in namedIds) it.copy(score = it.score + settings.namedBoost) else it }
@@ -400,6 +403,32 @@ class ResearchPipeline(
         return null
     }
 
+    /** "must-see sights in Barcelona", "landmarks of Rome". Mirrors tools/retrieve_proto.py. */
+    private fun isSightsQuestion(question: String): Boolean =
+        question.contains("must-see", ignoreCase = true) ||
+            Regex("\\p{L}+").findAll(question).any { it.value.lowercase().trimEnd('s') in SIGHT_NOUNS }
+
+    /**
+     * A city's sights sections as one source: the start of their opening prose ("The best-known
+     * site of Florence is ... the Duomo") and the bullet lines of the first few chunks ("Minor
+     * basilica of Sagrada Família, the symbol of Barcelona."). Compressing to the question's words
+     * kept "Barcelona is home to many World Heritage Sites:" and dropped the list after it.
+     * Mirrors tools/retrieve_proto.py sights_evidence.
+     */
+    private suspend fun sightsEvidence(corpus: Corpus, article: Article): Pair<Passage, String>? {
+        val chunks = (0 until article.n_chunks).mapNotNull { corpus.chunk(article, it) }
+            .filter { SIGHTS_SECTION_RE.containsMatchIn(it.section) }
+        if (chunks.isEmpty()) return null
+        var intro = chunks[0].text.lines().filter { it.isNotBlank() && !it.startsWith("- ") && !it.startsWith("|") }
+            .joinToString(" ").take(SIGHTS_PROSE_CHARS)
+        if (intro.length == SIGHTS_PROSE_CHARS && ". " in intro) intro = intro.substring(0, intro.lastIndexOf(". ") + 1)
+        val lines = chunks.take(SIGHTS_BULLET_CHUNKS)
+            .flatMap { c -> c.text.lines().filter { it.startsWith("- ") }.map { it.drop(2).trim().take(LIST_LINE_CHARS) } }
+            .take(SIGHTS_LINES)
+        val text = (listOf(intro) + lines).filter { it.isNotEmpty() }.joinToString("\n")
+        return if (text.isEmpty()) null else chunks[0] to text
+    }
+
     /**
      * No name-like word ("GPS", "mRNA", "Germany" mid-sentence) and every content word
      * common. Such a title counts only for a real topic ("Season", "Age of the universe"),
@@ -435,6 +464,15 @@ class ResearchPipeline(
         private const val LIST_LINE_CHARS = 160
         /** Section label of an expanded list article's source; mirrored in tools/answer_proto.py. */
         const val LIST_SECTION = "Most viewed entries"
+        /** Section label of a city's sights source; mirrored in tools/answer_proto.py. */
+        const val SIGHTS_SECTION = "Main sights"
+        /** Any level of the heading path: "Main sights", "Tourism > Main attractions > Old Town", "Heritage > Important monuments". */
+        private val SIGHTS_SECTION_RE = Regex(
+            "(^|> )[^>]*\\b(sights|attractions|landmarks|monuments|points of interest)\\b", RegexOption.IGNORE_CASE,
+        )
+        private const val SIGHTS_PROSE_CHARS = 600
+        private const val SIGHTS_LINES = 8
+        private const val SIGHTS_BULLET_CHUNKS = 3  // bullets further down are subsections (a square's history)
         private val COMMON_MIN_PRIOR = kotlin.math.ln(1.0 + 3_000)  // prior = ln(1 + monthly views)
 
         fun formatDistance(m: Double): String =

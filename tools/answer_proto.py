@@ -19,7 +19,8 @@ import urllib.request
 from pathlib import Path
 
 from places_proto import Places, parse_intent
-from retrieve_proto import Pack, compress, fts_query, is_namesake, keywords, list_entries, named_articles
+from retrieve_proto import (Pack, compress, fts_query, is_namesake, is_sights_question, keywords, list_entries,
+                            named_articles, sights_evidence)
 
 ROOT = Path(__file__).resolve().parent.parent
 SYSTEM = (ROOT / "app/src/main/assets/prompts/system.txt").read_text().strip()
@@ -38,6 +39,7 @@ PERSONAL = re.compile(
 MAX_SOURCES, PER_ARTICLE, EVIDENCE_CHARS, PRIOR_WEIGHT, NAMED_BOOST = 6, 2, 450, 0.5, 4.0
 INFOBOX_FACT_CHARS = 200
 LIST_SECTION = "Most viewed entries"  # ResearchPipeline.LIST_SECTION
+SIGHTS_SECTION_NAME = "Main sights"  # ResearchPipeline.SIGHTS_SECTION
 SAMPLING = dict(temperature=0.4, top_p=0.95, top_k=20, min_p=0.0, repeat_penalty=1.05, max_tokens=700)
 # Fixed seed: an unchanged prompt gives an unchanged answer, so a before/after comparison
 # (grade.py pair) measures the change instead of sampling luck. Unseeded reruns of identical
@@ -65,6 +67,7 @@ def retrieve(pack: Pack, q: str):
     named = named_articles(pack, q)
     named_ids = {a[0] for a in named}
     cands, facts, seen, whole, expanded = [], {}, set(), {}, set()
+    sights_q = is_sights_question(q)
     for art_id, title, first_chunk, n_chunks in named:
         if title.startswith("List of"):
             entries = list_entries(pack, (art_id, title, first_chunk, n_chunks))
@@ -78,6 +81,11 @@ def retrieve(pack: Pack, q: str):
         facts[cid] = fact_line
         if infobox is not None:
             seen.add(infobox)  # its useful lines are already in the lead
+        sights = sights_evidence(pack, (art_id, title, first_chunk, n_chunks)) if sights_q else None
+        if sights:  # a city's "Main sights" list, whole: its first chunk is the source
+            cands.append((sights[0], art_id, title, SIGHTS_SECTION_NAME))
+            whole[sights[0]] = sights[1]
+    n_leads = len(cands)  # named articles' leads (and sights lists) always pass the relevance gate
     for score, cid, title, sec in pack.search(fts_query(words), limit=MAX_SOURCES * 4, per_article=99,
                                               prior_weight=PRIOR_WEIGHT, boost_articles=named_ids, boost=NAMED_BOOST):
         art = pack.db.execute("SELECT article FROM chunk WHERE id = ?", (cid,)).fetchone()[0]
@@ -88,7 +96,7 @@ def retrieve(pack: Pack, q: str):
         if cid in seen or per.get(art, 0) >= PER_ARTICLE or (art in expanded and cid not in whole):
             continue
         # Relevance gate (Evidence.overlap): named articles' leads always pass.
-        if i >= len(named) and (overlap(f"{title} {sec} {pack.text(cid)}", words) < needed
+        if i >= n_leads and (overlap(f"{title} {sec} {pack.text(cid)}", words) < needed
                                 or is_namesake(title, q)):
             continue
         seen.add(cid)

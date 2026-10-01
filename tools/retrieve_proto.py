@@ -289,6 +289,37 @@ def list_article(pack: "Pack", question: str):
 
 
 SIGHT_NOUNS = {"sight", "attraction", "landmark", "monument"}  # ResearchPipeline.SIGHT_NOUNS
+# Any level of the heading path: "Main sights", "Tourism > Main attractions > Old Town", "Heritage > Important monuments".
+SIGHTS_SECTION = re.compile(r"(^|> )[^>]*\b(sights|attractions|landmarks|monuments|points of interest)\b", re.I)
+SIGHTS_PROSE_CHARS = 600
+SIGHTS_LINES = 8
+SIGHTS_BULLET_CHUNKS = 3  # bullets further down are subsections (a square's history, the islands)
+
+
+def is_sights_question(question: str) -> bool:
+    """ResearchPipeline.isSightsQuestion: "must-see sights in Barcelona", "landmarks of Rome"."""
+    words = [w.lower().rstrip("s") for w in re.findall(r"[^\W\d_]+", question)]
+    return "must-see" in question.lower() or any(w in SIGHT_NOUNS for w in words)
+
+
+def sights_evidence(pack: "Pack", article) -> tuple[int, str] | None:
+    """ResearchPipeline.sightsEvidence: a city's sights sections as one source (first chunk, text):
+    the start of their opening prose ("The best-known site of Florence is ... the Duomo") and the
+    bullet lines of the first few chunks ("- Minor basilica of Sagrada Família, the symbol of
+    Barcelona."). Compressing to the question's words kept "Barcelona is home to many World
+    Heritage Sites:" and dropped the list after it."""
+    chunks = [cid for cid, sec in pack.db.execute(
+        "SELECT id, section FROM chunk WHERE article = ? ORDER BY id", (article[0],)) if SIGHTS_SECTION.search(sec)]
+    if not chunks:
+        return None
+    prose = [l for l in pack.text(chunks[0]).split("\n") if l.strip() and not l.startswith(("- ", "|"))]
+    intro = " ".join(prose)[:SIGHTS_PROSE_CHARS]
+    if len(intro) == SIGHTS_PROSE_CHARS and ". " in intro:
+        intro = intro[:intro.rindex(". ") + 1]  # whole sentences
+    lines = [l[2:].strip()[:LIST_LINE_CHARS] for cid in chunks[:SIGHTS_BULLET_CHUNKS]
+             for l in pack.text(cid).split("\n") if l.startswith("- ")][:SIGHTS_LINES]
+    text = "\n".join(x for x in [intro] + lines if x)
+    return (chunks[0], text) if text else None
 
 
 LIST_SKIP_CELL = re.compile(r"^(:?-+:?|name|names|image|picture|photo|rank|no\.?|#)$", re.I)
