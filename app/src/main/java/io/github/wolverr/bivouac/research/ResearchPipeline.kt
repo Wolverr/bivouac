@@ -187,7 +187,20 @@ class ResearchPipeline(
         val namedIds = named.map { it.id }.toSet()
         val seen = HashSet<Long>()
         val facts = HashMap<Long, String>()
-        val leads = named.mapNotNull { lead(corpus, it, words, seen, facts) }
+        val whole = HashMap<Long, String>()  // chunk -> finished evidence of an expanded list article
+        val expanded = HashSet<Long>()  // those articles: further chunks would repeat rows
+        val leads = named.mapNotNull { article ->
+            if (article.title.startsWith("List of")) {
+                val entries = listEntries(corpus, article)
+                val first = if (entries.isNotEmpty()) corpus.chunk(article, 0) else null
+                if (first != null) {  // its most viewed entries, not its first rows
+                    whole[first.chunk] = entries.joinToString("\n")
+                    expanded += article.id
+                    return@mapNotNull first.copy(section = LIST_SECTION)
+                }
+            }
+            lead(corpus, article, words, seen, facts)
+        }
         val candidates = corpus.search(query, limit = settings.maxSources * 4, priorWeight = settings.priorWeight)
             .map { if (it.article in namedIds) it.copy(score = it.score + settings.namedBoost) else it }
             .sortedByDescending { it.score }
@@ -197,7 +210,8 @@ class ResearchPipeline(
         // small models tend to answer "the excerpts don't cover this" instead of answering.
         val needed = (words.size + 1) / 2
         val relevant = candidates.filter {
-            Evidence.overlap("${it.title} ${it.section} ${it.text}", words) >= needed && !Evidence.isNamesake(it.title, question)
+            it.article !in expanded && Evidence.overlap("${it.title} ${it.section} ${it.text}", words) >= needed &&
+                !Evidence.isNamesake(it.title, question)
         }
         val picked = (leads + relevant).filter { p ->
             val n = perArticle.getOrDefault(p.article, 0)
@@ -205,12 +219,41 @@ class ResearchPipeline(
         }.take(settings.maxSources)
 
         val sources = picked.mapIndexed { i, p ->
+            whole[p.chunk]?.let { return@mapIndexed Source(i + 1, p, it) }
             val f = facts[p.chunk].orEmpty()
             val evidence = Evidence.compress(p.text, words, settings.evidenceChars - f.length)
             Source(i + 1, p, if (f.isEmpty()) evidence else "$f\n$evidence")
         }
         emit(ResearchEvent.Sources(sources, System.currentTimeMillis() - t0))
         return sources
+    }
+
+    /**
+     * The [k] most viewed entries of a list article that are articles themselves, as
+     * "Name: cell — cell" lines. "Must-see museums in Berlin" wants the Pergamon Museum, not the
+     * first rows alphabetically, and one excerpt of a padded table is one row. Ranked lists
+     * ("tallest buildings", a rank column) keep their order. Mirrors tools/retrieve_proto.py.
+     */
+    private suspend fun listEntries(corpus: Corpus, list: Article, k: Int = 8, maxChunks: Int = 80, maxNames: Int = 200): List<String> {
+        class Entry(val prior: Double, val order: Int, val line: String)
+        val found = LinkedHashMap<Long, Entry>()
+        val names = HashSet<String>()
+        var ranked = 0
+        for (i in 0 until minOf(list.n_chunks, maxChunks)) {
+            val chunk = corpus.chunk(list, i) ?: continue
+            for (row in Evidence.listRows(chunk.text)) {
+                if (row.name in names || names.size >= maxNames) continue
+                names += row.name
+                val a = corpus.findArticle(row.name) ?: continue
+                if (a.id in found) continue
+                val line = if (row.cells.isEmpty()) row.name else "${row.name}: ${row.cells.joinToString(" — ")}"
+                found[a.id] = Entry(a.prior, found.size, line.take(LIST_LINE_CHARS))
+                if (row.ranked) ranked++
+            }
+        }
+        val entries = found.values.toList()
+        val ordered = if (ranked * 2 >= entries.size) entries else entries.sortedByDescending { it.prior }
+        return ordered.take(k).map { it.line }
     }
 
     /**
@@ -339,6 +382,9 @@ class ResearchPipeline(
         private val PLACE_STOP = setOf("and", "or", "for", "with", "that", "which", "what", "to", "is", "are")
         private const val COMMON_DF = 20_000
         private const val INFOBOX_FACT_CHARS = 200
+        private const val LIST_LINE_CHARS = 160
+        /** Section label of an expanded list article's source; mirrored in tools/answer_proto.py. */
+        const val LIST_SECTION = "Most viewed entries"
         private val COMMON_MIN_PRIOR = kotlin.math.ln(1.0 + 3_000)  // prior = ln(1 + monthly views)
 
         fun formatDistance(m: Double): String =

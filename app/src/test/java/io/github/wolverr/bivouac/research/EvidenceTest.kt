@@ -63,6 +63,31 @@ class EvidenceTest {
     }
 
     @Test
+    fun listRowsReadTablesAndBullets() {
+        val table = """
+            This is a list of museums in Berlin.
+            | Name            | Image | Neighborhood  | Type        |
+            | --------------- | ----- | ------------- | ----------- |
+            | Pergamon Museum |       | Museum Island | Archaeology [ 3 ] |
+            | M               |       |               |             |
+        """.trimIndent()
+        assertEquals(listOf(Evidence.ListRow("Pergamon Museum", listOf("Museum Island", "Archaeology"), false)),
+            Evidence.listRows(table))
+        val ranked = "| 1 | Burj Khalifa | 828 metres |\n| =2 | Marina 101 | 425 metres |"
+        assertEquals(listOf("Burj Khalifa", "Marina 101"), Evidence.listRows(ranked).map { it.name })
+        assertTrue(Evidence.listRows(ranked).all { it.ranked })
+        val bullets = "- Café Procope – the oldest restaurant in Paris\n* Guy Savoy\nplain text"
+        assertEquals(listOf(Evidence.ListRow("Café Procope", listOf("the oldest restaurant in Paris"), false),
+            Evidence.ListRow("Guy Savoy", emptyList(), false)), Evidence.listRows(bullets))
+    }
+
+    @Test
+    fun compressCollapsesTablePadding() {
+        val out = Evidence.compress("| Pergamon Museum          | Museum Island        |", listOf("pergamon"), 450)
+        assertEquals("| Pergamon Museum | Museum Island |", out)
+    }
+
+    @Test
     fun compressKeepsRelevantSentences() {
         val text = "Astana is the capital of Kazakhstan. The city has many parks. It became the capital in 1997. " +
             "Football is popular. Winters are cold."

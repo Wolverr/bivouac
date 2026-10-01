@@ -113,8 +113,51 @@ object Evidence {
         }
     }
 
+    /** An entry of a list article: its name, the other cells, and whether a rank column led it. */
+    data class ListRow(val name: String, val cells: List<String>, val ranked: Boolean)
+
+    private val LIST_SKIP_CELL = Regex("^(:?-+:?|name|names|image|picture|photo|rank|no\\.?|#)$", RegexOption.IGNORE_CASE)
+    private val CITATION = Regex("\\[\\s*\\d+\\s*]")
+    private val HAS_LETTER = Regex("\\p{L}")
+    private val ITEM_NAME_END = Regex("\\s[–—-]\\s|,|\\(|:")
+    private val PADDING = Regex("[ \\t]{2,}")
+
+    /**
+     * The entries of a list article chunk: markdown table rows ("| Pergamon Museum | Museum Island | ... |";
+     * a leading rank column like "1" or "=4" is dropped and sets [ListRow.ranked]) and bullet items
+     * ("- Café Procope – the oldest ..."). Mirrors list_rows() in tools/retrieve_proto.py.
+     */
+    fun listRows(text: String): List<ListRow> {
+        val out = ArrayList<ListRow>()
+        for (raw in text.lines()) {
+            val line = raw.replace(CITATION, "").trim()
+            var ranked = false
+            val name: String
+            val rest: List<String>
+            if (line.startsWith("|")) {
+                val cells = line.trim('|').split('|').map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+                while (cells.isNotEmpty() && !HAS_LETTER.containsMatchIn(cells[0])) {
+                    cells.removeAt(0)
+                    ranked = true
+                }
+                if (cells.isEmpty() || LIST_SKIP_CELL.matches(cells[0])) continue
+                name = cells[0]
+                rest = cells.drop(1)
+            } else if (line.startsWith("- ") || line.startsWith("* ")) {
+                val item = line.drop(2).trim()
+                name = item.split(ITEM_NAME_END, limit = 2)[0].trim()
+                rest = listOf(item.drop(name.length).trim(' ', ',', '–', '—', '-', ':'))
+            } else {
+                continue
+            }
+            if (name.length in 3..80 && HAS_LETTER.containsMatchIn(name)) out += ListRow(name, rest.filter { it.isNotEmpty() }, ranked)
+        }
+        return out
+    }
+
     /** Keeps the sentences that mention the most question words, in their original order. */
-    fun compress(text: String, words: List<String>, maxChars: Int): String {
+    fun compress(passage: String, words: List<String>, maxChars: Int): String {
+        val text = passage.replace(PADDING, " ")  // markdown tables are padded with long runs of spaces
         if (text.length <= maxChars) return text
         val sentences = text.split(SENTENCE_END)
         val ranked = sentences.withIndex().sortedByDescending { (i, s) ->
