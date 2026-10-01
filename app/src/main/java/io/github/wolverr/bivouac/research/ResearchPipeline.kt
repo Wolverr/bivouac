@@ -23,6 +23,8 @@ sealed interface ResearchEvent {
     /** center == null: the location couldn't be found (or GPS isn't available). */
     data class PlacesFound(val intent: PlaceIntent, val center: GeoPoint?, val places: List<Place>) : ResearchEvent
     data class Llm(val event: GenEvent) : ResearchEvent
+    /** "Think harder": tokens of (hidden) reasoning so far, out of the budget. */
+    data class Thinking(val tokens: Int, val budget: Int) : ResearchEvent
 }
 
 /**
@@ -38,6 +40,11 @@ class Conversation {
     val lastQuestion: String? get() = turns.lastOrNull()?.question
 
     fun clear() = turns.clear()
+
+    /** Forgets the last exchange if it was about [question] (before asking it again). */
+    fun dropLast(question: String) {
+        if (turns.lastOrNull()?.question == question) turns.removeAt(turns.lastIndex)
+    }
 }
 
 class ResearchPipeline(
@@ -63,6 +70,12 @@ class ResearchPipeline(
         /** Rough prompt budget in characters (~4 chars/token) for history + new turn. */
         val historyChars: Int = 9_000,
         val sampling: Sampling = Sampling(temperature = 0.4f, maxTokens = 700),
+        /**
+         * "Think harder": tokens of reasoning before the engine makes the model answer. 1,024 kept
+         * nearly all of unbounded thinking's gain on the reasoning questions (4B 4.2 -> 8.7, 9B 3.5 -> 8.8
+         * of 10) at ~1,100 tokens per answer; 512 lost much of it for the 4B (docs/ROADMAP.md).
+         */
+        val thinkBudget: Int = 1024,
     ) {
         companion object {
             /**
@@ -73,11 +86,21 @@ class ResearchPipeline(
             fun forContext(nCtx: Int) = Settings(
                 maxSources = if (nCtx < 3072) 3 else 6,
                 historyChars = maxOf(0, (nCtx - 1100) * 3),
+                thinkBudget = (nCtx - 1700).coerceIn(256, 1024),
             )
         }
     }
 
-    fun answer(question: String, conversation: Conversation, settings: Settings = Settings.forContext(llm.contextSize)): Flow<ResearchEvent> = flow {
+    /**
+     * [thinkHarder]: let the model reason first (hidden; up to [Settings.thinkBudget] tokens, so a
+     * few minutes on a phone). It fixes most multi-step reasoning mistakes.
+     */
+    fun answer(
+        question: String,
+        conversation: Conversation,
+        settings: Settings = Settings.forContext(llm.contextSize),
+        thinkHarder: Boolean = false,
+    ): Flow<ResearchEvent> = flow {
         val decision = Router.decide(question, !conversation.isEmpty)
         emit(ResearchEvent.Routed(decision))
 
@@ -118,16 +141,27 @@ class ResearchPipeline(
             append(question)
         }
 
-        val turns = history(conversation, settings.historyChars - prompt.length) + ChatTurn("user", prompt)
-        val (prefix, rest) = llm.chatPrompt(system, turns)
+        // Thinking needs room in the context: the reasoning (~3 chars/token) comes out of the history.
+        val budget = settings.thinkBudget
+        val promptChars = settings.historyChars - if (thinkHarder) budget * 3 else 0
+        val turns = history(conversation, promptChars - prompt.length) + ChatTurn("user", prompt)
+        val (prefix, rest) = llm.chatPrompt(system, turns, thinking = thinkHarder)
+        val sampling = if (thinkHarder) {
+            settings.sampling.copy(maxTokens = settings.sampling.maxTokens + budget, thinkBudget = budget)
+        } else {
+            settings.sampling
+        }
         val answer = StringBuilder()
-        val filter = ThinkFilter()
-        llm.complete(prefix, rest, settings.sampling).collect { ev ->
+        val filter = ThinkFilter(startInThink = thinkHarder && rest.trimEnd().endsWith("<think>"))
+        var hidden = 0
+        llm.complete(prefix, rest, sampling).collect { ev ->
             if (ev is GenEvent.Token) {
                 val visible = filter.feed(ev.text)
                 if (visible.isNotEmpty()) {
                     answer.append(visible)
                     emit(ResearchEvent.Llm(GenEvent.Token(visible)))
+                } else if (thinkHarder && answer.isEmpty() && ++hidden % 8 == 0) {
+                    emit(ResearchEvent.Thinking(minOf(hidden, budget), budget))
                 }
                 return@collect
             }

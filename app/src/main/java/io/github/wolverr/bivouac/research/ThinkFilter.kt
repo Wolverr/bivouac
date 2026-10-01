@@ -8,10 +8,13 @@ package io.github.wolverr.bivouac.research
  *
  * Tags can be split across tokens, so text that could still become a tag is
  * held back until the next piece decides it.
+ *
+ * [startInThink]: the prompt already opened the block (Qwen3.5 with thinking on ends its prompt
+ * with "<think>"), so the stream starts with reasoning and has only the closing tag.
  */
-class ThinkFilter {
+class ThinkFilter(startInThink: Boolean = false) {
     private val pending = StringBuilder()
-    private var inThink = false
+    private var inThink = startInThink
 
     /** Feeds one streamed piece; returns the text that is safe to show now. */
     fun feed(piece: String): String {

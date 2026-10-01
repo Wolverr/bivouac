@@ -18,12 +18,17 @@ struct SamplingParams {
     float min_p = 0.0f;
     float repeat_penalty = 1.05f;
     int   max_tokens = 1024;
+    // Thinking budget ("Think harder"): after this many tokens inside <think>, the engine
+    // writes "</think>" itself so the model answers. -1 = no budget. max_tokens covers both.
+    int   think_budget = -1;
 };
 
 struct CompletionStats {
     int     n_reused = 0;    // prompt tokens served from the KV cache / prefix snapshot
     int     n_prefill = 0;   // prompt tokens actually evaluated
     int     n_gen = 0;
+    int     n_think = 0;       // of n_gen, tokens spent inside <think>
+    bool    think_cut = false; // the thinking budget ran out and "</think>" was forced
     int64_t t_prefill_us = 0;
     int64_t t_first_token_us = 0;
     int64_t t_gen_us = 0;

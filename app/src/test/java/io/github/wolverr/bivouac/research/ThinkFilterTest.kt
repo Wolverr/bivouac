@@ -11,6 +11,15 @@ class ThinkFilterTest {
     }
 
     @Test
+    fun reasoningOpenedByThePromptIsHidden() {
+        // Qwen3.5 with thinking on: the prompt ends with "<think>", the stream has only "</think>".
+        val f = ThinkFilter(startInThink = true)
+        val shown = listOf("Thinking Process:\n1. Add 3h 55m", "\n</th", "ink>\n\nThe train arrives at **19:35**.")
+            .joinToString("") { f.feed(it) } + f.flush()
+        assertEquals("\n\nThe train arrives at **19:35**.", shown)
+    }
+
+    @Test
     fun plainTextPassesThrough() {
         assertEquals("Astana is the capital.", run("Astana ", "is the ", "capital."))
     }

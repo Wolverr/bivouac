@@ -23,6 +23,9 @@ data class CompletionStats(
     val t_prefill_ms: Double = 0.0,
     val t_first_token_ms: Double = 0.0,
     val t_gen_ms: Double = 0.0,
+    /** Of n_gen, tokens spent thinking; think_cut: the thinking budget ran out. */
+    val n_think: Int = 0,
+    val think_cut: Boolean = false,
     val cancelled: Boolean = false,
     val stop_reason: String = "",
     val error: String = "",
@@ -51,6 +54,8 @@ data class Sampling(
     val minP: Float = 0.0f,
     val repeatPenalty: Float = 1.05f,
     val maxTokens: Int = 1024,
+    /** Tokens of thinking before the engine closes the <think> block; -1 = no budget. Counts toward maxTokens. */
+    val thinkBudget: Int = -1,
 )
 
 data class ChatTurn(val role: String, val content: String)
@@ -163,7 +168,7 @@ class LlmRuntime private constructor(context: Context) {
         val raw = NativeEngine.nativeComplete(
             prefix.toByteArray(), rest.toByteArray(),
             sampling.temperature, sampling.topP, sampling.topK, sampling.minP,
-            sampling.repeatPenalty, sampling.maxTokens, listener,
+            sampling.repeatPenalty, sampling.maxTokens, sampling.thinkBudget, listener,
         )
         send(GenEvent.Done(json.decodeFromString<CompletionStats>(raw.decodeToString())))
         close()

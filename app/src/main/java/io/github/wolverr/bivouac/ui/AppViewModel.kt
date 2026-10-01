@@ -69,6 +69,9 @@ data class TurnUi(
     val placeCenter: GeoPoint? = null,
     val placeSearch: PlaceIntent? = null,
     val needsLocationPermission: Boolean = false,
+    /** Answered with "Think harder" (reasoning first); thinking = hidden tokens so far / budget. */
+    val thoughtHarder: Boolean = false,
+    val thinking: Pair<Int, Int>? = null,
 )
 
 data class AskState(
@@ -234,16 +237,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun askQuestion() {
         val q = _ask.value.input.trim()
         if (q.isEmpty() || _ask.value.running) return
+        _ask.update { it.copy(input = "") }
+        run(q, thinkHarder = false)
+    }
+
+    /**
+     * Asks the last question again with reasoning on ("Think harder"): slower (a few minutes
+     * on a phone) but it fixes most multi-step mistakes. Replaces the last answer.
+     */
+    fun thinkHarder() {
+        if (_ask.value.running) return
+        val q = _ask.value.turns.lastOrNull()?.question ?: return
+        conversation.dropLast(q)
+        _ask.update { it.copy(turns = it.turns.dropLast(1)) }
+        run(q, thinkHarder = true)
+    }
+
+    private fun run(q: String, thinkHarder: Boolean) {
         if (_library.value.loadedModel == null) {
             _ask.update { it.copy(error = "Load a model first (Library tab).") }
             return
         }
-        _ask.update { it.copy(input = "", running = true, error = null, turns = it.turns + TurnUi(q, status = "Thinking…")) }
+        val turn = TurnUi(q, status = if (thinkHarder) "Thinking harder…" else "Thinking…", thoughtHarder = thinkHarder)
+        _ask.update { it.copy(running = true, error = null, turns = it.turns + turn) }
         val modelId = _library.value.loadedModel!!
         askJob = viewModelScope.launch {
             runtime.crashGuard.begin(modelId, "answering", "ctx ${runtime.contextSize}")
             try {
-                pipeline.answer(q, conversation).collect { ev ->
+                pipeline.answer(q, conversation, thinkHarder = thinkHarder).collect { ev ->
                     when (ev) {
                         is ResearchEvent.Routed -> updateLast { it.copy(crisis = ev.decision.crisis) }
                         is ResearchEvent.Searching -> updateLast { it.copy(status = "Searching the library…", usedLibrary = true) }
@@ -257,9 +278,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         is ResearchEvent.Sources -> updateLast {
                             it.copy(sources = ev.sources, searchMs = ev.searchMs, status = "Reading sources…")
                         }
+                        is ResearchEvent.Thinking -> updateLast { it.copy(thinking = ev.tokens to ev.budget) }
                         is ResearchEvent.Llm -> when (val g = ev.event) {
                             is GenEvent.Prefill -> updateLast { it.copy(prefill = g.done to g.total) }
-                            is GenEvent.Token -> updateLast { it.copy(answer = it.answer + g.text, status = null) }
+                            is GenEvent.Token -> updateLast {
+                                // After a hidden reasoning block the answer starts with blank lines.
+                                it.copy(answer = if (it.answer.isEmpty()) g.text.trimStart() else it.answer + g.text, status = null, thinking = null)
+                            }
                             is GenEvent.Done -> {
                                 if (g.stats.error.isEmpty()) runtime.crashGuard.recovered(modelId)
                                 updateLast { it.copy(stats = g.stats, error = g.stats.error.ifEmpty { null }, status = null) }
@@ -289,7 +314,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * [questionsName] (a .jsonl in the app folder's eval/ directory). Results go to
      * eval/results-<model>.jsonl, resuming if that file exists. See docs/EVAL.md.
      */
-    fun startEval(questionsName: String, modelName: String) {
+    fun startEval(questionsName: String, modelName: String, thinkHarder: Boolean = false) {
         if (_eval.value?.startsWith("Eval ") == true && !_eval.value!!.startsWith("Eval finished")) return
         viewModelScope.launch {
             val dir = File(getApplication<Application>().getExternalFilesDir(null), "eval").apply { mkdirs() }
@@ -302,9 +327,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (_library.value.loadedModel != model.id) loadModel(model).join()
             val info = _library.value.modelInfo ?: return@launch
             val device = runtime.device.let { "${it.model} (${it.soc})" }
-            val out = File(dir, "results-${modelName.removeSuffix(".gguf")}.jsonl")
+            val out = File(dir, "results-${modelName.removeSuffix(".gguf")}${if (thinkHarder) "-think" else ""}.jsonl")
             _eval.value = "Eval starting…"
-            EvalRunner(pipeline, device, info.desc).run(File(dir, questionsName), out) { done, total ->
+            EvalRunner(pipeline, device, info.desc, thinkHarder).run(File(dir, questionsName), out) { done, total ->
                 _eval.value = "Eval $done/$total"
             }
             _eval.value = "Eval finished: ${out.name}"
@@ -315,6 +340,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun retryLast() {
         if (_ask.value.running) return
         val q = _ask.value.turns.lastOrNull()?.question ?: return
+        conversation.dropLast(q)
         _ask.update { it.copy(turns = it.turns.dropLast(1), input = q) }
         askQuestion()
     }

@@ -34,12 +34,12 @@ class MainActivity : ComponentActivity() {
         handleEval(intent)
     }
 
-    /** adb shell am start -n <pkg>/.ui.MainActivity --es eval questions.jsonl --es model <file>.gguf */
+    /** adb shell am start -n <pkg>/.ui.MainActivity --es eval questions.jsonl --es model <file>.gguf [--ez think true] */
     private fun handleEval(intent: Intent?) {
         val questions = intent?.getStringExtra("eval") ?: return
         val model = intent.getStringExtra("model") ?: return
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)  // a long run must not sleep
-        vm.startEval(questions, model)
+        vm.startEval(questions, model, thinkHarder = intent.getBooleanExtra("think", false))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

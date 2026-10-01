@@ -105,7 +105,14 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 }
             }
             itemsIndexed(s.turns) { i, turn ->
-                TurnView(turn, running = s.running && i == s.turns.lastIndex, onRetry = vm::retryLast)
+                val isLast = i == s.turns.lastIndex
+                TurnView(
+                    turn,
+                    running = s.running && isLast,
+                    onRetry = vm::retryLast,
+                    // Only the newest finished answer, and not one that already thought harder.
+                    onThinkHarder = vm::thinkHarder.takeIf { isLast && !s.running && !turn.thoughtHarder && turn.answer.isNotEmpty() },
+                )
             }
         }
 
@@ -138,7 +145,7 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TurnView(t: TurnUi, running: Boolean, onRetry: () -> Unit) {
+private fun TurnView(t: TurnUi, running: Boolean, onRetry: () -> Unit, onThinkHarder: (() -> Unit)? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(t.question, style = MaterialTheme.typography.titleMedium)
 
@@ -146,12 +153,20 @@ private fun TurnView(t: TurnUi, running: Boolean, onRetry: () -> Unit) {
         if (t.placeSearch != null) PlacesBlock(t, running, onRetry)
 
         val prefill = t.prefill
+        val thinking = t.thinking
         if (running && t.answer.isEmpty()) {
             Text(
-                if (prefill != null && prefill.second > 0) "Reading ${prefill.first}/${prefill.second} tokens" else t.status ?: "Working…",
+                when {
+                    thinking != null -> "Thinking it through… ${thinking.first}/${thinking.second}"
+                    prefill != null && prefill.second > 0 && prefill.first < prefill.second ->
+                        "Reading ${prefill.first}/${prefill.second} tokens"
+                    else -> t.status ?: "Working…"
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (prefill != null && prefill.second > 0) {
+            if (thinking != null) {
+                LinearProgressIndicator(progress = { thinking.first.toFloat() / thinking.second }, modifier = Modifier.fillMaxWidth())
+            } else if (prefill != null && prefill.second > 0) {
                 LinearProgressIndicator(progress = { prefill.first.toFloat() / prefill.second }, modifier = Modifier.fillMaxWidth())
             } else {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -164,14 +179,18 @@ private fun TurnView(t: TurnUi, running: Boolean, onRetry: () -> Unit) {
             }
         }
         t.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        onThinkHarder?.let {
+            TextButton(onClick = it) { Text("Think harder (slower, better at reasoning)") }
+        }
 
         t.stats?.let { st ->
             Text(
                 String.format(
                     Locale.US,
-                    "%s%d tok read (%d cached) %.1f tok/s · %d tok written %.1f tok/s · first token %.1fs",
+                    "%s%d tok read (%d cached) %.1f tok/s · %d tok written %.1f tok/s%s · first token %.1fs",
                     t.searchMs?.let { "search $it ms · " } ?: "",
-                    st.n_prefill, st.n_reused, st.prefillTps, st.n_gen, st.genTps, st.t_first_token_ms / 1000,
+                    st.n_prefill, st.n_reused, st.prefillTps, st.n_gen, st.genTps,
+                    if (st.n_think > 0) " (${st.n_think} thinking)" else "", st.t_first_token_ms / 1000,
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

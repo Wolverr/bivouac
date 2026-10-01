@@ -274,6 +274,19 @@ CompletionStats Engine::complete(const std::string & prefix, const std::string &
 
     const llama_vocab * vocab = llama_model_get_vocab(model_);
     std::string pending;  // bytes of an incomplete UTF-8 sequence
+
+    // Thinking budget, like llama.cpp's --reasoning-budget: inside <think>, count tokens, and
+    // when the budget is spent write "</think>" into the context ourselves. Templates either
+    // open the block in the prompt (it ends with "<think>") or let the model write the tag.
+    const bool budgeted = sp.think_budget >= 0;
+    std::string tail;  // last generated text, to spot the tags across token boundaries
+    auto ends_with_open_tag = [](const std::string & s) {
+        const size_t end = s.find_last_not_of(" \n\r\t");
+        return end != std::string::npos && end + 1 >= 7 && s.compare(end + 1 - 7, 7, "<think>") == 0;
+    };
+    bool thinking = budgeted && ends_with_open_tag(rest);
+    bool thought = false;  // a think block was closed; don't budget a second one
+
     st.stop_reason = "length";
     for (int i = 0; i < sp.max_tokens; i++) {
         if (cancel_.load()) {
@@ -319,14 +332,51 @@ CompletionStats Engine::complete(const std::string & prefix, const std::string &
             break;
         }
         kv_tokens_.push_back(tok);
+
+        if (budgeted && !thought) {
+            tail += common_token_to_piece(ctx_, tok, /*special*/ true);
+            if (tail.size() > 32) tail.erase(0, tail.size() - 32);
+            if (!thinking && tail.find("<think>") != std::string::npos) {
+                thinking = true;
+                tail.clear();
+            } else if (thinking && tail.find("</think>") != std::string::npos) {
+                thinking = false;
+                thought = true;
+            } else if (thinking && ++st.n_think >= sp.think_budget) {
+                const auto close = common_tokenize(ctx_, "\n</think>\n\n", /*add_special*/ false, /*parse_special*/ true);
+                if ((int) (kv_tokens_.size() + close.size()) + 1 >= n_ctx) {
+                    st.stop_reason = "context";
+                    break;
+                }
+                if (!pending.empty() && cb.on_token) cb.on_token(pending);
+                pending.clear();
+                if (cb.on_token && !cb.on_token("\n</think>\n\n")) {
+                    st.stop_reason = "stop";
+                    break;
+                }
+                llama_batch cb_batch = llama_batch_get_one(const_cast<llama_token *>(close.data()), (int32_t) close.size());
+                if (llama_decode(ctx_, cb_batch) != 0) {
+                    st.error = "decode failed during generation";
+                    break;
+                }
+                for (llama_token t : close) {
+                    common_sampler_accept(smpl, t, true);
+                    kv_tokens_.push_back(t);
+                }
+                thinking = false;
+                thought = true;
+                st.think_cut = true;
+            }
+        }
     }
     if (!pending.empty() && cb.on_token) cb.on_token(pending);
     common_sampler_free(smpl);
     st.t_gen_us = ggml_time_us() - t1;
-    LOGI("complete: reused %d, prefill %d tok in %.2f s (%.1f tok/s), gen %d tok in %.2f s (%.1f tok/s), first token %.2f s, stop=%s",
+    LOGI("complete: reused %d, prefill %d tok in %.2f s (%.1f tok/s), gen %d tok in %.2f s (%.1f tok/s), first token %.2f s, "
+         "think %d%s, stop=%s",
          st.n_reused, st.n_prefill, st.t_prefill_us / 1e6, st.n_prefill / std::max(1e-9, st.t_prefill_us / 1e6),
          st.n_gen, st.t_gen_us / 1e6, st.n_gen / std::max(1e-9, st.t_gen_us / 1e6), st.t_first_token_us / 1e6,
-         st.stop_reason.c_str());
+         st.n_think, st.think_cut ? " (cut)" : "", st.stop_reason.c_str());
     return st;
 }
 

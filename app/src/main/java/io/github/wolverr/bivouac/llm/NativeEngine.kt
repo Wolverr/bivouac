@@ -42,6 +42,7 @@ internal object NativeEngine {
         minP: Float,
         repeatPenalty: Float,
         maxTokens: Int,
+        thinkBudget: Int,
         listener: Listener,
     ): ByteArray
 

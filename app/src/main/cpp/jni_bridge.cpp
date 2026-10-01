@@ -108,7 +108,8 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(nativeBench)(JNIEnv * env, jobject, jint n_p
 // Returns stats as a JSON byte array.
 JNIEXPORT jbyteArray JNICALL JNI_FN(nativeComplete)(JNIEnv * env, jobject, jbyteArray prefix, jbyteArray rest,
                                                     jfloat temp, jfloat top_p, jint top_k, jfloat min_p,
-                                                    jfloat repeat_penalty, jint max_tokens, jobject listener) {
+                                                    jfloat repeat_penalty, jint max_tokens, jint think_budget,
+                                                    jobject listener) {
     jclass cls = env->GetObjectClass(listener);
     jmethodID on_prefill = env->GetMethodID(cls, "onPrefill", "(II)V");
     jmethodID on_token = env->GetMethodID(cls, "onToken", "([B)Z");
@@ -132,6 +133,7 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(nativeComplete)(JNIEnv * env, jobject, jbyte
     sp.min_p = min_p;
     sp.repeat_penalty = repeat_penalty;
     sp.max_tokens = max_tokens;
+    sp.think_budget = think_budget;
 
     CompletionStats st;
     {
@@ -142,9 +144,10 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(nativeComplete)(JNIEnv * env, jobject, jbyte
     char buf[512];
     snprintf(buf, sizeof(buf),
              "{\"n_reused\":%d,\"n_prefill\":%d,\"n_gen\":%d,\"t_prefill_ms\":%.1f,\"t_first_token_ms\":%.1f,"
-             "\"t_gen_ms\":%.1f,\"cancelled\":%s,\"stop_reason\":\"%s\",\"error\":\"%s\"}",
+             "\"t_gen_ms\":%.1f,\"n_think\":%d,\"think_cut\":%s,\"cancelled\":%s,\"stop_reason\":\"%s\",\"error\":\"%s\"}",
              st.n_reused, st.n_prefill, st.n_gen, st.t_prefill_us / 1000.0, st.t_first_token_us / 1000.0,
-             st.t_gen_us / 1000.0, st.cancelled ? "true" : "false", st.stop_reason.c_str(), st.error.c_str());
+             st.t_gen_us / 1000.0, st.n_think, st.think_cut ? "true" : "false", st.cancelled ? "true" : "false",
+             st.stop_reason.c_str(), st.error.c_str());
     return to_bytes(env, buf);
 }
 

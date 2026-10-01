@@ -40,6 +40,8 @@ class EvalRunner(
     private val pipeline: ResearchPipeline,
     private val device: String,
     private val model: String,
+    /** Answer with "Think harder" (reasoning on, with the thinking budget). */
+    private val thinkHarder: Boolean = false,
 ) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -72,7 +74,7 @@ class EvalRunner(
         var searchMs: Long? = null
         var stats: CompletionStats? = null
         val error = runCatching {
-            pipeline.answer(q.q, Conversation()).collect { ev ->
+            pipeline.answer(q.q, Conversation(), thinkHarder = thinkHarder).collect { ev ->
                 when (ev) {
                     is ResearchEvent.Routed -> route = ev.decision.route.name.lowercase()
                     is ResearchEvent.Sources -> {
@@ -88,7 +90,7 @@ class EvalRunner(
                         is GenEvent.Done -> stats = g.stats
                         is GenEvent.Prefill -> Unit
                     }
-                    is ResearchEvent.Searching -> Unit
+                    is ResearchEvent.Searching, is ResearchEvent.Thinking -> Unit
                 }
             }
         }.exceptionOrNull()?.message
