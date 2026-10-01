@@ -16,7 +16,25 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
-## Resume here (handoff, 2026-10-01 ~05:30, after the night session)
+## Resume here (handoff, 2026-10-01 ~11:15)
+
+**Morning session (user decisions):** "Think harder" is built (ac288ef: button under the newest answer,
+1,024-token thinking budget enforced in engine.cpp, tested on the PC with tools/native/engine_test; not yet
+on a phone). The 9B uses tools/prompts/system-calc2.txt via catalog.json "prompt" (ae330a8; the harness
+mirrors it with --model-id). The user leaves model/tier choices to us: optimize speed and quality to beat
+the other entries.
+
+**Running (check `systemctl --user is-active bivouac-queue6`, tools/queue6.log):** 6 GB tier test. The
+normal 4B (Q4_K_M, 2.74 GB) needs ~3.5 GB free RAM, too much for most 6 GB phones, and the 2B scores
+41-45 % (< 50 %). ~/bivouac-queue6.sh runs the 4B as Q4_K_M, UD-IQ3_XXS (1.95 GB) and Q3_K_M (2.29 GB)
+on the main 60 questions from the frozen worktree ~/bivouac-q (ac288ef); results in
+~/bivouac-q/eval/results-pc-qwen3.5-4b*-v6-*.jsonl (files in ~/models-quant/<quant>/). Next: copy them to
+eval/, `grade.py pair` Q4_K_M vs each lighter file (blind grader as before), `pairscore`. If a lighter file
+stays close, make it the 6 GB pick in catalog.json (and consider it for 8 GB: smaller files decode faster
+on phones; check speed on the Redmi, IQ quants may be slower on ARM than K-quants).
+
+The user asked about storage: total ~25-30 GB (APK ~70 MB; Wikipedia 18 GB, places 5 GB, model). A
+"lite" option (top articles only, places per continent, <10 GB) was offered for later; not started.
 
 Start a new session with: "Continue the Bivouac project. Read docs/ROADMAP.md, Resume here."
 
@@ -119,9 +137,8 @@ commit them when publishing the eval. Worktrees ~/bivouac-old (5077db9) and ~/bi
 for tonight's frozen runs (also ~/bivouac-v5 for the 2B): `git worktree remove` them when done.
 
 Next steps, in order:
-1. Decide with the user: (a) "Think harder" button (data above: big reasoning gain, phone time depends on
-   the budget; the app would need its own budget cut-off in the generation loop, like llama.cpp's
-   --reasoning-budget: count tokens inside <think>, then force "</think>"); (b) calc2 prompt for the 9B tier.
+1. Done this morning: "Think harder" (1,024-token budget) and calc2 for the 9B. Finish the 6 GB tier test
+   (Running, above).
 2. 6 GB tier: the 2B scores 41-45 % (< 50 %). Check whether the 4B loads on 6 GB phones (MemoryPlanner,
    no repack, smaller context) and switch the 6 GB pick if it does.
 3. Places are the weakest category and our planned edge: rerun the held-out places questions with the
