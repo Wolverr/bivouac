@@ -222,25 +222,30 @@ summaries in eval/grading/ (pair-* for paired). They're not committed yet (neith
 commit them when publishing the eval. Worktrees ~/bivouac-old (5077db9) and ~/bivouac-v4 (d29b13e) were only
 for tonight's frozen runs (also ~/bivouac-v5 for the 2B): `git worktree remove` them when done.
 
-Next steps, in order:
+Next steps, in order (updated 2026-10-02):
 1. Done: "Think harder" (1,024-token budget), calc2 for the 9B, 6 GB tier (4B Q3_K_M), places fixes,
-   sights sources, packs published.
-2. Phone tests (the phone has the new APK; check the copy finished): test the automatic memory settings
+   sights sources, packs published. 2026-10-01/02: 12 GB model and precision (9B Q4), Think harder stays
+   a button but turns on by itself for calculation/timeline questions (Router.needsReasoning), place
+   names without the wiki pack, README tiers + held-out scores, MIT license, eval files committed.
+2. 12 GB phone (user gets it 2026-10-04; model not known yet): MTP retest (see MTP above), speed of the
+   9B, GPU prompt reading if Snapdragon, Think harder timing on the phone.
+3. Phone tests (the phone has the new APK; check the copy finished): test the automatic memory settings
    (Library shows "auto: ctx …"; compare `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the
    estimate; the phone had only 3.0 GB MemAvailable at idle, so the 4B Q4_K_M may land on "no repack";
    load the 9B to force an OOM and check the crash notice), measure speed of 2B/4B/4B-Q3 (if Q3 decodes
    clearly faster on the phone, consider it for 8 GB too), Think harder timing, list-expansion latency
    (1-3 s on the PC: up to 200 title lookups), sights latency (reads every chunk of a city article).
-3. On-phone eval (docs/EVAL.md), 4B first; it gives the published numbers.
-4. Measure the sights change with the 4B (h-places-03 and a few new sights questions, paired).
-5. Publish the rest: README.md TBDs (phone speeds, release link, license; model table still shows the older
-   single-run scores and the old tiers). Commit the eval results + gradings. Then demo video (user), make the
-   repo public, poidh claim. Deadline 2026-10-31.
-6. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
+4. On-phone eval (docs/EVAL.md), 4B first; it gives the published numbers.
+5. Measure the sights change with the 4B (h-places-03 and a few new sights questions, paired).
+6. Publish the rest: README.md TBDs (phone speeds, release link), signed release APK + GitHub release.
+   Then demo video (user), make the repo public, poidh claim. Deadline 2026-10-31.
+7. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
    text, ~7 % of compressed blocks); spatial index on coord for "nearby articles" (above).
 
-What the user does (only these): choose the app license; record the demo video; submit the claim. Phone
-setup and HuggingFace are done. No 12 GB phone yet (borrow one, cloud device farm, or used Pixel 8 Pro).
+What the user does (only these): record the demo video; make the repo public; submit the claim; plug in
+the phones for tests. License chosen (MIT, 2026-10-01). Phone setup and HuggingFace are done.
+Note: the user often works from the phone over SSH; editing repo files from Windows (\\wsl.localhost)
+drops the executable bit on scripts, so check `git diff --summary` for mode changes before committing.
 See docs/COMPETITORS.md for the other entries.
 
 ## Milestones
