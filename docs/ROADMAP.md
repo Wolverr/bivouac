@@ -73,13 +73,34 @@ list expansion ("must-see museums in Berlin": the list article's most viewed ent
 
 Tier picks (in catalog.json): 6 GB -> 2B, 8 GB -> 4B, 12 GB -> 9B. Rival AndroidLM claims 64 %.
 
+### Measured tonight (paired, blind, seeded; 4B unless noted)
+
+| Comparison | Mean diff (1-10) | 95 % CI | better / worse / same |
+|---|---|---|---|
+| old retrieval (5077db9) -> v3 retrieval | -0.13 | -0.54..0.27 | 17 / 27 / 16 |
+| v3 -> v4 (list expansion, context acronyms, reorder) | 0.00 | -0.31..0.31 | 6 / 9 / 45 identical |
+| v4 -> v4-calc prompt | +0.25 | -0.35..0.85 | 28 / 20 / 12 |
+| no thinking -> thinking, 6 reasoning q | +2.17 | -1.28..5.61 | 3 / 2 / 1 |
+| 9B: no thinking (v2) -> thinking, 6 reasoning q | +5.17 | 1.40..8.93 | 5 / 1 / 0 |
+
+Reading: retrieval fixes do what they target (Berlin museums 2 -> 8, Linux scheduler 3 -> 6, fact +1.7)
+but at n = 60 they don't move the 4B's mean: small evidence changes flip other answers by 1-3 points
+either way. The bottleneck is answer writing. Reasoning answers fail mostly by stating a wrong number
+first and correcting it later; calc fixes that (reasoning +3.2) but made the 4B talk about "the provided
+excerpts" in 3/60 answers (health-04 9 -> 2), so calc2 (working-out rule folded into the research rule)
+is being tested. Thinking fixes reasoning (9B: 6/6 right) but costs 700-4,000 tokens per answer (4B avg
+~2,600, 9B ~1,500): 5-10+ minutes on the Redmi at 4-7 tok/s. Thinking budgets 512/1024 are queued.
+
 ### Running / queued overnight (check `systemctl --user list-units 'bivouac-*'`, tools/queue.log, tools/queue2.log)
 
 - ~/bivouac-queue.sh: 4B v3 (seeded, retrieval at ~c5d7af5 minus context acronyms) -> eval/;
   4B s-old (old retrieval 5077db9, seeded; worktree ~/bivouac-old) -> ~/bivouac-old/eval/;
   4B + 9B `--think` on the 6 reasoning questions -> eval/results-pc-*-v3-think.jsonl ("Think harder" test).
 - ~/bivouac-queue2.sh (after queue 1; frozen worktree ~/bivouac-v4 at d29b13e, results in ~/bivouac-v4/eval/):
-  4B v4, 4B v4-calc, 9B v4, 9B v4-calc. "calc" = tools/prompts/system-calc.txt: the app prompt plus
+  4B v4, 4B v4-calc, 9B v4, 9B v4-calc (**the 9B "calc" run uses calc2**: the prompt file in the worktree was
+  swapped before it started).
+- ~/bivouac-queue3.sh: 4B and 9B on the held-out set (v4 code) -> results-pc-*-v4-holdout.jsonl.
+- ~/bivouac-queue4.sh: 4B v4-calc2 (all 60), then 4B/9B thinking with --reasoning-budget 512 and 1024. "calc" = tools/prompts/system-calc.txt: the app prompt plus
   "work calculations out before stating the result" (the 4B/9B state a wrong number first, then correct
   themselves; graders punish that).
 
