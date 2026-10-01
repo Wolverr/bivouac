@@ -80,6 +80,7 @@ Every answer, blind packet, answer key (`*.key.json`) and grader score is in `ev
 | 6 GB tier (Q3_K_M vs Q4_K_M) | `results-pc-qwen3.5-4b-v6-{Q4_K_M,Q3_K_M}.jsonl` | `grading/pair-pc-qwen3.5-4b-v6-Q4_K_M--pc-qwen3.5-4b-v6-Q3_K_M.summary.json` |
 | 12 GB: Gemma-4-12B vs 9B | `results-pc-{qwen3.5-9b,gemma-4-12b-it-qat}-v13.jsonl` | `grading/pair-pc-qwen3.5-9b-v13--pc-gemma-4-12b-it-qat-v13.summary.json` |
 | 12 GB: 9B Q5 vs Q4 | `results-pc-qwen3.5-9b-{v13,v14-q5}.jsonl` | `grading/pair-pc-qwen3.5-9b-v13--pc-qwen3.5-9b-v14-q5.summary.json` |
-| Think harder | `results-pc-qwen3.5-{4b,9b}-v4-think1024.jsonl` | `grading/pair-pc-qwen3.5-{4b,9b}-v4--…-think1024.summary.json` |
+| Think harder, reasoning questions | `results-pc-qwen3.5-{4b,9b}-v4-think1024.jsonl` | `grading/pair-pc-qwen3.5-{4b,9b}-v4--…-think1024.summary.json` |
+| Think harder, all 60 questions (9B) | `results-pc-qwen3.5-9b-{v13,v15-think1024}.jsonl` | `grading/pair-pc-qwen3.5-9b-v13--pc-qwen3.5-9b-v15-think1024.summary.json` |
 
 Pair gradings without a summary file are scored with `tools/grade.py pairscore`.

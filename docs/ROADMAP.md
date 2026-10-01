@@ -62,10 +62,19 @@ RAM at ctx 4096 (8.1 at 8192), PC 28 tok/s read / 2.6 write vs the 9B's 49 / 12.
 **12 GB precision: Q4_K_M stays.** 9B UD-Q5_K_XL (6.87 GB) vs Q4_K_M (5.6 GB), paired blind, 60 main
 questions: +0.02 (CI -0.31..+0.34, 20 better / 17 worse / 23 ties, p 0.74): no measurable gain. Q5 is
 slower (PC 40 tok/s read / 10.5 write vs 49 / 12.2) and 1.3 GB bigger. Answer length the same (184 vs 183).
+(It thrashed at first: llama-server's host prompt cache, default 8 GB, pushed it past the 12 GB cap;
+run_model_eval.sh now passes `--cache-ram 0`. The app doesn't use llama-server, so it isn't affected.)
+
+**12 GB: Think harder stays a button, not the default.** 9B with thinking (1,024 budget) vs without, paired
+blind, all 60 main questions: -0.25 (CI -0.83..+0.33, 18 better / 24 worse / 18 ties, p 0.44), at 1,177
+vs 183 tokens per answer (PC 99 s vs 21 s). It wins reasoning (+1.83) and places (+2.25, 4 questions)
+but loses compare (-1.83), tech/science (-1.3), explain (-0.9): thought-through answers are shorter and
+leave things out (662 vs 810 chars). Idea: turn it on automatically for reasoning questions only (a
+Router class: arithmetic, estimates, "how long/how much"), measured paired on the reasoning set.
 
 **Next (12 GB):** (1) GPU prompt reading once the phone model is known (Snapdragon: OpenCL/Adreno path in
-llama.cpp); (2) pick the 12 GB model by blind eval on the PC: 9B vs a dense ~12-14B standard transformer
-vs a MoE that fits in RAM; (3) Think harder on the 12 GB tier.
+llama.cpp); (2) MTP retest on the phone (see above); (3) maybe: automatic Think harder for reasoning
+questions (above).
 
 **Earlier this afternoon, done:**
 - **Tiers** (paired, blind, seeded, 60 main questions vs the 4B Q4_K_M): UD-IQ3_XXS -1.25 (CI -1.71..-0.79,
