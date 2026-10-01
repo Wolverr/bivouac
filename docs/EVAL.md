@@ -16,6 +16,14 @@ We measure that directly:
 
 The model file must already be in the Library, packs are opened automatically.
 
+Open the app once after installing it **before** pushing files: it creates its `models/`, `packs/` and
+`eval/` folders itself. Folders made by `adb shell mkdir` (or by `adb push` into a missing folder) belong
+to the shell user, the app can't list them, and the eval stops with "model … not found". To repair without
+copying again: rename the folders aside, open the app, `mv` the files into the new folders.
+
+For big copies on Windows + WSL, use Windows' own adb (platform-tools for Windows): through usbipd the
+link ran at ~3 MB/s, natively at ~45 MB/s.
+
 ```bash
 PKG=io.github.wolverr.bivouac
 adb shell mkdir -p /sdcard/Android/data/$PKG/files/eval
