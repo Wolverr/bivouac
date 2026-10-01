@@ -178,8 +178,17 @@ class Places {
             if (found.size >= limit / 2) break
             radius *= 2.5
         }
-        return found.sortedBy { it.distanceM * (1.6 - it.confidence) }.take(limit)
+        return found.sortedBy { it.distanceM * (1.6 - it.confidence) * (if (namedAsCategory(it)) NAME_HINT_FACTOR else 1.0) }
+            .take(limit)
     }
+
+    /**
+     * The name says what the place is ("Farmacia del Duomo", "龍生堂薬局"). Overture tags law firms,
+     * izakayas and phone shops in Tokyo as pharmacies (all at confidence 0.85, which elsewhere
+     * holds good data), so for health places a telling name ranks first. Mirrors tools/places_proto.py.
+     */
+    private fun namedAsCategory(p: Place): Boolean =
+        NAME_HINTS.any { (cat, re) -> cat in p.category && re.containsMatchIn(p.name) }
 
     private suspend fun within(c: GeoPoint, radiusM: Double, cats: Set<Int>): List<Place> {
         val dLat = radiusM / 111_320.0
@@ -232,6 +241,19 @@ class Places {
     }
 
     companion object {
+        /** Category name part -> words in place names that confirm it, in common languages. */
+        private val NAME_HINTS = listOf(
+            "pharmacy" to Regex(
+                "pharm|farmac|apothe|apotek|aptek|chemist|drug|eczane|botica|薬|藥|药|약국|ドラッグ", RegexOption.IGNORE_CASE,
+            ),
+            "drugstore" to Regex("pharm|farmac|apothe|apotek|aptek|chemist|drug|薬|藥|药|약국|ドラッグ", RegexOption.IGNORE_CASE),
+            "hospital" to Regex(
+                "hospit|ospedal|hôpital|hopital|krankenhaus|klinik|clinic|clínic|ziekenhuis|szpital|policlin|" +
+                    "病院|医院|醫院|병원|クリニック|medical|medic",
+                RegexOption.IGNORE_CASE,
+            ),
+        )
+        private const val NAME_HINT_FACTOR = 0.4
         private val GENERIC_ENDINGS = setOf("store", "shop", "station", "center", "centre", "office")
         private val CLAUSE = Regex("\\s+(?:and|that|which|where|with|for|so|because|to)\\s+|[;:]")
 

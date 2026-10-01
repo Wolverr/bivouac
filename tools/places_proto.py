@@ -257,7 +257,25 @@ class Places:
             if len(found) >= limit // 2:
                 break
             radius *= 2.5
-        return sorted(found, key=lambda p: p["dist"] * (1.6 - p["conf"]))[:limit], radius
+        return sorted(found, key=lambda p: p["dist"] * (1.6 - p["conf"])
+                      * (NAME_HINT_FACTOR if named_as_category(p) else 1.0))[:limit], radius
+
+
+# Places.NAME_HINTS: category name part -> words in place names that confirm it. Overture tags law
+# firms, izakayas and phone shops in Tokyo as pharmacies (all at confidence 0.85, which elsewhere
+# holds good data), so for health places a telling name ranks first.
+_PHARMACY = r"pharm|farmac|apothe|apotek|aptek|chemist|drug|薬|藥|药|약국|ドラッグ"
+NAME_HINTS = [
+    ("pharmacy", re.compile(_PHARMACY + r"|eczane|botica", re.I)),
+    ("drugstore", re.compile(_PHARMACY, re.I)),
+    ("hospital", re.compile(r"hospit|ospedal|hôpital|hopital|krankenhaus|klinik|clinic|clínic|ziekenhuis|szpital|policlin|"
+                            r"病院|医院|醫院|병원|クリニック|medical|medic", re.I)),
+]
+NAME_HINT_FACTOR = 0.4
+
+
+def named_as_category(p):
+    return any(cat in p["cat"] and rx.search(p["name"]) for cat, rx in NAME_HINTS)
 
 
 def run(places, q):
