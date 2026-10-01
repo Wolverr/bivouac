@@ -75,11 +75,13 @@ Shibuya Crossing -> Shibuya, not Tokyo's centroid in Aoyama); "Geographic coordi
 | Qwen3.5-4B | 2.6 GB | 60.2 (v4; earlier 54.7, 57.1) | 54.0 | ~15 |
 | LFM2.5-8B-A1B | 4.9 GB | 46.4 (old pipeline) | – | ~6 |
 | Gemma-4-E4B | 4.7 GB | 44.1 (old pipeline) | – | 12.6 |
-| Qwen3.5-2B | 1.2 GB | 44.0 (old pipeline) | – | 9.7 |
+| Qwen3.5-2B | 1.2 GB | 40.7 (v5; old pipeline 44.0) | 45.2 | ~9 |
 
 Weakest categories (v4 + held-out): places (28–48 %; the held-out Shibuya failure is the geocoding bug fixed
 after these runs), reasoning (35–57 %), travel (39–63 %). Strongest: explain, science, fact (60–76 %).
 Tier picks (catalog.json): 6 GB -> 2B, 8 GB -> 4B, 12 GB -> 9B. Rival AndroidLM claims 64 %.
+**The 2B is below the bounty's 50 % bar** (40.7 / 45.2): consider the 4B for 6 GB phones too (2.6 GB file;
+without repacking it should fit a 6 GB phone's budget — check MemoryPlanner's numbers on a device).
 
 ### Measured tonight (paired, blind, seeded; 4B unless noted)
 
@@ -114,24 +116,26 @@ Reading:
 Eval files: results in eval/results-pc-*.jsonl (v3/v4/s-old/calc/calc2/think/holdout), gradings and
 summaries in eval/grading/ (pair-* for paired). They're not committed yet (neither were earlier ones);
 commit them when publishing the eval. Worktrees ~/bivouac-old (5077db9) and ~/bivouac-v4 (d29b13e) were only
-for tonight's frozen runs: `git worktree remove` them when done.
+for tonight's frozen runs (also ~/bivouac-v5 for the 2B): `git worktree remove` them when done.
 
 Next steps, in order:
 1. Decide with the user: (a) "Think harder" button (data above: big reasoning gain, phone time depends on
    the budget; the app would need its own budget cut-off in the generation loop, like llama.cpp's
    --reasoning-budget: count tokens inside <think>, then force "</think>"); (b) calc2 prompt for the 9B tier.
-2. Places are the weakest category and our planned edge: rerun the held-out places questions with the
+2. 6 GB tier: the 2B scores 41-45 % (< 50 %). Check whether the 4B loads on 6 GB phones (MemoryPlanner,
+   no repack, smaller context) and switch the 6 GB pick if it does.
+3. Places are the weakest category and our planned edge: rerun the held-out places questions with the
    geocoding fix (c080b3b); look at "near X" questions where Overture is thin (hikes: 2 trails near Chamonix).
-3. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
+4. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
    (~24 GB; wiki.db now also has the acronym table — copy it again), test the automatic memory settings
    (Library shows "auto: ctx …"; compare `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the
    estimate; load the 9B to force an OOM and check the crash notice), measure speed of 2B/4B, list-expansion
    latency (1-3 s on the PC: up to 200 title lookups), run the on-phone eval (docs/EVAL.md).
-4. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
+5. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
    (uploads, fills catalog URLs). README.md is a draft with TBDs (phone speeds, release link, license; model
    table still shows the older single-run scores). Commit the eval results + gradings. Then demo video
    (user), make the repo public, poidh claim. Deadline 2026-10-31.
-5. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
+6. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
    text, ~7 % of compressed blocks).
 
 What the user does (only these): connect the phone (`winget install usbipd`, then as admin
@@ -237,7 +241,7 @@ See docs/COMPETITORS.md for the other entries.
   held-out set with its own frontier + web baseline); retrieval: namesakes, sentence starts, intro + infobox
   leads, 40 k mined acronyms, "<noun> of the <name>", list expansion, tourist-attraction lists; places:
   landmark-first geocoding (Shibuya Crossing). hit@6 main 41 -> 44/48, held-out 33 -> 34/36. Single-run
-  parity: 4B 60.2 % / held-out 54.0 %, 9B 60.7 % / 62.7 %. Paired: retrieval changes neutral for the 4B's
+  parity: 2B 40.7 % / held-out 45.2 %, 4B 60.2 % / 54.0 %, 9B 60.7 % / 62.7 %. Paired: retrieval changes neutral for the 4B's
   answers overall; calc prompts help reasoning but the 4B then talks about the excerpts (app prompt kept);
   thinking with a 1,024-token budget: reasoning 4B 4.2 -> 8.7, 9B 3.5 -> 8.8 at ~1,100 tokens/answer.
   Found: the 9B with weight repacking thrashes under a 12 GB cap (use --no-repack on the PC).
