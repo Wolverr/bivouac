@@ -105,6 +105,8 @@ class Places:
         if wiki:
             from retrieve_proto import Pack
             self.wiki = Pack(wiki)
+            self.has_coord = self.wiki.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coord'").fetchone() is not None
 
     def category_ids(self, keywords):
         out = set()
@@ -136,28 +138,50 @@ class Places:
         m = ms[-1]
         return float(m[1]) * (-1 if m[2] == "S" else 1), float(m[3]) * (-1 if m[4] == "W" else 1)
 
-    def landmark(self, place, where):
-        """Places.landmark: "Shibuya Crossing" in "Tokyo". The landmark's own coordinates when its
-        infobox has them, else the first part of its Location line ("Shibuya, Tokyo, Japan" -> Shibuya),
-        never the city centre a few km away. The infobox must mention the city, so a generic
-        "old town" in Prague can't match some other town's article."""
-        box = self.infobox(place)
-        if not box or not any(w.lower() in box[1].lower() for w in where):
+    def article_coords(self, title):
+        """(article title, lat, lon) from the coord table (build_coords.py), else the infobox
+        coordinates line, else None (Places.articleCoords)."""
+        row = self.wiki.find_article(title)
+        if not row:
             return None
-        c = self.coords(box[1])
-        if c:
-            return c[0], c[1], f"wiki:{box[0]}"
-        line = next((l for l in box[1].splitlines() if l.lower().startswith("location:")), "")
-        area = line.split(":", 1)[1].split(",")[0].strip() if line else ""
-        if area and area.lower() not in (w.lower() for w in where):
-            sub = self.infobox(area)
-            c = self.coords(sub[1]) if sub else None
+        if self.has_coord:
+            c = self.wiki.db.execute("SELECT lat, lon FROM coord WHERE article = ?", (row[0],)).fetchone()
             if c:
-                return c[0], c[1], f"wiki:{sub[0]} (location of {box[0]})"
-            row = self.db.execute("SELECT lat, lon, country, n, name FROM locality WHERE name IN (?, ?) ORDER BY n DESC LIMIT 1",
-                                  (area.lower(), area.lower() + " city")).fetchone()
-            if row:
-                return row[0], row[1], f"locality:{row[4]} (location of {box[0]})"
+                return row[1], c[0], c[1]
+        box = self.infobox(title)
+        c = self.coords(box[1]) if box else None
+        return (box[0], c[0], c[1]) if c else None
+
+    def mentions(self, row, where):
+        """The article's infobox or intro names one of `where` (its city)."""
+        text = " ".join(self.wiki.text(row[2] + i) for i in range(min(2, row[3]))).lower()
+        return any(w.lower() in text for w in where)
+
+    def landmark(self, place, where):
+        """Places.landmark: "Shibuya Crossing" in "Tokyo". The landmark's own coordinates, else
+        the first part of its infobox Location line ("Shibuya, Tokyo, Japan" -> Shibuya), never
+        the city centre a few km away. Its infobox or intro must mention the city, so a generic
+        "old town" in Prague can't match some other town's article. A bare "Duomo" (an article
+        about the word) also tries "Florence Duomo" and "Duomo of Florence"."""
+        titles = [place] + [t for w in where[:1] for t in (f"{w} {place}", f"{place} of {w}", f"{place}, {w}", f"{place} ({w})")]
+        for t in titles:
+            row = self.wiki.find_article(t)
+            if not row or not self.mentions(row, where):
+                continue
+            c = self.article_coords(row[1])
+            if c:
+                return c[1], c[2], f"wiki:{c[0]}"
+            box = self.infobox(row[1])
+            line = next((l for l in box[1].splitlines() if l.lower().startswith("location:")), "") if box else ""
+            area = line.split(":", 1)[1].split(",")[0].strip() if line else ""
+            if area and area.lower() not in (w.lower() for w in where):
+                sub = self.article_coords(area)
+                if sub:
+                    return sub[1], sub[2], f"wiki:{sub[0]} (location of {row[1]})"
+                loc = self.db.execute("SELECT lat, lon, country, n, name FROM locality WHERE name IN (?, ?) ORDER BY n DESC LIMIT 1",
+                                      (area.lower(), area.lower() + " city")).fetchone()
+                if loc:
+                    return loc[0], loc[1], f"locality:{loc[4]} (location of {row[1]})"
         return None
 
     def geocode(self, phrase):
@@ -171,10 +195,9 @@ class Places:
                 if hit:
                     return hit
             for c in cands:
-                box = self.infobox(c)
-                c2 = self.coords(box[1]) if box else None
+                c2 = self.article_coords(c)
                 if c2:
-                    return c2[0], c2[1], f"wiki:{box[0]}"
+                    return c2[1], c2[2], f"wiki:{c2[0]}"
         for c in cands:
             # Overture uses local names: "Florence" alone finds Florence, Alabama; the
             # article's aliases add "firenze", and the biggest locality wins.

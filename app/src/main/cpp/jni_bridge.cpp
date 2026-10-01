@@ -191,14 +191,16 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(corpusSearch)(JNIEnv * env, jobject, jbyteAr
     return to_bytes(env, out);
 }
 
-// Returns {"id":..,"title":"..","first_chunk":..,"n_chunks":..} or {} if missing.
+// Returns {"id":..,"title":"..","first_chunk":..,"n_chunks":..[,"lat":..,"lon":..]} or {} if missing.
 JNIEXPORT jbyteArray JNICALL JNI_FN(corpusFindArticle)(JNIEnv * env, jobject, jbyteArray title, jbyteArray context) {
     std::lock_guard<std::mutex> lock(g_corpus_mutex);
     ArticleRef a;
     if (!g_corpus.find_article(to_string(env, title), a, to_string(env, context))) return to_bytes(env, "{}");
-    char buf[128];
-    snprintf(buf, sizeof(buf), "{\"id\":%lld,\"first_chunk\":%lld,\"n_chunks\":%d,\"prior\":%.3f,",
-             (long long) a.id, (long long) a.first_chunk, a.n_chunks, a.prior);
+    char buf[192];
+    int n = snprintf(buf, sizeof(buf), "{\"id\":%lld,\"first_chunk\":%lld,\"n_chunks\":%d,\"prior\":%.3f,",
+                     (long long) a.id, (long long) a.first_chunk, a.n_chunks, a.prior);
+    double lat, lon;
+    if (g_corpus.coords(a.id, lat, lon)) snprintf(buf + n, sizeof(buf) - n, "\"lat\":%.6f,\"lon\":%.6f,", lat, lon);
     return to_bytes(env, std::string(buf) + "\"title\":\"" + json_escape(a.title) + "\"}");
 }
 

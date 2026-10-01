@@ -51,6 +51,8 @@ public:
     int doc_freq(const std::string & fts_query, int cap);
     // Other names of an article from the alias table, most viewed first ("firenze" for Florence).
     std::vector<std::string> other_names(int64_t article, int limit);
+    // The article's primary coordinates from the coord table (tools/build_coords.py).
+    bool coords(int64_t article, double & lat, double & lon);
 
     // Chunk text and metadata.
     bool chunk_text(int64_t chunk, std::string & text, std::string & section, int64_t & article);
@@ -66,6 +68,7 @@ private:
     std::string error_;
     bool has_alias_ = false;  // packs built before build_aliases.py have no alias table
     bool has_acronym_ = false;  // nor before build_acronyms.py an acronym table
+    bool has_coord_ = false;  // nor before build_coords.py a coord table
 
     // Small LRU of decompressed blocks: neighbouring chunks share blocks.
     static constexpr size_t kCacheBlocks = 64;

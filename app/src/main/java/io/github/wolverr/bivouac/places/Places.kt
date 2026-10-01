@@ -108,8 +108,7 @@ class Places {
         }.distinct()
         if (corpus != null && parts.size >= 2) landmark(corpus, parts[0], parts.drop(1))?.let { return it }
         for (c in candidates) {
-            val (article, infobox) = infobox(corpus ?: break, c) ?: continue
-            parseCoordinates(infobox)?.let { return GeoPoint(it.first, it.second, article.title) }
+            articleCoords(corpus ?: break, corpus.findArticle(c) ?: continue)?.let { return it }
         }
         for (c in candidates) {
             // Overture uses local names: "Florence" alone finds Florence, Alabama; the
@@ -127,31 +126,43 @@ class Places {
         return null
     }
 
-    private suspend fun infobox(corpus: Corpus, title: String): Pair<Article, String>? {
-        val article = corpus.findArticle(title) ?: return null
-        val chunk = corpus.chunk(article, 0)?.takeIf { it.section == "Infobox" } ?: return null
-        return article to chunk.text
+    /**
+     * The article's coordinates: the pack's coord table (many landmarks keep theirs outside
+     * the infobox, so FineWiki dropped them), else its infobox coordinates line.
+     */
+    private suspend fun articleCoords(corpus: Corpus, article: Article, label: String = article.title): GeoPoint? {
+        if (article.lat != null && article.lon != null) return GeoPoint(article.lat, article.lon, label)
+        val box = corpus.chunk(article, 0)?.takeIf { it.section == "Infobox" }?.text ?: return null
+        return parseCoordinates(box)?.let { GeoPoint(it.first, it.second, label) }
     }
 
     /**
-     * "Shibuya Crossing" in "Tokyo": the landmark's own coordinates when its infobox has
-     * them, else the first part of its Location line ("Shibuya, Tokyo, Japan" -> Shibuya),
-     * never the city centre a few km away. The infobox must mention the city, so a generic
-     * "old town" in Prague can't match another town's article. Mirrors tools/places_proto.py.
+     * "Shibuya Crossing" in "Tokyo": the landmark's own coordinates, else the first part of
+     * its infobox Location line ("Shibuya, Tokyo, Japan" -> Shibuya), never the city centre
+     * a few km away. Its infobox or intro must mention the city, so a generic "old town" in
+     * Prague can't match another town's article. A bare "Duomo" (an article about the word)
+     * also tries "Florence Duomo", "Duomo of Florence", "Grand Bazaar, Istanbul".
+     * Mirrors tools/places_proto.py.
      */
     private suspend fun landmark(corpus: Corpus, place: String, where: List<String>): GeoPoint? {
-        val (article, box) = infobox(corpus, place) ?: return null
-        if (where.none { box.contains(it, ignoreCase = true) }) return null
-        parseCoordinates(box)?.let { return GeoPoint(it.first, it.second, article.title) }
-        val area = locationArea(box)?.takeIf { a -> where.none { it.equals(a, ignoreCase = true) } } ?: return null
-        infobox(corpus, area)?.let { (sub, subBox) ->
-            parseCoordinates(subBox)?.let { return GeoPoint(it.first, it.second, "${sub.title} (location of ${article.title})") }
+        val city = where.first()
+        for (title in listOf(place, "$city $place", "$place of $city", "$place, $city", "$place ($city)")) {
+            val article = corpus.findArticle(title) ?: continue
+            val head = (0 until minOf(2, article.n_chunks)).mapNotNull { corpus.chunk(article, it) }
+            if (where.none { w -> head.any { it.text.contains(w, ignoreCase = true) } }) continue
+            articleCoords(corpus, article)?.let { return it }
+            val box = head.firstOrNull()?.takeIf { it.section == "Infobox" }?.text ?: continue
+            val area = locationArea(box)?.takeIf { a -> where.none { it.equals(a, ignoreCase = true) } } ?: continue
+            corpus.findArticle(area)?.let { sub ->
+                articleCoords(corpus, sub, "${sub.title} (location of ${article.title})")?.let { return it }
+            }
+            val row = query(
+                "SELECT lat, lon, name FROM locality WHERE name IN (?1, ?2) ORDER BY n DESC LIMIT 1",
+                area.lowercase(), area.lowercase() + " city",
+            ).firstOrNull() ?: continue
+            return GeoPoint((row[0] as Number).toDouble(), (row[1] as Number).toDouble(), "$area (location of ${article.title})")
         }
-        val row = query(
-            "SELECT lat, lon, name FROM locality WHERE name IN (?1, ?2) ORDER BY n DESC LIMIT 1",
-            area.lowercase(), area.lowercase() + " city",
-        ).firstOrNull() ?: return null
-        return GeoPoint((row[0] as Number).toDouble(), (row[1] as Number).toDouble(), "$area (location of ${article.title})")
+        return null
     }
 
     /**

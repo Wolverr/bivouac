@@ -127,6 +127,10 @@ std::string Corpus::open(const std::string & path) {
         Stmt a(db_, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'acronym'");
         has_acronym_ = a.ok() && sqlite3_step(a.s) == SQLITE_ROW;
     }
+    {
+        Stmt a(db_, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'coord'");
+        has_coord_ = a.ok() && sqlite3_step(a.s) == SQLITE_ROW;
+    }
 
     Stmt st(db_, "SELECT data FROM dict WHERE id = 1");
     if (!st.ok() || sqlite3_step(st.s) != SQLITE_ROW) {
@@ -288,6 +292,17 @@ std::vector<std::string> Corpus::other_names(int64_t article, int limit) {
     sqlite3_bind_int(st.s, 2, limit);
     while (sqlite3_step(st.s) == SQLITE_ROW) out.push_back(st.text(0));
     return out;
+}
+
+bool Corpus::coords(int64_t article, double & lat, double & lon) {
+    if (!db_ || !has_coord_) return false;
+    Stmt st(db_, "SELECT lat, lon FROM coord WHERE article = ?1");
+    if (!st.ok()) return false;
+    sqlite3_bind_int64(st.s, 1, article);
+    if (sqlite3_step(st.s) != SQLITE_ROW) return false;
+    lat = sqlite3_column_double(st.s, 0);
+    lon = sqlite3_column_double(st.s, 1);
+    return true;
 }
 
 int Corpus::doc_freq(const std::string & fts_query, int cap) {

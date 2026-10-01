@@ -23,6 +23,9 @@ data class Article(
     val first_chunk: Long = 0,
     val n_chunks: Int = 0,
     val prior: Double = 0.0,
+    /** Primary coordinates, from the pack's coord table (tools/build_coords.py). */
+    val lat: Double? = null,
+    val lon: Double? = null,
 )
 
 /** The offline Wikipedia pack (wiki.db built by tools/build_corpus.py). */
