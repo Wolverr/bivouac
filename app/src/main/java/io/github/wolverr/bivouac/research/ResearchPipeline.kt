@@ -282,7 +282,8 @@ class ResearchPipeline(
         val starts = Evidence.sentenceStarts(question)
         val used = BooleanArray(toks.size)
         val found = LinkedHashMap<Long, Article>()
-        val plain = HashSet<Long>()  // everyday-word matches ("North", "Time"), kept only if nothing specific matched
+        val plain = HashSet<Long>()  // everyday-word matches ("North", "Time"), dropped when a name matched
+        var namedHit = false
         for (n in minOf(maxN, toks.size) downTo 1) {
             for (i in 0..toks.size - n) {
                 if ((i until i + n).any { used[it] }) continue
@@ -317,15 +318,18 @@ class ResearchPipeline(
                     }
                     found[hit.id] = hit
                     // Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
-                    if (common || (n == 1 && obscure && !isNamed(words[0], starts[i]))) plain += hit.id
+                    val named = words.indices.any { isNamed(words[it], starts[i + it]) }
+                    namedHit = namedHit || named
+                    if (common || (n == 1 && obscure && !named)) plain += hit.id
                     (i until i + n).forEach { used[it] = true }
                     break
                 }
             }
         }
-        // "Which is further north: Rome or New York?" is about Rome and New York, not "North";
-        // "why do we have seasons" has nothing else, so "Season" stays.
-        return if (plain.size < found.size) found.values.filterNot { it.id in plain } else found.values.toList()
+        // "Which is further north: Rome or New York?" is about Rome and New York, not "North". Only
+        // names push these out: "why do we have seasons" keeps "Season", and "is a snake bite
+        // venomous" keeps "Snakebite" next to "Venom".
+        return if (namedHit) found.values.filterNot { it.id in plain } else found.values.toList()
     }
 
     /**

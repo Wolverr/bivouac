@@ -23,7 +23,9 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASELINE = ROOT / "eval/baseline_frontier_web.jsonl"
+# Main set and the held-out set (ids "h-..."); results files hold one or the other.
+QUESTION_FILES = [ROOT / "eval/questions.jsonl", ROOT / "eval/questions-holdout.jsonl"]
+BASELINE_FILES = [ROOT / "eval/baseline_frontier_web.jsonl", ROOT / "eval/baseline_holdout_frontier_web.jsonl"]
 GRADING = ROOT / "eval/grading"
 
 GRADER_INSTRUCTIONS = """You are grading answers from two assistants to the same questions, blind.
@@ -41,10 +43,18 @@ def load(path: Path) -> dict:
     return {r["id"]: r for r in map(json.loads, open(path))}
 
 
+def load_all(paths) -> dict:
+    out = {}
+    for p in paths:
+        if p.exists():
+            out.update(load(p))
+    return out
+
+
 def packet(results_path: Path):
     name = results_path.stem.replace("results-", "")
-    ours, base = load(results_path), load(BASELINE)
-    questions = {q["id"]: q for q in map(json.loads, open(ROOT / "eval/questions.jsonl"))}
+    ours, base = load(results_path), load_all(BASELINE_FILES)
+    questions = load_all(QUESTION_FILES)
     rng = random.Random(name)  # deterministic per results file
     GRADING.mkdir(parents=True, exist_ok=True)
     key, lines = {}, []
@@ -64,7 +74,7 @@ def packet(results_path: Path):
 def score(results_path: Path):
     name = results_path.stem.replace("results-", "")
     key = json.loads((GRADING / f"{name}.key.json").read_text())
-    questions = {q["id"]: q for q in map(json.loads, open(ROOT / "eval/questions.jsonl"))}
+    questions = load_all(QUESTION_FILES)
     per_cat = defaultdict(lambda: {"bivouac": [], "frontier": []})
     rows = []
     for s in map(json.loads, open(GRADING / f"{name}.scores.jsonl")):
@@ -102,7 +112,7 @@ def pair_name(old: Path, new: Path) -> str:
 def pair_packet(old_path: Path, new_path: Path):
     name = pair_name(old_path, new_path)
     old, new = load(old_path), load(new_path)
-    questions = {q["id"]: q for q in map(json.loads, open(ROOT / "eval/questions.jsonl"))}
+    questions = load_all(QUESTION_FILES)
     rng = random.Random(name)
     GRADING.mkdir(parents=True, exist_ok=True)
     key, lines = {}, []
@@ -136,7 +146,7 @@ def sign_test_p(wins: int, losses: int) -> float:
 def pair_score(old_path: Path, new_path: Path):
     name = pair_name(old_path, new_path)
     key = json.loads((GRADING / f"{name}.key.json").read_text())
-    questions = {q["id"]: q for q in map(json.loads, open(ROOT / "eval/questions.jsonl"))}
+    questions = load_all(QUESTION_FILES)
     scores = {s["id"]: s for s in map(json.loads, open(GRADING / f"{name}.scores.jsonl"))}
     rows = []  # (id, cat, old, new, note)
     for qid, k in key.items():

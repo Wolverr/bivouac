@@ -1,0 +1,40 @@
+{"id": "h-fact-01", "cat": "fact", "q": "Who designed the Sydney Opera House, and when was it opened?", "gold": ["Sydney Opera House", "Jørn Utzon"]}
+{"id": "h-fact-02", "cat": "fact", "q": "What is the deepest lake in the world and how deep is it?", "gold": ["Lake Baikal"]}
+{"id": "h-fact-03", "cat": "fact", "q": "Which countries border Bolivia?", "gold": ["Bolivia"]}
+{"id": "h-fact-04", "cat": "fact", "q": "When did Iceland become independent from Denmark?", "gold": ["Iceland", "History of Iceland"]}
+{"id": "h-explain-01", "cat": "explain", "q": "How do vaccines train the immune system?", "gold": ["Vaccine", "Vaccination"]}
+{"id": "h-explain-02", "cat": "explain", "q": "Why does ice float on water?", "gold": ["Ice", "Properties of water"]}
+{"id": "h-explain-03", "cat": "explain", "q": "How does a lithium-ion battery store and release energy?", "gold": ["Lithium-ion battery"]}
+{"id": "h-explain-04", "cat": "explain", "q": "What causes the northern lights?", "gold": ["Aurora"]}
+{"id": "h-compare-01", "cat": "compare", "q": "What is the difference between a virus and a bacterium?", "gold": ["Virus", "Bacteria"]}
+{"id": "h-compare-02", "cat": "compare", "q": "Proof of work vs proof of stake: what are the main trade-offs?", "gold": ["Proof of work", "Proof of stake"]}
+{"id": "h-compare-03", "cat": "compare", "q": "How do the climates of Seattle and Denver differ?", "gold": ["Seattle", "Denver", "Climate of Seattle", "Geography of Denver"]}
+{"id": "h-compare-04", "cat": "compare", "q": "Diesel vs petrol engines: how do they ignite fuel differently?", "gold": ["Diesel engine", "Petrol engine"]}
+{"id": "h-synth-01", "cat": "synthesis", "q": "Summarize the main causes of the First World War.", "gold": ["Causes of World War I"]}
+{"id": "h-synth-02", "cat": "synthesis", "q": "What were the long-term effects of the printing press on Europe?", "gold": ["Printing press", "Global spread of the printing press"]}
+{"id": "h-synth-03", "cat": "synthesis", "q": "Why did the Bronze Age collapse happen, according to historians?", "gold": ["Late Bronze Age collapse"]}
+{"id": "h-reason-01", "cat": "reasoning", "q": "A flight leaves Tokyo at 10:00 local time and takes 11 hours to reach London, which is 9 hours behind Tokyo. What local time does it land?"}
+{"id": "h-reason-02", "cat": "reasoning", "q": "If a car uses 6.5 liters per 100 km, how much fuel do I need for a 340 km trip?"}
+{"id": "h-reason-03", "cat": "reasoning", "q": "Was Isaac Newton alive when Galileo Galilei died?", "gold": ["Isaac Newton", "Galileo Galilei"]}
+{"id": "h-reason-04", "cat": "reasoning", "q": "Water boils at a lower temperature at altitude. Roughly what is the boiling point at 3,000 m, and why does it matter for cooking pasta?", "gold": ["Boiling point", "High-altitude cooking"]}
+{"id": "h-travel-01", "cat": "travel", "q": "Do I need a visa-free entry permit (ETIAS) to visit the Schengen area as a US citizen, and how long can I stay?", "gold": ["European Travel Information and Authorisation System", "Schengen Area"]}
+{"id": "h-travel-02", "cat": "travel", "q": "What is the best way to get around Istanbul as a tourist?", "gold": ["Istanbul"]}
+{"id": "h-travel-03", "cat": "travel", "q": "When is the monsoon season in Thailand, and which coast is affected when?", "gold": ["Geography of Thailand", "Thailand"]}
+{"id": "h-travel-04", "cat": "travel", "q": "What should I know about altitude sickness before trekking to Everest Base Camp?", "gold": ["Altitude sickness", "Everest base camps"]}
+{"id": "h-health-01", "cat": "health", "q": "What are the symptoms of heat stroke and what should I do first?", "gold": ["Heat stroke"]}
+{"id": "h-health-02", "cat": "health", "q": "How do I treat a minor burn at home, and when should I see a doctor?", "gold": ["Burn"]}
+{"id": "h-health-03", "cat": "health", "q": "What is the difference between ibuprofen and paracetamol, and can they be taken together?", "gold": ["Ibuprofen", "Paracetamol"]}
+{"id": "h-health-04", "cat": "health", "q": "How can I tell if a snake bite is venomous, and what first aid should I give?", "gold": ["Snakebite"]}
+{"id": "h-tech-01", "cat": "tech", "q": "How does HTTPS keep a connection private?", "gold": ["HTTPS", "Transport Layer Security"]}
+{"id": "h-tech-02", "cat": "tech", "q": "What is the difference between RAM and storage in a phone?", "gold": ["Random-access memory", "Computer data storage"]}
+{"id": "h-tech-03", "cat": "tech", "q": "How do zero-knowledge proofs work, in simple terms?", "gold": ["Zero-knowledge proof"]}
+{"id": "h-tech-04", "cat": "tech", "q": "What does a VPN protect against, and what does it not protect against?", "gold": ["Virtual private network"]}
+{"id": "h-science-01", "cat": "science", "q": "How do we know the age of the Earth?", "gold": ["Age of Earth", "Radiometric dating"]}
+{"id": "h-science-02", "cat": "science", "q": "Why do we have tides, and why are there two a day?", "gold": ["Tide"]}
+{"id": "h-science-03", "cat": "science", "q": "What is CRISPR and how is it used to edit genes?", "gold": ["CRISPR gene editing", "CRISPR"]}
+{"id": "h-history-01", "cat": "history", "q": "Why did the Roman Republic become an empire?", "gold": ["Roman Republic", "Crisis of the Roman Republic"]}
+{"id": "h-history-02", "cat": "history", "q": "What was the Meiji Restoration and why was it important?", "gold": ["Meiji Restoration"]}
+{"id": "h-history-03", "cat": "history", "q": "How did the Black Death spread across Europe?", "gold": ["Black Death"]}
+{"id": "h-places-01", "cat": "places", "q": "Where can I find a hospital near the Colosseum in Rome?"}
+{"id": "h-places-02", "cat": "places", "q": "Coffee shops near Shibuya Crossing in Tokyo?"}
+{"id": "h-places-03", "cat": "places", "q": "What are the must-see sights in Barcelona?", "gold": ["Barcelona"]}

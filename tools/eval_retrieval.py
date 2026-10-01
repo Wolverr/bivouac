@@ -36,10 +36,11 @@ def main():
     ap.add_argument("db")
     ap.add_argument("--k", type=int, default=6)
     ap.add_argument("--show-misses", action="store_true")
+    ap.add_argument("--questions", default=str(Path(__file__).parent.parent / "eval" / "questions.jsonl"))
     args = ap.parse_args()
 
     pack = Pack(args.db)
-    qs = [json.loads(l) for l in open(Path(__file__).parent.parent / "eval" / "questions.jsonl")]
+    qs = [json.loads(l) for l in open(args.questions)]
     qs = [q for q in qs if q.get("gold")]
     for use_titles in (False, True):
         hit, ms, misses = 0, 0.0, []

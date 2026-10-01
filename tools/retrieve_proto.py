@@ -82,8 +82,10 @@ class Pack:
             "SELECT a.id, a.title, a.first_chunk, a.n_chunks, a.prior FROM alias l JOIN article a "
             "ON a.id = l.article WHERE l.norm_title = ? ORDER BY l.views DESC LIMIT 1", (norm,)).fetchone() \
             if self.has_alias else None
-        # Acronyms (Corpus::find_article): exact spelling as a title wins ("NATO"), else the most
-        # viewed of title / alias / acronym match ("TCP" -> Transmission Control Protocol).
+        # Acronyms (Corpus::find_article): exact spelling as a title wins ("NATO"), then a meaning
+        # that shares a word with the question ("CFS" in a Linux scheduling question), then a
+        # Wikipedia redirect (editors' primary meaning: "RAM" -> Random-access memory, not a
+        # slightly more viewed missile), else the more viewed of title and mined acronym.
         if self.has_acronym and ACRONYM_RE.match(title):
             row = self.db.execute("SELECT id, title, first_chunk, n_chunks, prior FROM article "
                                   "WHERE norm_title = ? AND title = ? ORDER BY prior DESC LIMIT 1", (norm, title)).fetchone()
@@ -94,8 +96,11 @@ class Pack:
                 "ON a.id = x.article WHERE x.abbr = ? ORDER BY x.views DESC LIMIT 5", (title,)).fetchall()
             for m in meanings:
                 if context and shares_word(m[1], context):
-                    return m  # "CFS" in a Linux scheduling question
-            found = [r for r in (by_title(), by_alias(), meanings[0] if meanings else None) if r]
+                    return m
+            alias = by_alias()
+            if alias:
+                return alias
+            found = [r for r in (by_title(), meanings[0] if meanings else None) if r]
             if found:
                 return max(found, key=lambda r: r[4])
         row = by_title()
@@ -179,7 +184,8 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
     starts = sentence_starts(question)
     used = [False] * len(toks)
     found, seen = [], set()
-    plain = set()  # everyday-word matches ("North", "Time"), kept only if nothing specific matched
+    plain = set()  # everyday-word matches ("North", "Time"), dropped when a name matched
+    named_hit = False
     for n in range(min(max_n, len(toks)), 0, -1):
         for i in range(len(toks) - n + 1):
             if any(used[i:i + n]):
@@ -215,15 +221,18 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                             break
                 found.append(row[:4])
                 seen.add(row[0])
+                named = any(is_named(w, s) for w, s in zip(words, starts[i:i + n]))
+                named_hit = named_hit or named
                 # Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
-                if common or (n == 1 and obscure and not is_named(words[0], starts[i])):
+                if common or (n == 1 and obscure and not named):
                     plain.add(row[0])
                 for j in range(i, i + n):
                     used[j] = True
                 break
-    # "Which is further north: Rome or New York?" is about Rome and New York, not "North";
-    # "why do we have seasons" has nothing else, so "Season" stays.
-    if len(plain) < len(found):
+    # "Which is further north: Rome or New York?" is about Rome and New York, not "North". Only
+    # names push these out: "why do we have seasons" keeps "Season", and "is a snake bite
+    # venomous" keeps "Snakebite" next to "Venom".
+    if named_hit:
         found = [r for r in found if r[0] not in plain]
     return found
 

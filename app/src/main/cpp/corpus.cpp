@@ -224,9 +224,9 @@ bool Corpus::find_article(const std::string & title, ArticleRef & out, const std
 
     // Acronyms: many are disambiguation pages on Wikipedia ("TCP", "BMI"), so they are in no
     // title or alias; tools/build_acronyms.py mines them from intros. A title spelled exactly
-    // so wins ("NATO", "DNA"); otherwise the most viewed of the title, alias and acronym
-    // matches ("PoW": Prisoner of war over People of Walmart). An acronym meaning that shares
-    // a word with the question beats both ("CFS" in a Linux scheduling question).
+    // so wins ("NATO", "DNA"), then a mined meaning that shares a word with the question ("CFS"
+    // in a Linux scheduling question), then a redirect ("PoW": Prisoner of war, not People of
+    // Walmart), else the more viewed of the title and the top mined meaning.
     if (has_acronym_ && looks_like_acronym(title)) {
         if (lookup("SELECT id, title, prior, first_chunk, n_chunks FROM article WHERE norm_title = ?1 AND title = ?2 "
                    "ORDER BY prior DESC LIMIT 1")) {
@@ -255,14 +255,15 @@ bool Corpus::find_article(const std::string & title, ArticleRef & out, const std
                 return true;
             }
         }
+        // A redirect is the editors' primary meaning: "RAM" -> Random-access memory, not a
+        // slightly more viewed missile from the mined table.
+        if (has_alias_ && lookup(kByAlias)) return true;
         bool found = !meanings.empty();
         if (found) out = meanings[0];
-        for (const char * sql : {kByTitle, has_alias_ ? kByAlias : nullptr}) {
-            ArticleRef r;
-            if (sql && lookup_into(sql, r) && (!found || r.prior > out.prior)) {
-                out = r;
-                found = true;
-            }
+        ArticleRef r;
+        if (lookup_into(kByTitle, r) && (!found || r.prior > out.prior)) {
+            out = r;
+            found = true;
         }
         if (found) return true;
     }

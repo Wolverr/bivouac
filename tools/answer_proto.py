@@ -219,6 +219,7 @@ def main():
     ap.add_argument("--name", required=True, help="label for the results file, e.g. qwen3.5-2b")
     ap.add_argument("--port", type=int, default=8088)
     ap.add_argument("--only", default="", help="comma-separated question ids")
+    ap.add_argument("--questions", default=str(ROOT / "eval/questions.jsonl"), help="question set (eval/questions-holdout.jsonl)")
     ap.add_argument("--places", default="out/places.db", help="places pack ('' to skip, like an app without one)")
     ap.add_argument("--think", action="store_true", help="reasoning on (measures a 'Think harder' mode)")
     ap.add_argument("--system", default="", help="system prompt file to try instead of the app's")
@@ -229,7 +230,7 @@ def main():
     places = Places(args.places) if args.places else None
     if places:
         places.wiki = pack  # geocoding by Wikipedia title / aliases, as in the app
-    qs = [json.loads(l) for l in open(ROOT / "eval/questions.jsonl")]
+    qs = [json.loads(l) for l in open(args.questions)]
     if args.only:
         keep = set(args.only.split(","))
         qs = [q for q in qs if q["id"] in keep]
