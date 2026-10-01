@@ -239,7 +239,12 @@ def main():
     ap.add_argument("--think", action="store_true", help="reasoning on (measures a 'Think harder' mode)")
     ap.add_argument("--system", default="", help="system prompt file to try instead of the app's")
     ap.add_argument("--model-id", default="", help="catalog id (qwen3.5-9b): use that model's prompt, like the app")
+    ap.add_argument("--max-sources", type=int, default=0, help="sources per answer (app: Settings.maxSources, 6)")
+    ap.add_argument("--evidence-chars", type=int, default=0, help="characters per source (app: Settings.evidenceChars, 450)")
     args = ap.parse_args()
+    global MAX_SOURCES, EVIDENCE_CHARS  # prompt-length experiments; the app reads them from Settings
+    MAX_SOURCES = args.max_sources or MAX_SOURCES
+    EVIDENCE_CHARS = args.evidence_chars or EVIDENCE_CHARS
     system = Path(args.system).read_text().strip() if args.system else catalog_prompt(args.model_id)
 
     pack = Pack(args.db)
