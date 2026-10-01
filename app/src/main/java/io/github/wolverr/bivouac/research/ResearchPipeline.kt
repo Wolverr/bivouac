@@ -351,6 +351,16 @@ class ResearchPipeline(
                     for (prep in listOf("in", "of")) corpus.findArticle("List of $what $prep $where")?.let { return it }
                 }
             }
+            // "must-see sights in Barcelona": Wikipedia's words are "tourist attractions" / "Tourism in X".
+            if (nouns.last().lowercase().trimEnd('s') in SIGHT_NOUNS) {
+                for (k in place.size downTo 1) {
+                    val where = place.take(k).joinToString(" ")
+                    for (title in listOf("List of tourist attractions in $where", "Tourism in $where")) {
+                        corpus.findArticle(title)?.takeIf { it.title.startsWith("List of") || it.title.startsWith("Tourism") }
+                            ?.let { return it }
+                    }
+                }
+            }
         }
         return null
     }
@@ -383,6 +393,7 @@ class ResearchPipeline(
         )
         private val WHITESPACE = Regex("\\s+")
         private val EXPLAIN_QUERY = Regex("^\\s*(why|how)\\b|\\bcaus", RegexOption.IGNORE_CASE)
+        private val SIGHT_NOUNS = setOf("sight", "attraction", "landmark", "monument")
         private val PLACE_STOP = setOf("and", "or", "for", "with", "that", "which", "what", "to", "is", "are")
         private const val COMMON_DF = 20_000
         private const val INFOBOX_FACT_CHARS = 200

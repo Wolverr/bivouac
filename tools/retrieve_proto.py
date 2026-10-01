@@ -277,7 +277,18 @@ def list_article(pack: "Pack", question: str):
                     row = pack.find_article(f"List of {what} {prep} {where}")
                     if row:
                         return row[:4]
+        # "must-see sights in Barcelona": Wikipedia's words are "tourist attractions" / "Tourism in X".
+        if nouns[-1].lower().rstrip("s") in SIGHT_NOUNS:
+            for k in range(len(place), 0, -1):
+                where = " ".join(place[:k])
+                for title in (f"List of tourist attractions in {where}", f"Tourism in {where}"):
+                    row = pack.find_article(title)
+                    if row and row[1].startswith(("List of", "Tourism")):
+                        return row[:4]
     return None
+
+
+SIGHT_NOUNS = {"sight", "attraction", "landmark", "monument"}  # ResearchPipeline.SIGHT_NOUNS
 
 
 LIST_SKIP_CELL = re.compile(r"^(:?-+:?|name|names|image|picture|photo|rank|no\.?|#)$", re.I)
