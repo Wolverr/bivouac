@@ -79,6 +79,20 @@ Held-out h-reason-01..03 (v16, paired blind, Sonnet grader): 4B 5.0 -> 6.3, 9B 8
 gained or tied in all 9 cases; timelines (Napoleon/Beethoven, Newton/Galileo) lost (-4 9B, -9 4B), so the
 timeline rule was dropped. 0 false alarms on the other 90 questions and on 20 lookups with numbers.
 
+**Sights sources measured (2026-10-02 night, queue17):** 0725b6e vs the commit before (5f857fb), 13 sights
+questions written blind (eval/questions-sights.jsonl: 12 unseen cities + h-places-03), paired blind (Sonnet).
+The change applies to 6 of 13 (the others get the same prompt): 4B -0.33, 9B -0.17 on those 6, i.e. neutral,
+but it splits cleanly. Barcelona, the only city whose sights section has a bulleted list, wins big
+(4B 5 -> 8, 9B 3 -> 8). The 5 cities with prose-only sections lose overall (4B -5, 9B -6 summed): Lisbon
+4B 7 -> 3, 9B 8 -> 3 (its "Main sights" prose is about what the 1755 earthquake destroyed, so the model
+writes about architecture styles instead of naming sights); Budapest +1 both; Cairo, Dubrovnik, Seville mixed.
+**Next fix to try (tomorrow):** use the sights source only when it has bullet lines, else the old path;
+check it on a fresh set of sights questions (this set now shaped the rule). Also found: **the 4B on the PC is not
+reproducible with the fixed seed** (7 identical prompts, all 7 answers changed, paired -1.71 from noise
+alone); the 9B is (7 of 7 identical). So 4B-only paired results from earlier carry this noise too; prefer the 9B
+for paired checks, or run the 4B twice. Old eval worktrees removed (files that were only in them:
+~/bivouac-eval-archive/).
+
 **Next (12 GB):** (1) GPU prompt reading once the phone model is known (Snapdragon: OpenCL/Adreno path in
 llama.cpp); (2) MTP retest on the phone (see above); (3) time an auto-think answer on the phone.
 
@@ -242,14 +256,15 @@ Next steps, in order (updated 2026-10-02):
    clearly faster on the phone, consider it for 8 GB too), Think harder timing, list-expansion latency
    (1-3 s on the PC: up to 200 title lookups), sights latency (reads every chunk of a city article).
 4. On-phone eval (docs/EVAL.md), 4B first; it gives the published numbers.
-5. Measure the sights change with the 4B (h-places-03 and a few new sights questions, paired).
+5. Done (neutral, see "Sights sources measured"): next, sights source only when it has bullets, fresh questions.
 6. Publish the rest: README.md TBDs (phone speeds, release link), GitHub release. The release key exists
    (2026-10-02): ~/bivouac-release/{bivouac-release.jks,keystore.properties}, outside the repo, cert
    SHA-256 5206…ed90; `./gradlew assembleRelease` signs with it (11.6 MB APK, R8). **Test the R8
    release build on a phone before publishing it** (JNI and serialization classes); user must keep a
    backup of the key (lost key = no updates under the same app).
    Then demo video (user), make the repo public, poidh claim. Deadline 2026-10-31.
-7. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
+7. **Planned for 2026-10-03:** "nearby Wikipedia articles" (spatial index on coord; the 12 GB phone needs a
+   fresh pack copy anyway, so changing the pack now costs nothing extra). Also, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
    text, ~7 % of compressed blocks); spatial index on coord for "nearby articles" (above).
 
 What the user does (only these): record the demo video; make the repo public; submit the claim; plug in
