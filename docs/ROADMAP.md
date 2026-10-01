@@ -16,9 +16,41 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
-## Resume here (handoff, 2026-10-01 ~13:15)
+## Resume here (handoff, 2026-10-01 ~16:00)
 
-**Afternoon session, done:**
+**User direction (16:00):** the **12 GB phone is the main demo device** (user gets one Sunday 2026-10-04,
+model not known yet; keep 8 GB working). The user wants original ideas that improve on the other entries
+drastically, not reimplementations (e.g. not AndroidLM's MoE expert streaming).
+
+**Phone results (Redmi Note 15 Pro, MT6789, 8 GB), 4B Q4_K_M:**
+- llama-bench (tools: ~/llama-android-build, cross-built llama-bench in /data/local/tmp, scripts bench.sh /
+  setpref.sh / freq.sh in the session scratchpad): reading 10-12 tok/s at 4-8 threads, writing 3.7 tok/s on
+  the 2 big cores (8 threads: 0.7). Repack gives nothing for Q4_K on this chip; Q3_K_M is *slower* (read
+  6.4, write 2.8) so it is a poor 6 GB pick (still the catalog's 6 GB entry: decide again with a 6 GB
+  candidate measured on a phone); Q4_0 + repack reads 13.4 but writes 2.2; IQ4_NL no gain; 2B reads 20-21,
+  writes 6.1.
+- In the app: ~6 tok/s reading, ~2.5 writing, ~3 min per answer (10-question test,
+  eval/results-redmi-qwen3.5-4b-speed10.jsonl). Not an app bug as far as measured: the same llama-bench
+  run gives 11.7 on a cool idle phone and 5.1 after an hour of load (Xiaomi hides the clock caps).
+- The app sent 6 sources where the harness sends 3 (named-article boost applied after the cut): fixed
+  (70d04e3), prompts 897 -> 649 tokens for the same question.
+
+**Prompt/answer length (paired, blind, 4B, PC):** 300 chars per source = same quality (+0.02, CI
+-0.37..0.40), prompts -16 %: adopted (451372b). 4 sources instead of 6: -0.17 (CI -0.50..0.17) for -9 %:
+not taken. Places prompt "best 3 to 5, one short line each", model reads the 8 nearest (screen shows all):
+0.00, answers 255 -> 189 tokens: adopted (17b5280); the old diet note made the model invent a restaurant.
+
+**Speculative decoding: no gain with Qwen3.5 (measured on the PC, 9B):** no draft 12.7 tok/s; 0.8B draft
+7-11 (rejected guesses cost a recurrent-state checkpoint restore in this hybrid model), with
+`--spec-draft-p-min 0.8` 10.8-12.2 at 93-99 % acceptance; n-gram lookup 12.4 (2 % accepted). The GGUFs
+have no MTP heads. Note: with `-md` this llama-server also needs `--spec-type draft-simple`. Worth
+retrying only with a standard-transformer model (cheap rollback). ~/spec_try.sh runs the quick check.
+
+**Next (12 GB):** (1) GPU prompt reading once the phone model is known (Snapdragon: OpenCL/Adreno path in
+llama.cpp); (2) pick the 12 GB model by blind eval on the PC: 9B vs a dense ~12-14B standard transformer
+vs a MoE that fits in RAM; (3) Think harder on the 12 GB tier.
+
+**Earlier this afternoon, done:**
 - **Tiers** (paired, blind, seeded, 60 main questions vs the 4B Q4_K_M): UD-IQ3_XXS -1.25 (CI -1.71..-0.79,
   39 worse / 9 better): rejected. Q3_K_M (2.29 GB) -0.38 (CI -0.80..0.03, 27/18): now the **6 GB pick**
   (catalog id qwen3.5-4b-q3, min_ram_gb 5, ~3.0 GB free needed vs 3.5). The 2B moved to 4 GB phones
