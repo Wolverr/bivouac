@@ -16,7 +16,7 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
-## Resume here (handoff, 2026-10-01 night session, interim ~02:15)
+## Resume here (handoff, 2026-10-01 ~05:30, after the night session)
 
 Start a new session with: "Continue the Bivouac project. Read docs/ROADMAP.md, Resume here."
 
@@ -34,7 +34,9 @@ tools/out/places.db (30.0 M places, 5.3 GB). Desktop tools need `tools/native/bu
 `export PATH=$HOME/Android/Sdk/cmake/3.31.6/bin:$PATH; cmake -S tools/native -B tools/native/build -G Ninja && ninja -C tools/native/build`.
 Models in ~/models; llama-server for the PC at ~/llama-pc/bin. **Run the 9B with `--no-repack`**
 (`SERVER_ARGS=--no-repack`): with repacking it needs ~12 GB and thrashes under the 12 GB service cap
-(answers went from 28 s to 340 s).
+(answers went from 28 s to 340 s). For several runs in a row, chain them in a queue script like
+~/bivouac-queue*.sh (each waits for the previous unit) and run each from a frozen `git worktree`, so
+editing the repo meanwhile can't change a run halfway.
 
 ### Eval method (changed tonight)
 
@@ -50,28 +52,34 @@ Models in ~/models; llama-server for the PC at ~/llama-pc/bin. **Run the 9B with
 - Retrieval hit@6 (`tools/eval_retrieval.py`, `--questions` for the held-out set):
   main 41/48 -> **44/48**, held-out 33/36 -> **34/36** (old code 5077db9 vs d29b13e).
 
-### Retrieval changes tonight (app + harness, mirrored)
+### Retrieval and places changes tonight (app + harness, mirrored)
 
 Namesakes dropped ("Rome, New York" for "Rome or New York?"); words after . ! ? aren't names ("Check" the
-film); "Ethereum's" -> Ethereum; everyday-word titles (North, Time, Week) dropped when a name matched;
-named articles lead with their intro + the infobox lines that mention the question (Napoleon's dates);
-acronym table (tools/build_acronyms.py, needs `--apply` on a pack; TCP/UDP/TLS/BMI/ICU were
-disambiguation pages = no article, no redirect) with context ("CFS" in a Linux question) and redirects
-first ("RAM"); "<noun> of the <name>" ("Soviet Union collapse" -> Dissolution of the Soviet Union);
-list expansion ("must-see museums in Berlin": the list article's most viewed entries, or rank order for
-"tallest" lists, instead of one 450-char slice of a padded table).
+film); "Ethereum's" -> Ethereum; everyday-word titles (North, Time, Week) dropped when a *name* matched
+(not when any specific word matched: "snake bite venomous" keeps Snakebite); named articles lead with their
+intro + the infobox lines that mention the question (Napoleon's dates); acronym table
+(tools/build_acronyms.py, `--apply` on a pack; TCP/UDP/TLS/BMI/ICU were disambiguation pages = no article,
+no redirect): exact-case title, then a mined meaning sharing a word with the question ("CFS" in a Linux
+question), then the redirect ("RAM"), then the more viewed; "<noun> of the <name>" ("Soviet Union collapse"
+-> Dissolution of the Soviet Union); list expansion ("must-see museums in Berlin": the list's most viewed
+entries, or rank order for "tallest" lists, instead of one 450-char slice of a padded table);
+sights/attractions/landmarks -> "List of tourist attractions in X" (Rome: Colosseum, Pantheon, St Peter's…).
+Places: "X in Y" geocodes the landmark X before the city (its coordinates, else its infobox Location line:
+Shibuya Crossing -> Shibuya, not Tokyo's centroid in Aoyama); "Geographic coordinates" lines count.
 
-### Results
+### Results (PC harness, % of the frontier + web baseline; single runs, ±3 points)
 
-| Model | File | Score (main, single run) | PC s/answer |
-|---|---|---|---|
-| Qwen3.5-9B | 5.3 GB | 57.7 (v2: 55.2) | 26.5 |
-| Qwen3.5-4B | 2.6 GB | 54.7 (v2: 57.1) | 16.4 |
-| LFM2.5-8B-A1B | 4.9 GB | 46.4 (needs `--reasoning-budget 0`) | ~6 |
-| Gemma-4-E4B | 4.7 GB | 44.1 | 12.6 |
-| Qwen3.5-2B | 1.2 GB | 44.0 | 9.7 |
+| Model | File | Main 60 q | Held-out 40 q | PC s/answer |
+|---|---|---|---|---|
+| Qwen3.5-9B | 5.3 GB | 60.7 (v4; earlier 57.7, 55.2) | 62.7 | ~28 (`--no-repack`) |
+| Qwen3.5-4B | 2.6 GB | 60.2 (v4; earlier 54.7, 57.1) | 54.0 | ~15 |
+| LFM2.5-8B-A1B | 4.9 GB | 46.4 (old pipeline) | – | ~6 |
+| Gemma-4-E4B | 4.7 GB | 44.1 (old pipeline) | – | 12.6 |
+| Qwen3.5-2B | 1.2 GB | 44.0 (old pipeline) | – | 9.7 |
 
-Tier picks (in catalog.json): 6 GB -> 2B, 8 GB -> 4B, 12 GB -> 9B. Rival AndroidLM claims 64 %.
+Weakest categories (v4 + held-out): places (28–48 %; the held-out Shibuya failure is the geocoding bug fixed
+after these runs), reasoning (35–57 %), travel (39–63 %). Strongest: explain, science, fact (60–76 %).
+Tier picks (catalog.json): 6 GB -> 2B, 8 GB -> 4B, 12 GB -> 9B. Rival AndroidLM claims 64 %.
 
 ### Measured tonight (paired, blind, seeded; 4B unless noted)
 
@@ -79,46 +87,52 @@ Tier picks (in catalog.json): 6 GB -> 2B, 8 GB -> 4B, 12 GB -> 9B. Rival Android
 |---|---|---|---|
 | old retrieval (5077db9) -> v3 retrieval | -0.13 | -0.54..0.27 | 17 / 27 / 16 |
 | v3 -> v4 (list expansion, context acronyms, reorder) | 0.00 | -0.31..0.31 | 6 / 9 / 45 identical |
-| v4 -> v4-calc prompt | +0.25 | -0.35..0.85 | 28 / 20 / 12 |
+| v4 -> calc prompt | +0.25 | -0.35..0.85 | 28 / 20 / 12 |
+| v4 -> calc2 prompt | -0.05 | -0.55..0.45 | 22 / 15 / 23 |
+| 9B: v4 -> calc2 prompt | +0.43 | -0.10..0.96 | 20 / 21 / 19 |
 | no thinking -> thinking, 6 reasoning q | +2.17 | -1.28..5.61 | 3 / 2 / 1 |
 | 9B: no thinking (v2) -> thinking, 6 reasoning q | +5.17 | 1.40..8.93 | 5 / 1 / 0 |
+| 4B: thinking, budget 512 tokens (~640 tok/answer), 6 reasoning q | +2.00 | -1.12..5.12 | 2 / 2 / 2 |
+| 4B: thinking, budget 1024 (~1,070 tok/answer) | **+4.50** | 1.65..7.35 | 5 / 1 / 0 |
+| 9B: thinking, budget 512 (~700 tok/answer) | +3.67 | 0.69..6.65 | 4 / 0 / 2 |
+| 9B: thinking, budget 1024 (~1,140 tok/answer) | **+5.33** | 2.92..7.74 | 6 / 0 / 0 |
 
-Reading: retrieval fixes do what they target (Berlin museums 2 -> 8, Linux scheduler 3 -> 6, fact +1.7)
-but at n = 60 they don't move the 4B's mean: small evidence changes flip other answers by 1-3 points
-either way. The bottleneck is answer writing. Reasoning answers fail mostly by stating a wrong number
-first and correcting it later; calc fixes that (reasoning +3.2) but made the 4B talk about "the provided
-excerpts" in 3/60 answers (health-04 9 -> 2), so calc2 (working-out rule folded into the research rule)
-is being tested. Thinking fixes reasoning (9B: 6/6 right) but costs 700-4,000 tokens per answer (4B avg
-~2,600, 9B ~1,500): 5-10+ minutes on the Redmi at 4-7 tok/s. Thinking budgets 512/1024 are queued.
+Reading:
+- Retrieval fixes do what they target (Berlin museums 2 -> 8, Linux scheduler 3 -> 6, fact +1.7) but at
+  n = 60 they don't move the 4B's mean: small evidence changes flip other answers by 1-3 points either way.
+  The bottleneck is answer writing, not retrieval (hit@6 main 44/48, held-out 34/36).
+- Reasoning answers fail mostly by stating a wrong number first and correcting it later. The calc prompts
+  fix that (reasoning +1 to +3.7) but the 4B then talks about "the provided excerpts" / half-refuses in 3-4
+  of 60 answers (0 with the app prompt), which cancels the gain. calc2 helps the 9B (+0.43, reasoning +3.7,
+  no extra excerpt talk). **App prompt unchanged.** Option: use tools/prompts/system-calc2.txt for the 12 GB
+  (9B) tier only — needs a per-model prompt (assets/prompts/ + catalog field) and breaks nothing else.
+- Thinking fixes reasoning (9B 6/6 right) but unbounded it costs 700-4,000 tokens per answer (4B avg
+  ~2,600, 9B ~1,500): 5-10+ minutes on the Redmi at 4-7 tok/s. **A 1,024-token thinking budget keeps
+  nearly all of the gain (4B +4.5, 9B +5.3, all 6 right for both) at ~1,100 tokens per answer**, i.e.
+  roughly 3-5 minutes on the Redmi (4B decode speed there not measured yet). 512 is too little for the 4B.
 
-### Running / queued overnight (check `systemctl --user list-units 'bivouac-*'`, tools/queue.log, tools/queue2.log)
-
-- ~/bivouac-queue.sh: 4B v3 (seeded, retrieval at ~c5d7af5 minus context acronyms) -> eval/;
-  4B s-old (old retrieval 5077db9, seeded; worktree ~/bivouac-old) -> ~/bivouac-old/eval/;
-  4B + 9B `--think` on the 6 reasoning questions -> eval/results-pc-*-v3-think.jsonl ("Think harder" test).
-- ~/bivouac-queue2.sh (after queue 1; frozen worktree ~/bivouac-v4 at d29b13e, results in ~/bivouac-v4/eval/):
-  4B v4, 4B v4-calc, 9B v4, 9B v4-calc (**the 9B "calc" run uses calc2**: the prompt file in the worktree was
-  swapped before it started).
-- ~/bivouac-queue3.sh: 4B and 9B on the held-out set (v4 code) -> results-pc-*-v4-holdout.jsonl.
-- ~/bivouac-queue4.sh: 4B v4-calc2 (all 60), then 4B/9B thinking with --reasoning-budget 512 and 1024. "calc" = tools/prompts/system-calc.txt: the app prompt plus
-  "work calculations out before stating the result" (the 4B/9B state a wrong number first, then correct
-  themselves; graders punish that).
+Eval files: results in eval/results-pc-*.jsonl (v3/v4/s-old/calc/calc2/think/holdout), gradings and
+summaries in eval/grading/ (pair-* for paired). They're not committed yet (neither were earlier ones);
+commit them when publishing the eval. Worktrees ~/bivouac-old (5077db9) and ~/bivouac-v4 (d29b13e) were only
+for tonight's frozen runs: `git worktree remove` them when done.
 
 Next steps, in order:
-1. Read the overnight results (see the status log entry for 2026-10-01 night; grade what isn't graded):
-   paired v3 vs s-old (retrieval effect), v4 vs v4-calc (prompt), think vs no-think on reasoning.
-   Adopt system-calc.txt into app/src/main/assets/prompts/system.txt if it wins.
-2. "Think harder" button: proposed to the user, not decided. Decide with the think-run numbers
-   (quality on the 6 reasoning questions and completion tokens -> phone time at ~4-7 tok/s).
-3. Held-out runs for the published numbers: 4B and 9B on eval/questions-holdout.jsonl.
-4. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
-   (~24 GB; wiki.db now also has the acronym table), test the automatic memory settings (Library shows
-   "auto: ctx …"; compare `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the estimate; load the
-   9B to force an OOM and check the crash notice), measure speed of 2B/4B, list expansion latency (~1-3 s
-   on the PC), run the on-phone eval (docs/EVAL.md).
-5. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
-   (uploads, fills catalog URLs). README.md is a draft with TBDs (phone speeds, release link, license).
-   Then demo video (user), make the repo public, poidh claim. Deadline 2026-10-31.
+1. Decide with the user: (a) "Think harder" button (data above: big reasoning gain, phone time depends on
+   the budget; the app would need its own budget cut-off in the generation loop, like llama.cpp's
+   --reasoning-budget: count tokens inside <think>, then force "</think>"); (b) calc2 prompt for the 9B tier.
+2. Places are the weakest category and our planned edge: rerun the held-out places questions with the
+   geocoding fix (c080b3b); look at "near X" questions where Overture is thin (hikes: 2 trails near Chamonix).
+3. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
+   (~24 GB; wiki.db now also has the acronym table — copy it again), test the automatic memory settings
+   (Library shows "auto: ctx …"; compare `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the
+   estimate; load the 9B to force an OOM and check the crash notice), measure speed of 2B/4B, list-expansion
+   latency (1-3 s on the PC: up to 200 title lookups), run the on-phone eval (docs/EVAL.md).
+4. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
+   (uploads, fills catalog URLs). README.md is a draft with TBDs (phone speeds, release link, license; model
+   table still shows the older single-run scores). Commit the eval results + gradings. Then demo video
+   (user), make the repo public, poidh claim. Deadline 2026-10-31.
+5. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
+   text, ~7 % of compressed blocks).
 
 What the user does (only these): connect the phone (`winget install usbipd`, then as admin
 `usbipd list`, `usbipd bind --busid X`, `usbipd attach --wsl --busid X`); choose the app license;
@@ -138,7 +152,7 @@ See docs/COMPETITORS.md for the other entries.
   device); 12 GB is the ceiling, not the requirement. Auto repack/context sizing by free RAM.
 - [~] M5: install UX: catalog + browser download + link-in-place (done); host packs, fill catalog URLs (todo)
 - [~] M6: places (Overture Maps) + "near me" queries: app side done; places.db built; desktop-tested
-- [ ] M7: eval harness vs frontier + web, published results
+- [~] M7: eval harness vs frontier + web, published results (harness, paired grading, held-out set done; publish)
 - [ ] M8: README, demo video, public repo, poidh claim
 
 ## Status log
@@ -218,6 +232,15 @@ See docs/COMPETITORS.md for the other entries.
   questions need the "List of X in Y" article, "New York" is a disambiguation page (fallback to the most
   viewed "X (...)"/"X City" article, names only), the diet sentence belongs only to diet requests, LFM2.5
   reasoning must be filtered (research/ThinkFilter.kt). Retrieval hit@6 stays 85%.
+
+- 2026-10-01 (night, unattended): eval method fixed (paired grading, seeded harness, 40-question
+  held-out set with its own frontier + web baseline); retrieval: namesakes, sentence starts, intro + infobox
+  leads, 40 k mined acronyms, "<noun> of the <name>", list expansion, tourist-attraction lists; places:
+  landmark-first geocoding (Shibuya Crossing). hit@6 main 41 -> 44/48, held-out 33 -> 34/36. Single-run
+  parity: 4B 60.2 % / held-out 54.0 %, 9B 60.7 % / 62.7 %. Paired: retrieval changes neutral for the 4B's
+  answers overall; calc prompts help reasoning but the 4B then talks about the excerpts (app prompt kept);
+  thinking with a 1,024-token budget: reasoning 4B 4.2 -> 8.7, 9B 3.5 -> 8.8 at ~1,100 tokens/answer.
+  Found: the 9B with weight repacking thrashes under a 12 GB cap (use --no-repack on the PC).
 
 ## Dev notes
 
