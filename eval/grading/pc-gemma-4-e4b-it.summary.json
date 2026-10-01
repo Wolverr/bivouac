@@ -1,0 +1,65 @@
+{
+ "results": "results-pc-gemma-4-e4b-it.jsonl",
+ "questions": 60,
+ "bivouac_mean": 4.33,
+ "frontier_mean": 9.83,
+ "parity_pct": 44.1,
+ "bivouac_wins_or_ties": 0,
+ "by_category": {
+  "compare": {
+   "bivouac": 4.67,
+   "frontier": 10,
+   "parity_pct": 46.7
+  },
+  "explain": {
+   "bivouac": 4.75,
+   "frontier": 10,
+   "parity_pct": 47.5
+  },
+  "fact": {
+   "bivouac": 3.33,
+   "frontier": 9.5,
+   "parity_pct": 35.1
+  },
+  "health": {
+   "bivouac": 4.25,
+   "frontier": 10,
+   "parity_pct": 42.5
+  },
+  "history": {
+   "bivouac": 5.5,
+   "frontier": 10,
+   "parity_pct": 55.0
+  },
+  "places": {
+   "bivouac": 3.75,
+   "frontier": 9,
+   "parity_pct": 41.7
+  },
+  "reasoning": {
+   "bivouac": 3.83,
+   "frontier": 10,
+   "parity_pct": 38.3
+  },
+  "science": {
+   "bivouac": 4.25,
+   "frontier": 10,
+   "parity_pct": 42.5
+  },
+  "synthesis": {
+   "bivouac": 4.5,
+   "frontier": 10,
+   "parity_pct": 45.0
+  },
+  "tech": {
+   "bivouac": 5.67,
+   "frontier": 9.83,
+   "parity_pct": 57.6
+  },
+  "travel": {
+   "bivouac": 3.17,
+   "frontier": 9.67,
+   "parity_pct": 32.8
+  }
+ }
+}

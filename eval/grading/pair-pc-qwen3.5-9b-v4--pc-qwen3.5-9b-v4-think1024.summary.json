@@ -1,0 +1,20 @@
+{
+ "old": "results-pc-qwen3.5-9b-v4.jsonl",
+ "new": "results-pc-qwen3.5-9b-v4-think1024.jsonl",
+ "questions": 6,
+ "identical": 0,
+ "old_mean": 3.5,
+ "new_mean": 8.83,
+ "mean_diff": 5.33,
+ "ci95": [
+  2.92,
+  7.74
+ ],
+ "new_better": 6,
+ "old_better": 0,
+ "ties": 0,
+ "sign_test_p": 0.031,
+ "by_category": {
+  "reasoning": 5.33
+ }
+}

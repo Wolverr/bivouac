@@ -1,0 +1,30 @@
+{
+ "old": "results-pc-qwen3.5-4b-v10-base.jsonl",
+ "new": "results-pc-qwen3.5-4b-v10-c300.jsonl",
+ "questions": 60,
+ "identical": 1,
+ "old_mean": 5.95,
+ "new_mean": 5.97,
+ "mean_diff": 0.02,
+ "ci95": [
+  -0.37,
+  0.4
+ ],
+ "new_better": 24,
+ "old_better": 21,
+ "ties": 15,
+ "sign_test_p": 0.766,
+ "by_category": {
+  "compare": 0.17,
+  "explain": 0.5,
+  "fact": -0.5,
+  "health": 1.25,
+  "history": 0.25,
+  "places": -1,
+  "reasoning": -1.33,
+  "science": -1,
+  "synthesis": 1.5,
+  "tech": -0.5,
+  "travel": 0.5
+ }
+}
