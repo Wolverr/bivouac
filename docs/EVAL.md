@@ -28,3 +28,34 @@ adb pull /sdcard/Android/data/$PKG/files/eval/results-Qwen3.5-2B-Q4_K_M.jsonl ev
 Each result line has the answer, the sources and places shown, the route taken, total
 wall-clock time and the engine's prefill/generation stats. Re-running resumes: questions
 already in the results file are skipped. The screen stays on while the eval runs.
+
+## Held-out questions
+
+`eval/questions-holdout.jsonl` has 40 more questions in the same categories, written without
+looking at how the pipeline handles them and never used for tuning, with their own baseline
+(`eval/baseline_holdout_frontier_web.jsonl`). Pipeline fixes are found on the main set; the
+held-out set checks that they generalize, and gives the numbers we publish.
+
+## Desktop harness and grading
+
+`tools/answer_proto.py` runs the app pipeline (same retrieval, prompt and sampling) against a
+llama-server on the PC; `tools/run_model_eval.sh` runs it for each model in `~/models`.
+Sampling uses a fixed seed, so an unchanged prompt gives an unchanged answer.
+
+```bash
+tools/.venv/bin/python tools/grade.py packet eval/results-pc-qwen3.5-4b.jsonl   # blind packet vs baseline
+# a grader fills eval/grading/<name>.scores.jsonl (eval/grading/GRADER_INSTRUCTIONS.txt + the packet only)
+tools/.venv/bin/python tools/grade.py score  eval/results-pc-qwen3.5-4b.jsonl   # % of the baseline
+```
+
+A single run is noisy: regrading identical answers moves the score by about ±3 points, and
+unseeded reruns move it as much as most pipeline changes. To compare two versions of the
+pipeline, grade their answers against each other in one blind packet:
+
+```bash
+tools/.venv/bin/python tools/grade.py pair      eval/results-OLD.jsonl eval/results-NEW.jsonl
+tools/.venv/bin/python tools/grade.py pairscore eval/results-OLD.jsonl eval/results-NEW.jsonl
+```
+
+`pairscore` reports the mean difference with a 95 % confidence interval and a sign test;
+questions with identical answers are counted as ties without being graded.
