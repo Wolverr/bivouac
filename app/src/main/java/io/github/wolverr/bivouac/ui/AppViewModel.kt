@@ -348,6 +348,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Loads [modelName] like the eval does and logs the engine benchmark (pp256, tg32) for adb. */
+    fun startBench(modelName: String) {
+        viewModelScope.launch {
+            val model = models.list().firstOrNull { it.name == modelName }
+            if (model == null) {
+                android.util.Log.e(EvalRunner.TAG, "bench: model $modelName not found")
+                return@launch
+            }
+            if (_library.value.loadedModel != model.id) loadModel(model).join()
+            android.util.Log.i(EvalRunner.TAG, "bench ${model.name}: ${runtime.bench(256, 32)}")
+        }
+    }
+
     /** Asks the last question again, e.g. after location permission was granted. */
     fun retryLast() {
         if (_ask.value.running) return

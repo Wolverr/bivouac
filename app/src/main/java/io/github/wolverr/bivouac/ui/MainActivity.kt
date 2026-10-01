@@ -34,10 +34,17 @@ class MainActivity : ComponentActivity() {
         handleEval(intent)
     }
 
-    /** adb shell am start -n <pkg>/.ui.MainActivity --es eval questions.jsonl --es model <file>.gguf [--ez think true] */
+    /**
+     * adb shell am start -n <pkg>/.ui.MainActivity --es eval questions.jsonl --es model <file>.gguf [--ez think true]
+     * adb shell am start -n <pkg>/.ui.MainActivity --ez bench true --es model <file>.gguf   (result in logcat bivouac-eval)
+     */
     private fun handleEval(intent: Intent?) {
-        val questions = intent?.getStringExtra("eval") ?: return
-        val model = intent.getStringExtra("model") ?: return
+        val model = intent?.getStringExtra("model") ?: return
+        if (intent.getBooleanExtra("bench", false)) {
+            vm.startBench(model)
+            return
+        }
+        val questions = intent.getStringExtra("eval") ?: return
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)  // a long run must not sleep
         vm.startEval(questions, model, thinkHarder = intent.getBooleanExtra("think", false))
     }
