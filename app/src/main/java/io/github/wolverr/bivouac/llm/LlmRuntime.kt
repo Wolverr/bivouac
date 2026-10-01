@@ -96,10 +96,16 @@ class LlmRuntime private constructor(context: Context) {
         val allCores: Boolean = true,
         /** Let llama.cpp copy weights into a faster layout (costs about the model's size in extra RAM). */
         val repack: Boolean = true,
+        /** Experiments (hidden pref "batch_cores"): read prompts on this many of the fastest cores; 0 = [allCores]. */
+        val batchCores: Int = 0,
     )
 
     suspend fun load(path: String, opts: LoadOptions = LoadOptions()): Result<ModelInfo> = withContext(llmThread) {
-        val batchCpus = if (opts.allCores) device.allCores else device.bigCores
+        val batchCpus = when {
+            opts.batchCores > 0 -> device.allCores.takeLast(opts.batchCores).toIntArray()  // highest ids are the big cores
+            opts.allCores -> device.allCores
+            else -> device.bigCores
+        }
         val err = NativeEngine.nativeLoad(
             path.toByteArray(), opts.nCtx, opts.nBatch, device.bigCores, batchCpus, opts.repack,
         ).decodeToString()

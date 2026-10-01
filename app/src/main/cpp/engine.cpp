@@ -398,6 +398,7 @@ std::string Engine::model_info_json() const {
 
 std::string Engine::bench(int n_prompt, int n_gen) {
     if (!ctx_) return "{\"error\":\"no model loaded\"}";
+    cancel_.store(false);  // a Stop pressed earlier left it set, and decode_tokens gave up at once
     auto * mem = llama_get_memory(ctx_);
     const llama_vocab * vocab = llama_model_get_vocab(model_);
     const int n_vocab = llama_vocab_n_tokens(vocab);

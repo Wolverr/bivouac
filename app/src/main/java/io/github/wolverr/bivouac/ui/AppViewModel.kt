@@ -151,7 +151,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _library.update { it.copy(busy = "Loading ${file.name}…", error = null, benchResult = null) }
         val lib = _library.value
         val path = models.path(file)
-        var opts = LlmRuntime.LoadOptions(allCores = lib.allCores, repack = lib.repack)
+        var opts = LlmRuntime.LoadOptions(allCores = lib.allCores, repack = lib.repack, batchCores = prefs.getInt("batch_cores", 0))
         var note: String? = null
         if (lib.autoMemory) {
             val plan = runtime.planLoad(path, file.size, runtime.crashGuard.safety(file.id)).getOrElse { e ->
