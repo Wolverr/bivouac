@@ -16,61 +16,86 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
-## Resume here (handoff, 2026-10-01 ~01:00)
+## Resume here (handoff, 2026-10-01 night session, interim ~02:15)
 
 Start a new session with: "Continue the Bivouac project. Read docs/ROADMAP.md, Resume here."
 
 Dev machine: home Windows PC, WSL2 Ubuntu-24.04, repo /home/nicolas/bivouac (from the
 Windows side, reach WSL with `wsl -e bash -lc ...`; editing through
 \\\\wsl.localhost drops the exec bit on .sh files, so re-run `chmod +x tools/*.sh`).
-Build: `export JAVA_HOME=$HOME/.local/opt/jdk-17.0.20+8; ./gradlew testDebugUnitTest assembleDebug`.
+Build: `export JAVA_HOME=$HOME/.local/opt/jdk-17.0.20+8; ./gradlew testDebugUnitTest assembleDebug`,
+then `./gradlew --stop` — the Gradle + Kotlin daemons hold ~2 GB, enough to make a running 9B eval thrash.
 Commits: no AI attribution lines, ever (user rule). Commit messages with quotes or apostrophes:
 write them to a file and use `git commit -F file` (heredocs through `wsl -e bash -lc` break).
+Keep an Ubuntu terminal open when leaving jobs running overnight (WSL can stop the VM otherwise).
 
-Data (built): tools/out/wiki.db (6.49 M articles, 18.3 GB, 2.28 M aliases) and tools/out/places.db
-(30.0 M places, 5.3 GB). Desktop tools need `tools/native/build/fts_rank.so`:
+Data (built): tools/out/wiki.db (6.49 M articles, 18.3 GB, 2.28 M aliases, 40 k acronyms) and
+tools/out/places.db (30.0 M places, 5.3 GB). Desktop tools need `tools/native/build/fts_rank.so`:
 `export PATH=$HOME/Android/Sdk/cmake/3.31.6/bin:$PATH; cmake -S tools/native -B tools/native/build -G Ninja && ninja -C tools/native/build`.
-Models in ~/models; llama-server for the PC at ~/llama-pc/bin.
+Models in ~/models; llama-server for the PC at ~/llama-pc/bin. **Run the 9B with `--no-repack`**
+(`SERVER_ARGS=--no-repack`): with repacking it needs ~12 GB and thrashes under the 12 GB service cap
+(answers went from 28 s to 340 s).
 
-**Possibly still running** (check `systemctl --user is-active bivouac-models`, `tail tools/model_eval.log`):
-the v2 rerun of Qwen3.5-9B (`eval/results-pc-qwen3.5-9b-v2.jsonl`, resumable). If it stopped before 60
-lines, restart only it:
-`cd tools && systemd-run --user --unit=bivouac-models --working-directory=$PWD -p MemoryMax=12G -p MemorySwapMax=1G --collect --setenv=ONLY=qwen3.5-9b --setenv=SUFFIX=-v2 bash -c './run_model_eval.sh >> model_eval.log 2>&1'`.
-When it has 60 lines: `tools/.venv/bin/python tools/grade.py packet eval/results-pc-qwen3.5-9b-v2.jsonl`,
-then a blind grader subagent (reads only eval/grading/GRADER_INSTRUCTIONS.txt + the packet, never the key
-or other files; same prompt as the earlier graders: place answers with specific real places count as useful,
-longer isn't better) writes eval/grading/pc-qwen3.5-9b-v2.scores.jsonl, then `grade.py score ...`.
+### Eval method (changed tonight)
 
-Results so far (PC harness, % of the frontier + web baseline's score):
+- `grade.py pair old.jsonl new.jsonl` / `pairscore`: old vs new answers in one blind packet, with mean
+  difference, 95 % CI and sign test. First use showed that **unseeded reruns of identical prompts move the
+  4B's paired mean by −0.48** (CI −0.89..−0.08), bigger than most pipeline effects. The harness now sends
+  a fixed seed (`answer_proto.py` SEED), so unchanged prompts give unchanged answers and `pair` skips them.
+  Single unseeded runs (the table below) are ±3 points; don't read v1-vs-v2 differences from them.
+- **Held-out set**: eval/questions-holdout.jsonl (40 questions, written blind, never used for tuning) +
+  eval/baseline_holdout_frontier_web.jsonl (frontier + live web search). Run with
+  `ANSWER_ARGS="--questions ../eval/questions-holdout.jsonl" SUFFIX=-holdout`; grade.py reads both sets.
+  Use it to check that a fix generalizes before trusting main-set gains — it caught two regressions tonight.
+- Retrieval hit@6 (`tools/eval_retrieval.py`, `--questions` for the held-out set):
+  main 41/48 -> **44/48**, held-out 33/36 -> **34/36** (old code 5077db9 vs d29b13e).
 
-| Model | File | Score | PC s/answer |
+### Retrieval changes tonight (app + harness, mirrored)
+
+Namesakes dropped ("Rome, New York" for "Rome or New York?"); words after . ! ? aren't names ("Check" the
+film); "Ethereum's" -> Ethereum; everyday-word titles (North, Time, Week) dropped when a name matched;
+named articles lead with their intro + the infobox lines that mention the question (Napoleon's dates);
+acronym table (tools/build_acronyms.py, needs `--apply` on a pack; TCP/UDP/TLS/BMI/ICU were
+disambiguation pages = no article, no redirect) with context ("CFS" in a Linux question) and redirects
+first ("RAM"); "<noun> of the <name>" ("Soviet Union collapse" -> Dissolution of the Soviet Union);
+list expansion ("must-see museums in Berlin": the list article's most viewed entries, or rank order for
+"tallest" lists, instead of one 450-char slice of a padded table).
+
+### Results
+
+| Model | File | Score (main, single run) | PC s/answer |
 |---|---|---|---|
-| Qwen3.5-9B | 5.3 GB | 57.7 (v2: pending) | 26.5 |
+| Qwen3.5-9B | 5.3 GB | 57.7 (v2: 55.2) | 26.5 |
 | Qwen3.5-4B | 2.6 GB | 54.7 (v2: 57.1) | 16.4 |
 | LFM2.5-8B-A1B | 4.9 GB | 46.4 (needs `--reasoning-budget 0`) | ~6 |
 | Gemma-4-E4B | 4.7 GB | 44.1 | 12.6 |
 | Qwen3.5-2B | 1.2 GB | 44.0 | 9.7 |
 
-Gemma-4-26B / Qwen3.6-35B dropped: too big for any phone, and they swap the 16 GB PC.
 Tier picks (in catalog.json): 6 GB -> 2B, 8 GB -> 4B, 12 GB -> 9B. Rival AndroidLM claims 64 %.
 
-**Grader noise:** regrading moves the baseline's mean by ~0.7 (9.83 vs 9.13 on identical frontier
-answers), i.e. ±2–3 points of parity. Small pipeline changes need a *paired* comparison (old vs new
-answers of the same model in one blind packet) — `grade.py` doesn't have that mode yet; add it.
+### Running / queued overnight (check `systemctl --user list-units 'bivouac-*'`, tools/queue.log, tools/queue2.log)
+
+- ~/bivouac-queue.sh: 4B v3 (seeded, retrieval at ~c5d7af5 minus context acronyms) -> eval/;
+  4B s-old (old retrieval 5077db9, seeded; worktree ~/bivouac-old) -> ~/bivouac-old/eval/;
+  4B + 9B `--think` on the 6 reasoning questions -> eval/results-pc-*-v3-think.jsonl ("Think harder" test).
+- ~/bivouac-queue2.sh (after queue 1; frozen worktree ~/bivouac-v4 at d29b13e, results in ~/bivouac-v4/eval/):
+  4B v4, 4B v4-calc, 9B v4, 9B v4-calc. "calc" = tools/prompts/system-calc.txt: the app prompt plus
+  "work calculations out before stating the result" (the 4B/9B state a wrong number first, then correct
+  themselves; graders punish that).
 
 Next steps, in order:
-1. Finish/grade 9B v2 (above). Add a paired old-vs-new grading mode to tools/grade.py and use it to
-   check the v2 fixes on 4B and 9B.
-2. Known answer problems (from graded answers): reasoning is the weakest category (28–40 %);
-   "Rome vs New York" still pulls "Rome, New York" articles (idea: drop namesake articles titled
-   "X, Y" when X and Y are both named separately in the question); Gemma E4B / LFM2.5 refuse when
-   excerpts miss. Proposed to the user, not decided: a "Think harder" button that reruns a question
-   with reasoning on (slower, 1–3 min on a phone) — measure on the reasoning questions first.
-3. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
-   (~24 GB), test the automatic memory settings (Library shows "auto: ctx …"; compare
-   `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the estimate; load the 9B to force an OOM and
-   check the crash notice), measure speed of 2B/4B, run the on-phone eval (docs/EVAL.md).
-4. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
+1. Read the overnight results (see the status log entry for 2026-10-01 night; grade what isn't graded):
+   paired v3 vs s-old (retrieval effect), v4 vs v4-calc (prompt), think vs no-think on reasoning.
+   Adopt system-calc.txt into app/src/main/assets/prompts/system.txt if it wins.
+2. "Think harder" button: proposed to the user, not decided. Decide with the think-run numbers
+   (quality on the 6 reasoning questions and completion tokens -> phone time at ~4-7 tok/s).
+3. Held-out runs for the published numbers: 4B and 9B on eval/questions-holdout.jsonl.
+4. Phone (user connects the Redmi via usbipd, see "What the user does"): install the APK, copy the packs
+   (~24 GB; wiki.db now also has the acronym table), test the automatic memory settings (Library shows
+   "auto: ctx …"; compare `adb shell dumpsys meminfo io.github.wolverr.bivouac` with the estimate; load the
+   9B to force an OOM and check the crash notice), measure speed of 2B/4B, list expansion latency (~1-3 s
+   on the PC), run the on-phone eval (docs/EVAL.md).
+5. Publish: user makes a HuggingFace account + token, then `tools/publish_packs.py <user>/bivouac-packs`
    (uploads, fills catalog URLs). README.md is a draft with TBDs (phone speeds, release link, license).
    Then demo video (user), make the repo public, poidh claim. Deadline 2026-10-31.
 
