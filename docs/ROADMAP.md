@@ -243,7 +243,11 @@ Next steps, in order (updated 2026-10-02):
    (1-3 s on the PC: up to 200 title lookups), sights latency (reads every chunk of a city article).
 4. On-phone eval (docs/EVAL.md), 4B first; it gives the published numbers.
 5. Measure the sights change with the 4B (h-places-03 and a few new sights questions, paired).
-6. Publish the rest: README.md TBDs (phone speeds, release link), signed release APK + GitHub release.
+6. Publish the rest: README.md TBDs (phone speeds, release link), GitHub release. The release key exists
+   (2026-10-02): ~/bivouac-release/{bivouac-release.jks,keystore.properties}, outside the repo, cert
+   SHA-256 5206…ed90; `./gradlew assembleRelease` signs with it (11.6 MB APK, R8). **Test the R8
+   release build on a phone before publishing it** (JNI and serialization classes); user must keep a
+   backup of the key (lost key = no updates under the same app).
    Then demo video (user), make the repo public, poidh claim. Deadline 2026-10-31.
 7. Later, if the pack is rebuilt anyway: collapse markdown-table padding in build_corpus.py (27 % of raw
    text, ~7 % of compressed blocks); spatial index on coord for "nearby articles" (above).

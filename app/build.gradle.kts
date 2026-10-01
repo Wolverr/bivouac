@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -45,6 +47,20 @@ android {
         }
     }
 
+    // Release key from a properties file outside the repo (BIVOUAC_KEYSTORE, default
+    // ~/bivouac-release/keystore.properties: storeFile, storePassword, keyAlias, keyPassword).
+    // Without it, release builds are signed with the debug key so anyone can build from source.
+    val keystoreProps = file(System.getenv("BIVOUAC_KEYSTORE") ?: "${System.getProperty("user.home")}/bivouac-release/keystore.properties")
+    if (keystoreProps.exists()) {
+        val p = Properties().apply { keystoreProps.inputStream().use { load(it) } }
+        signingConfigs.create("release") {
+            storeFile = file(p.getProperty("storeFile"))
+            storePassword = p.getProperty("storePassword")
+            keyAlias = p.getProperty("keyAlias")
+            keyPassword = p.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         debug {
             // The native code is always built optimized; an -O0 llama.cpp is unusably slow.
@@ -53,8 +69,7 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Until a real release key exists, sign release builds with the debug key.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
