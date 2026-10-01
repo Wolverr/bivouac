@@ -50,7 +50,9 @@ internal object NativeEngine {
     external fun corpusOpen(path: ByteArray): ByteArray
     external fun corpusClose()
     external fun corpusMeta(key: ByteArray): ByteArray
-    external fun corpusSearch(query: ByteArray, limit: Int, priorWeight: Double, withText: Boolean): ByteArray
+    external fun corpusSearch(
+        query: ByteArray, limit: Int, priorWeight: Double, withText: Boolean, boostArticles: LongArray, boost: Double,
+    ): ByteArray
     external fun corpusFindArticle(title: ByteArray, context: ByteArray): ByteArray
     external fun corpusChunk(chunk: Long): ByteArray
     external fun corpusDocFreq(query: ByteArray, cap: Int): Int

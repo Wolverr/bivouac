@@ -166,7 +166,8 @@ std::string Corpus::meta(const std::string & key) {
     return sqlite3_step(st.s) == SQLITE_ROW ? st.text(0) : "";
 }
 
-std::vector<ChunkHit> Corpus::search(const std::string & fts_query, int limit, double prior_weight) {
+std::vector<ChunkHit> Corpus::search(const std::string & fts_query, int limit, double prior_weight,
+                                     const std::vector<int64_t> & boost_articles, double boost) {
     std::vector<ChunkHit> hits;
     if (!db_ || fts_query.empty()) return hits;
 
@@ -193,6 +194,7 @@ std::vector<ChunkHit> Corpus::search(const std::string & fts_query, int limit, d
         h.section = st.text(3);
         h.title = st.text(4);
         h.score = -h.bm25 + prior_weight * sqlite3_column_double(st.s, 5);
+        if (std::find(boost_articles.begin(), boost_articles.end(), h.article) != boost_articles.end()) h.score += boost;
         hits.push_back(std::move(h));
     }
     if (rc != SQLITE_DONE) error_ = sqlite3_errmsg(db_);

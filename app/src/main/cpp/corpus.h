@@ -42,7 +42,10 @@ public:
 
     // Full-text search. `fts_query` is FTS5 query syntax. Returns up to `limit`
     // chunks ranked by colrank (BM25, see fts_rank.c) blended with the article popularity prior.
-    std::vector<ChunkHit> search(const std::string & fts_query, int limit, double prior_weight);
+    // Chunks of `boost_articles` (those named in the question) score `boost` higher, before the
+    // cut to `limit`, as in tools/retrieve_proto.py Pack.search.
+    std::vector<ChunkHit> search(const std::string & fts_query, int limit, double prior_weight,
+                                 const std::vector<int64_t> & boost_articles = {}, double boost = 0.0);
 
     // Exact (case-insensitive, whitespace-normalized) title lookup, then the alias table;
     // acronyms also via the acronym table, where `context` (the question) picks the meaning.

@@ -169,10 +169,16 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(corpusMeta)(JNIEnv * env, jobject, jbyteArra
 }
 
 // Returns [{"chunk":..,"article":..,"title":"..","section":"..","score":..,"text":".."}] as JSON.
+// boost_articles: chunks of these articles score `boost` higher, before the cut to `limit`.
 JNIEXPORT jbyteArray JNICALL JNI_FN(corpusSearch)(JNIEnv * env, jobject, jbyteArray query, jint limit,
-                                                  jdouble prior_weight, jboolean with_text) {
+                                                  jdouble prior_weight, jboolean with_text,
+                                                  jlongArray boost_articles, jdouble boost) {
     std::lock_guard<std::mutex> lock(g_corpus_mutex);
-    const auto hits = g_corpus.search(to_string(env, query), limit, prior_weight);
+    std::vector<int64_t> boosted(env->GetArrayLength(boost_articles));
+    if (!boosted.empty()) {
+        env->GetLongArrayRegion(boost_articles, 0, (jsize) boosted.size(), reinterpret_cast<jlong *>(boosted.data()));
+    }
+    const auto hits = g_corpus.search(to_string(env, query), limit, prior_weight, boosted, boost);
     std::string out = "[";
     for (size_t i = 0; i < hits.size(); i++) {
         const auto & h = hits[i];

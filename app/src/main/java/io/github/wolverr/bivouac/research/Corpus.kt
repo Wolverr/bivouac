@@ -54,10 +54,13 @@ class Corpus {
         NativeEngine.corpusMeta(key.toByteArray()).decodeToString()
     }
 
-    suspend fun search(ftsQuery: String, limit: Int, priorWeight: Double = 0.5): List<Passage> =
-        withContext(Dispatchers.IO) {
-            json.decodeFromString(NativeEngine.corpusSearch(ftsQuery.toByteArray(), limit, priorWeight, true).decodeToString())
-        }
+    /** [boostArticles] (named in the question) score [boost] higher before the cut to [limit]. */
+    suspend fun search(
+        ftsQuery: String, limit: Int, priorWeight: Double = 0.5, boostArticles: Set<Long> = emptySet(), boost: Double = 0.0,
+    ): List<Passage> = withContext(Dispatchers.IO) {
+        val raw = NativeEngine.corpusSearch(ftsQuery.toByteArray(), limit, priorWeight, true, boostArticles.toLongArray(), boost)
+        json.decodeFromString(raw.decodeToString())
+    }
 
     /** [context]: the question, to pick among acronym meanings ("CFS" in a Linux question). */
     suspend fun findArticle(title: String, context: String = ""): Article? = withContext(Dispatchers.IO) {

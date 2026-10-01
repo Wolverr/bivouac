@@ -239,9 +239,13 @@ class ResearchPipeline(
             sights?.let { (p, text) -> whole[p.chunk] = text }  // a city's sights list, whole
             listOfNotNull(lead(corpus, article, words, seen, facts), sights?.first?.copy(section = SIGHTS_SECTION))
         }
-        val candidates = corpus.search(query, limit = settings.maxSources * 4, priorWeight = settings.priorWeight)
-            .map { if (it.article in namedIds) it.copy(score = it.score + settings.namedBoost) else it }
-            .sortedByDescending { it.score }
+        // Boosted before the cut to maxSources * 4, as in tools/retrieve_proto.py: boosting afterwards
+        // let other articles fill the candidates (6 sources instead of 3 for "capital of Kazakhstan",
+        // ~900 prompt tokens instead of ~650: 25 s more on the Redmi), unlike the evaluated harness.
+        val candidates = corpus.search(
+            query, limit = settings.maxSources * 4, priorWeight = settings.priorWeight,
+            boostArticles = namedIds, boost = settings.namedBoost,
+        )
 
         val perArticle = HashMap<Long, Int>()
         // Relevance gate: a passage that shares few of the question's words is noise, and
