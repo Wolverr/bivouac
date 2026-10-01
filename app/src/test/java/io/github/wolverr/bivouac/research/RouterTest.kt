@@ -40,6 +40,34 @@ class RouterTest {
     }
 
     @Test
+    fun calculationsAndTimelinesNeedReasoning() {
+        listOf(
+            "If I walk at 5 km/h and need to cover 23 km with a 900 m climb, roughly how long will it take using Naismith's rule?",
+            "A train leaves at 14:40 and the trip takes 3 h 55 min, crossing into a time zone one hour ahead. What local time does it arrive?",
+            "I have 1.5 liters of water and am hiking 6 hours in 30°C heat. Is that enough? Explain.",
+            "If Ethereum's block time is 12 seconds, how many blocks are produced in a week?",
+            "Which is further north: Rome or New York? By roughly how many degrees of latitude?",
+            "Could Napoleon have met Beethoven? Check their lifetimes and whereabouts.",
+            "Was Shakespeare alive when Elizabeth I died?",
+            "A 4 GB file downloads at 12 MB/s. How long will it take?",
+            "If I save 200 euros a month, how long until I have 5000?",
+        ).forEach { assertTrue(it, route(it).reasoning) }
+    }
+
+    @Test
+    fun lookupsWithNumbersDontNeedReasoning() {
+        listOf(
+            "How long did the 100 Years War last?",
+            "How many Oscars did Titanic (1997) win?",
+            "How many countries are in the EU in 2024?",
+            "How long does it take to boil an egg?",
+            "What year did the Berlin Wall fall?",
+            "Explain how GPS works",
+            "hi",
+        ).forEach { assertFalse(it, route(it).reasoning) }
+    }
+
+    @Test
     fun followUpsNeedHistory() {
         assertTrue(route("and its population?", history = true).followUp)
         assertTrue(route("why?", history = true).followUp)

@@ -17,7 +17,8 @@ import kotlinx.coroutines.flow.flow
 data class Source(val n: Int, val passage: Passage, val evidence: String)
 
 sealed interface ResearchEvent {
-    data class Routed(val decision: Router.Decision) : ResearchEvent
+    /** [thinkHarder]: this answer reasons first, asked for or because [Router.Decision.reasoning]. */
+    data class Routed(val decision: Router.Decision, val thinkHarder: Boolean = false) : ResearchEvent
     data class Searching(val query: String) : ResearchEvent
     data class Sources(val sources: List<Source>, val searchMs: Long) : ResearchEvent
     /** center == null: the location couldn't be found (or GPS isn't available). */
@@ -94,18 +95,21 @@ class ResearchPipeline(
 
     /**
      * [thinkHarder]: let the model reason first (hidden; up to [Settings.thinkBudget] tokens, so a
-     * few minutes on a phone). It fixes most multi-step reasoning mistakes.
+     * few minutes on a phone). It fixes most multi-step reasoning mistakes. [autoThink]: also for
+     * questions the router finds need reasoning (calculations, timelines), not for place searches.
      */
     fun answer(
         question: String,
         conversation: Conversation,
         settings: Settings = Settings.forContext(llm.contextSize),
         thinkHarder: Boolean = false,
+        autoThink: Boolean = true,
     ): Flow<ResearchEvent> = flow {
         val decision = Router.decide(question, !conversation.isEmpty)
-        emit(ResearchEvent.Routed(decision))
-
         val placeIntent = places?.takeIf { it.path != null }?.let { PlaceIntent.parse(question, it.placeNouns) }
+        val think = thinkHarder || (autoThink && decision.reasoning && placeIntent == null)
+        emit(ResearchEvent.Routed(decision, think))
+
         val nearby = if (placeIntent != null) findPlaces(placeIntent) else emptyList()
 
         val sources = if (placeIntent == null && decision.route == Router.Route.LOOKUP && corpus?.path != null) {
@@ -146,16 +150,16 @@ class ResearchPipeline(
 
         // Thinking needs room in the context: the reasoning (~3 chars/token) comes out of the history.
         val budget = settings.thinkBudget
-        val promptChars = settings.historyChars - if (thinkHarder) budget * 3 else 0
+        val promptChars = settings.historyChars - if (think) budget * 3 else 0
         val turns = history(conversation, promptChars - prompt.length) + ChatTurn("user", prompt)
-        val (prefix, rest) = llm.chatPrompt(system, turns, thinking = thinkHarder)
-        val sampling = if (thinkHarder) {
+        val (prefix, rest) = llm.chatPrompt(system, turns, thinking = think)
+        val sampling = if (think) {
             settings.sampling.copy(maxTokens = settings.sampling.maxTokens + budget, thinkBudget = budget)
         } else {
             settings.sampling
         }
         val answer = StringBuilder()
-        val filter = ThinkFilter(startInThink = thinkHarder && rest.trimEnd().endsWith("<think>"))
+        val filter = ThinkFilter(startInThink = think && rest.trimEnd().endsWith("<think>"))
         var hidden = 0
         llm.complete(prefix, rest, sampling).collect { ev ->
             if (ev is GenEvent.Token) {
@@ -163,7 +167,7 @@ class ResearchPipeline(
                 if (visible.isNotEmpty()) {
                     answer.append(visible)
                     emit(ResearchEvent.Llm(GenEvent.Token(visible)))
-                } else if (thinkHarder && answer.isEmpty() && ++hidden % 8 == 0) {
+                } else if (think && answer.isEmpty() && ++hidden % 8 == 0) {
                     emit(ResearchEvent.Thinking(minOf(hidden, budget), budget))
                 }
                 return@collect

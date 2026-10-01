@@ -47,6 +47,8 @@ data class LibraryState(
     val repack: Boolean = true,
     /** Pick context size and repacking from free RAM at load time. */
     val autoMemory: Boolean = true,
+    /** Think harder by itself for calculations and timelines (Router.needsReasoning). */
+    val autoThink: Boolean = true,
     /** How the loaded model was configured (auto mode). */
     val loadNote: String? = null,
     /** Shown once after Android killed the app while it was busy with a model. */
@@ -113,6 +115,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             allCores = prefs.getBoolean("all_cores_reading", true),
             repack = prefs.getBoolean("repack", true),
             autoMemory = prefs.getBoolean("auto_memory", true),
+            autoThink = prefs.getBoolean("auto_think", true),
             notice = runtime.crashGuard.previous?.let { c ->
                 "Bivouac was stopped while ${c.phase}${if (c.lowMemory) ", probably because the phone ran out of memory" else ""}. " +
                     "The next load of that model uses smaller memory settings."
@@ -222,6 +225,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _library.update { it.copy(autoMemory = on) }
     }
 
+    fun setAutoThink(on: Boolean) {
+        prefs.edit().putBoolean("auto_think", on).apply()
+        _library.update { it.copy(autoThink = on) }
+    }
+
     fun dismissNotice() = _library.update { it.copy(notice = null) }
 
     fun setRepack(on: Boolean) {
@@ -276,9 +284,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         askJob = viewModelScope.launch {
             runtime.crashGuard.begin(modelId, "answering", "ctx ${runtime.contextSize}")
             try {
-                pipeline.answer(q, conversation, thinkHarder = thinkHarder).collect { ev ->
+                pipeline.answer(q, conversation, thinkHarder = thinkHarder, autoThink = _library.value.autoThink).collect { ev ->
                     when (ev) {
-                        is ResearchEvent.Routed -> updateLast { it.copy(crisis = ev.decision.crisis) }
+                        is ResearchEvent.Routed -> updateLast {
+                            if (ev.thinkHarder && !it.thoughtHarder) {
+                                it.copy(crisis = ev.decision.crisis, thoughtHarder = true, status = "Thinking harder (calculation)…")
+                            } else {
+                                it.copy(crisis = ev.decision.crisis)
+                            }
+                        }
                         is ResearchEvent.Searching -> updateLast { it.copy(status = "Searching the library…", usedLibrary = true) }
                         is ResearchEvent.PlacesFound -> updateLast {
                             it.copy(

@@ -59,6 +59,22 @@ def route(q: str) -> str:
     return "chat" if GREETING.match(m) or PERSONAL.search(m) or not keywords(m) else "lookup"
 
 
+# Router.needsReasoning: calculations, "by how much", timeline overlaps get thinking on.
+R_NUMBER = re.compile(r"\d+(?:[.,:]\d+)*")
+R_CALC = re.compile(r"\b(how (long|many|much|far)|what (local )?time|is (that|it|this) enough|will (it|i|we) (last|need))\b")
+R_RATE = re.compile(r"\b(per|every|each|a (day|week|month|year|hour)|in an? (day|week|month|year|hour))\b|/")
+R_IF = re.compile(r"^\s*if\b")
+R_BY_HOW = re.compile(r"\bby (roughly |about |approximately )?how (many|much)\b")
+R_OVERLAP = re.compile(r"\b(could .{2,40} have met|(was|were) .{2,40} (alive|born) when|lifetimes?)\b")
+
+
+def needs_reasoning(q: str) -> bool:
+    m = q.strip().lower()
+    n = len(R_NUMBER.findall(m))
+    calc = R_CALC.search(m) and (n >= 2 or (n == 1 and (R_RATE.search(m) or R_IF.search(m))))
+    return bool(calc or R_BY_HOW.search(m) or R_OVERLAP.search(m))
+
+
 def retrieve(pack: Pack, q: str):
     """Mirrors ResearchPipeline.retrieve: named articles' leads first, then boosted BM25."""
     words = keywords(q)
@@ -241,7 +257,10 @@ def main():
     ap.add_argument("--only", default="", help="comma-separated question ids")
     ap.add_argument("--questions", default=str(ROOT / "eval/questions.jsonl"), help="question set (eval/questions-holdout.jsonl)")
     ap.add_argument("--places", default="out/places.db", help="places pack ('' to skip, like an app without one)")
-    ap.add_argument("--think", action="store_true", help="reasoning on (measures a 'Think harder' mode)")
+    ap.add_argument("--think", action="store_true", help="reasoning on for every question ('Think harder')")
+    ap.add_argument("--no-auto-think", action="store_true",
+                    help="no reasoning for calculation questions either (the app before 2026-10-02); "
+                         "with it on, start llama-server with --reasoning-budget 1024 like the app")
     ap.add_argument("--system", default="", help="system prompt file to try instead of the app's")
     ap.add_argument("--model-id", default="", help="catalog id (qwen3.5-9b): use that model's prompt, like the app")
     ap.add_argument("--max-sources", type=int, default=0, help="sources per answer (app: Settings.maxSources, 6)")
@@ -276,8 +295,9 @@ def main():
         else:
             sources = retrieve(pack, q["q"]) if r == "lookup" else []
             prompt = build_prompt(q["q"], sources)
-        answer, usage = generate(args.port, prompt, args.think, system)
-        rec = {"id": q["id"], "question": q["q"], "answer": answer, "route": r,
+        think = args.think or (not args.no_auto_think and r == "lookup" and needs_reasoning(q["q"]))
+        answer, usage = generate(args.port, prompt, think, system)
+        rec = {"id": q["id"], "question": q["q"], "answer": answer, "route": r, "think": think,
                "sources": [f"{t} — {s}" if s else t for _, t, s, _ in sources] +
                           [f"[P{i + 1}] {p['name']} ({p['cat']}, {format_distance(p['dist'])})" for i, p in enumerate(found or [])],
                "model": args.name, "device": "pc-harness", "total_ms": int((time.time() - t0) * 1000), "usage": usage}

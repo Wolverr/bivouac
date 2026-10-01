@@ -107,6 +107,9 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             SettingRow("Repack weights", "Faster math, but uses extra RAM about the model's size", s.repack, vm::setRepack)
         }
 
+        Text("Answers", style = MaterialTheme.typography.titleMedium)
+        SettingRow("Think harder for calculations", "Reasons first on questions with numbers or dates to work out: right far more often, a few minutes slower", s.autoThink, vm::setAutoThink)
+
         Text("Knowledge packs", style = MaterialTheme.typography.titleMedium)
         if (s.packs.isEmpty()) {
             Text("No knowledge pack. Without one, answers come from the model's memory only.", style = MaterialTheme.typography.bodyMedium)

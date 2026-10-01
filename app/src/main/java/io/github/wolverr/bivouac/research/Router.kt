@@ -8,7 +8,8 @@ package io.github.wolverr.bivouac.research
 object Router {
     enum class Route { LOOKUP, CHAT }
 
-    data class Decision(val route: Route, val followUp: Boolean, val crisis: Boolean)
+    /** [reasoning]: a calculation or timeline question, answered with thinking on (see [needsReasoning]). */
+    data class Decision(val route: Route, val followUp: Boolean, val crisis: Boolean, val reasoning: Boolean = false)
 
     private val GREETING = Regex(
         "^(hi|hello|hey|yo|hiya|thanks|thank you|thx|ok|okay|cool|nice|great|good (morning|evening|night)|bye|lol)\\b[\\s!.?]*$",
@@ -29,13 +30,37 @@ object Router {
             "does it|did they|it|its|it's|that|those|these|they|he|she|which one)\\b",
     )
 
+    // Reasoning questions: numbers to work with plus a question that asks for a result.
+    private val NUMBER = Regex("\\d+(?:[.,:]\\d+)*")
+    private val CALC = Regex("\\b(how (long|many|much|far)|what (local )?time|is (that|it|this) enough|will (it|i|we) (last|need))\\b")
+    private val RATE = Regex("\\b(per|every|each|a (day|week|month|year|hour)|in an? (day|week|month|year|hour))\\b|/")
+    private val IF_START = Regex("^\\s*if\\b")
+    private val BY_HOW = Regex("\\bby (roughly |about |approximately )?how (many|much)\\b")
+    private val OVERLAP = Regex("\\b(could .{2,40} have met|(was|were) .{2,40} (alive|born) when|lifetimes?)\\b")
+
+    /**
+     * Calculations ("23 km with a 900 m climb, how long…", "a 4 GB file at 12 MB/s…"), "by how
+     * much" comparisons and timeline overlaps ("could Napoleon have met Beethoven"). Thinking
+     * lifts the 9B from 3.5 to 8.8 of 10 on these but makes other answers shorter and worse
+     * (paired, all 60 questions: -0.25 when always on, +0.18 when on for these only). One number
+     * counts only with a rate or an "if": "how long did the 100 Years' War last" is a lookup.
+     * Mirrors tools/answer_proto.py.
+     */
+    fun needsReasoning(message: String): Boolean {
+        val m = message.trim().lowercase()
+        val numbers = NUMBER.findAll(m).count()
+        val calc = CALC.containsMatchIn(m) &&
+            (numbers >= 2 || (numbers == 1 && (RATE.containsMatchIn(m) || IF_START.containsMatchIn(m))))
+        return calc || BY_HOW.containsMatchIn(m) || OVERLAP.containsMatchIn(m)
+    }
+
     fun decide(message: String, hasHistory: Boolean): Decision {
         val m = message.trim().lowercase()
         val crisis = CRISIS.containsMatchIn(m)
         val words = Evidence.keywords(m)
         val chat = crisis || GREETING.matches(m) || PERSONAL.containsMatchIn(m) || words.isEmpty()
         val followUp = hasHistory && (FOLLOW_UP_START.containsMatchIn(m) || m.split(Regex("\\s+")).size <= 5)
-        return Decision(if (chat) Route.CHAT else Route.LOOKUP, followUp, crisis)
+        return Decision(if (chat) Route.CHAT else Route.LOOKUP, followUp, crisis, reasoning = !chat && needsReasoning(m))
     }
 }
 
