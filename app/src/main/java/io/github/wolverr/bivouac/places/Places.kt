@@ -185,12 +185,15 @@ class Places {
         val dLat = radiusM / 111_320.0
         val dLon = radiusM / (111_320.0 * cos(c.lat * PI / 180).coerceAtLeast(0.01))
         val catList = cats.joinToString(",")
-        // Category ids come from the pack itself, so inlining them is safe.
+        // Category ids come from the pack itself, so inlining them is safe. Filter them here, not
+        // after the LIMIT: a city centre has more than 4000 places within 800 m (the Duomo: 4488),
+        // and the R-tree returns them in no particular order, so the nearest matches got cut.
         val rows = query(
             """
             SELECT p.name, p.name_en, k.name, p.lat, p.lon, p.street, p.locality, p.phone, p.conf, p.alt, p.cat
             FROM place_geo g JOIN place p ON p.id = g.id JOIN category k ON k.id = p.cat
             WHERE g.lat0 >= ?1 AND g.lat1 <= ?2 AND g.lon0 >= ?3 AND g.lon1 <= ?4
+              AND (p.cat IN ($catList) OR p.alt != '')
             LIMIT 4000
             """.trimIndent(),
             (c.lat - dLat).toString(), (c.lat + dLat).toString(), (c.lon - dLon).toString(), (c.lon + dLon).toString(),

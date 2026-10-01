@@ -233,8 +233,10 @@ class Places:
         rows = self.db.execute("""
             SELECT p.name, p.name_en, k.name, p.lat, p.lon, p.street, p.locality, p.phone, p.conf, p.alt, p.cat
             FROM place_geo g JOIN place p ON p.id = g.id JOIN category k ON k.id = p.cat
-            WHERE g.lat0 >= ? AND g.lat1 <= ? AND g.lon0 >= ? AND g.lon1 <= ? LIMIT 4000""",
+            WHERE g.lat0 >= ? AND g.lat1 <= ? AND g.lon0 >= ? AND g.lon1 <= ?
+              AND (p.cat IN (%s) OR p.alt != '') LIMIT 4000""" % ",".join(str(int(c)) for c in cats),
             (lat - d_lat, lat + d_lat, lon - d_lon, lon + d_lon)).fetchall()
+        # categories filtered before the LIMIT: a city centre has > 4000 places within 800 m (Places.within)
         out = []
         for r in rows:
             alts = [int(a) for a in (r[9] or "").split(",") if a.isdigit()]
