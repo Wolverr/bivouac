@@ -35,6 +35,7 @@ NEAR_ME = re.compile(r"\b(near me|nearby|near here|around here|close by|closest|
 LOCATION = re.compile(r"\b(?:near|around|close to|in|at|by|next to)\s+(?:the\s+)?(.+?)\s*[?.!]*$", re.I)
 WORD = re.compile(r"[^\W\d_][\w'\-]*")
 DECIMAL_COORDS = re.compile(r"(\d+(?:\.\d+)?)°\s*([NS])\s+(\d+(?:\.\d+)?)°\s*([EW])")
+COORDS_LINE = re.compile(r"^(geographic )?coordinates", re.I)  # Places.COORDS_LINE
 
 
 def singularize(w):
@@ -116,26 +117,64 @@ class Places:
     def categories_for(self, intent):
         return self.category_ids(intent["modifiers"]) or self.category_ids(intent["noun"])
 
+    def infobox(self, title):
+        """(article title, infobox text) or None (Places.infobox)."""
+        row = self.wiki.find_article(title)  # like Corpus.findArticle: title, then alias
+        if not row:
+            return None
+        sec = self.wiki.db.execute("SELECT section FROM chunk WHERE id = ?", (row[2],)).fetchone()
+        if not sec or sec[0] != "Infobox":
+            return None
+        return row[1], self.wiki.text(row[2])
+
+    @staticmethod
+    def coords(infobox_text):
+        line = next((l for l in infobox_text.splitlines() if COORDS_LINE.match(l)), None)
+        ms = list(DECIMAL_COORDS.finditer(line or ""))
+        if not ms:
+            return None
+        m = ms[-1]
+        return float(m[1]) * (-1 if m[2] == "S" else 1), float(m[3]) * (-1 if m[4] == "W" else 1)
+
+    def landmark(self, place, where):
+        """Places.landmark: "Shibuya Crossing" in "Tokyo". The landmark's own coordinates when its
+        infobox has them, else the first part of its Location line ("Shibuya, Tokyo, Japan" -> Shibuya),
+        never the city centre a few km away. The infobox must mention the city, so a generic
+        "old town" in Prague can't match some other town's article."""
+        box = self.infobox(place)
+        if not box or not any(w.lower() in box[1].lower() for w in where):
+            return None
+        c = self.coords(box[1])
+        if c:
+            return c[0], c[1], f"wiki:{box[0]}"
+        line = next((l for l in box[1].splitlines() if l.lower().startswith("location:")), "")
+        area = line.split(":", 1)[1].split(",")[0].strip() if line else ""
+        if area and area.lower() not in (w.lower() for w in where):
+            sub = self.infobox(area)
+            c = self.coords(sub[1]) if sub else None
+            if c:
+                return c[0], c[1], f"wiki:{sub[0]} (location of {box[0]})"
+            row = self.db.execute("SELECT lat, lon, country, n, name FROM locality WHERE name IN (?, ?) ORDER BY n DESC LIMIT 1",
+                                  (area.lower(), area.lower() + " city")).fetchone()
+            if row:
+                return row[0], row[1], f"locality:{row[4]} (location of {box[0]})"
+        return None
+
     def geocode(self, phrase):
         core = CLAUSE.split(phrase, maxsplit=1)[0].strip()
-        cands = [phrase, core] + [p.strip() for p in reversed(re.split(r"\s+in\s+|,\s*", core)) if p.strip()]
+        parts = [p.strip() for p in re.split(r"\s+in\s+|,\s*", core) if p.strip()]
+        cands = [phrase, core] + list(reversed(parts))
         cands = list(dict.fromkeys(cands))
         if self.wiki:
+            if len(parts) >= 2:
+                hit = self.landmark(parts[0], parts[1:])
+                if hit:
+                    return hit
             for c in cands:
-                row = self.wiki.find_article(c)  # like Corpus.findArticle: title, then alias
-                if not row:
-                    continue
-                row = (row[1], row[2])
-                sec = self.wiki.db.execute("SELECT section FROM chunk WHERE id = ?", (row[1],)).fetchone()
-                if not sec or sec[0] != "Infobox":
-                    continue
-                line = next((l for l in self.wiki.text(row[1]).splitlines() if l.lower().startswith("coordinates")), None)
-                ms = list(DECIMAL_COORDS.finditer(line or ""))
-                if ms:
-                    m = ms[-1]
-                    lat = float(m[1]) * (-1 if m[2] == "S" else 1)
-                    lon = float(m[3]) * (-1 if m[4] == "W" else 1)
-                    return lat, lon, f"wiki:{row[0]}"
+                box = self.infobox(c)
+                c2 = self.coords(box[1]) if box else None
+                if c2:
+                    return c2[0], c2[1], f"wiki:{box[0]}"
         for c in cands:
             # Overture uses local names: "Florence" alone finds Florence, Alabama; the
             # article's aliases add "firenze", and the biggest locality wins.

@@ -1,6 +1,7 @@
 package io.github.wolverr.bivouac.places
 
 import io.github.wolverr.bivouac.llm.NativeEngine
+import io.github.wolverr.bivouac.research.Article
 import io.github.wolverr.bivouac.research.Corpus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -99,15 +100,16 @@ class Places {
     suspend fun geocode(phrase: String, corpus: Corpus?): GeoPoint? {
         // "Shinjuku Station that is open late" -> also try "Shinjuku Station".
         val core = phrase.split(CLAUSE, limit = 2)[0].trim()
+        val parts = core.split(Regex("\\s+in\\s+|,\\s*")).map { it.trim() }.filter { it.isNotEmpty() }
         val candidates = buildList {
             add(phrase)
             add(core)
-            core.split(Regex("\\s+in\\s+|,\\s*")).map { it.trim() }.filter { it.isNotEmpty() }.reversed().forEach(::add)
+            parts.reversed().forEach(::add)
         }.distinct()
+        if (corpus != null && parts.size >= 2) landmark(corpus, parts[0], parts.drop(1))?.let { return it }
         for (c in candidates) {
-            val article = corpus?.findArticle(c) ?: continue
-            val infobox = corpus.chunk(article, 0)?.takeIf { it.section == "Infobox" } ?: continue
-            parseCoordinates(infobox.text)?.let { return GeoPoint(it.first, it.second, article.title) }
+            val (article, infobox) = infobox(corpus ?: break, c) ?: continue
+            parseCoordinates(infobox)?.let { return GeoPoint(it.first, it.second, article.title) }
         }
         for (c in candidates) {
             // Overture uses local names: "Florence" alone finds Florence, Alabama; the
@@ -123,6 +125,33 @@ class Places {
             return GeoPoint((row[0] as Number).toDouble(), (row[1] as Number).toDouble(), c)
         }
         return null
+    }
+
+    private suspend fun infobox(corpus: Corpus, title: String): Pair<Article, String>? {
+        val article = corpus.findArticle(title) ?: return null
+        val chunk = corpus.chunk(article, 0)?.takeIf { it.section == "Infobox" } ?: return null
+        return article to chunk.text
+    }
+
+    /**
+     * "Shibuya Crossing" in "Tokyo": the landmark's own coordinates when its infobox has
+     * them, else the first part of its Location line ("Shibuya, Tokyo, Japan" -> Shibuya),
+     * never the city centre a few km away. The infobox must mention the city, so a generic
+     * "old town" in Prague can't match another town's article. Mirrors tools/places_proto.py.
+     */
+    private suspend fun landmark(corpus: Corpus, place: String, where: List<String>): GeoPoint? {
+        val (article, box) = infobox(corpus, place) ?: return null
+        if (where.none { box.contains(it, ignoreCase = true) }) return null
+        parseCoordinates(box)?.let { return GeoPoint(it.first, it.second, article.title) }
+        val area = locationArea(box)?.takeIf { a -> where.none { it.equals(a, ignoreCase = true) } } ?: return null
+        infobox(corpus, area)?.let { (sub, subBox) ->
+            parseCoordinates(subBox)?.let { return GeoPoint(it.first, it.second, "${sub.title} (location of ${article.title})") }
+        }
+        val row = query(
+            "SELECT lat, lon, name FROM locality WHERE name IN (?1, ?2) ORDER BY n DESC LIMIT 1",
+            area.lowercase(), area.lowercase() + " city",
+        ).firstOrNull() ?: return null
+        return GeoPoint((row[0] as Number).toDouble(), (row[1] as Number).toDouble(), "$area (location of ${article.title})")
     }
 
     /**
@@ -201,14 +230,24 @@ class Places {
 
         private val DECIMAL_COORDS = Regex("(\\d+(?:\\.\\d+)?)°\\s*([NS])\\s+(\\d+(?:\\.\\d+)?)°\\s*([EW])")
 
-        /** "Coordinates: 43°46′23″N 11°15′22″E / 43.77306°N 11.25611°E" -> (43.77306, 11.25611). */
+        private val COORDS_LINE = Regex("^(geographic )?coordinates", RegexOption.IGNORE_CASE)
+
+        /**
+         * "Coordinates: 43°46′23″N 11°15′22″E / 43.77306°N 11.25611°E" -> (43.77306, 11.25611);
+         * also "Geographic coordinates: ..." (Sagrada Família, Shinjuku Station).
+         */
         fun parseCoordinates(infobox: String): Pair<Double, Double>? {
-            val line = infobox.lineSequence().firstOrNull { it.startsWith("Coordinates", ignoreCase = true) } ?: return null
+            val line = infobox.lineSequence().firstOrNull { COORDS_LINE.containsMatchIn(it) } ?: return null
             val m = DECIMAL_COORDS.findAll(line).lastOrNull() ?: return null
             val lat = m.groupValues[1].toDouble() * if (m.groupValues[2] == "S") -1 else 1
             val lon = m.groupValues[3].toDouble() * if (m.groupValues[4] == "W") -1 else 1
             return lat to lon
         }
+
+        /** "Location: Shibuya, Tokyo, Japan" -> "Shibuya": the most specific part of an infobox's Location line. */
+        fun locationArea(infobox: String): String? =
+            infobox.lineSequence().firstOrNull { it.startsWith("Location:", ignoreCase = true) }
+                ?.substringAfter(':')?.substringBefore(',')?.trim()?.takeIf { it.isNotEmpty() }
 
         fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
             val r = 6_371_000.0
