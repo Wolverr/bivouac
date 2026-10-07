@@ -1,0 +1,20 @@
+{
+ "old": "results-pc-qwen3.5-9b-v21-daytrip-old.jsonl",
+ "new": "results-pc-qwen3.5-9b-v21-daytrip-new.jsonl",
+ "questions": 7,
+ "identical": 0,
+ "old_mean": 4.71,
+ "new_mean": 6.29,
+ "mean_diff": 1.57,
+ "ci95": [
+  -0.24,
+  3.38
+ ],
+ "new_better": 4,
+ "old_better": 1,
+ "ties": 2,
+ "sign_test_p": 0.375,
+ "by_category": {
+  "travel": 1.57
+ }
+}
