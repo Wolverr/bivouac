@@ -1,0 +1,60 @@
+{"id":"fact-01","A":{"correctness":9,"completeness":6,"usefulness":7,"overall":8},"B":{"correctness":6,"completeness":8,"usefulness":7,"overall":6},"note":"B adds detail but misdates the move (Jan 1997, referendum)"}
+{"id":"fact-02","A":{"correctness":5,"completeness":5,"usefulness":5,"overall":5},"B":{"correctness":8,"completeness":4,"usefulness":5,"overall":6},"note":"A gives dubious Gaudi dates and no completion, B correct but incomplete"}
+{"id":"fact-03","A":{"correctness":6,"completeness":2,"usefulness":2,"overall":3},"B":{"correctness":10,"completeness":9,"usefulness":9,"overall":9},"note":"B gives the height, A does not"}
+{"id":"fact-04","A":{"correctness":4,"completeness":6,"usefulness":5,"overall":4},"B":{"correctness":6,"completeness":3,"usefulness":3,"overall":4},"note":"A wrongly credits Krenz, B vague"}
+{"id":"fact-05","A":{"correctness":4,"completeness":5,"usefulness":5,"overall":4},"B":{"correctness":6,"completeness":1,"usefulness":1,"overall":2},"note":"A gives an answer with a wrong carbon figure, B refuses"}
+{"id":"fact-06","A":{"correctness":8,"completeness":6,"usefulness":6,"overall":7},"B":{"correctness":5,"completeness":8,"usefulness":6,"overall":5},"note":"B has muddled history errors, A concise and right"}
+{"id":"explain-01","A":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B slightly fuller with COP example"}
+{"id":"explain-02","A":{"correctness":9,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"note":"B cleaner and more complete"}
+{"id":"explain-03","A":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"note":"B clearer step-by-step"}
+{"id":"explain-04","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"note":"A covers energy tradeoff better"}
+{"id":"explain-05","A":{"correctness":5,"completeness":4,"usefulness":4,"overall":4},"B":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"note":"A's analogy is confused, B clearer"}
+{"id":"explain-06","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":8,"completeness":8,"usefulness":9,"overall":8},"note":"Similar, B gives better action advice"}
+{"id":"explain-07","A":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"B":{"correctness":8,"completeness":6,"usefulness":7,"overall":7},"note":"A gives the relativity numbers"}
+{"id":"explain-08","A":{"correctness":7,"completeness":5,"usefulness":5,"overall":6},"B":{"correctness":7,"completeness":1,"usefulness":1,"overall":2},"note":"A adds general knowledge, B gives nothing"}
+{"id":"compare-01","A":{"correctness":7,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":7,"completeness":8,"usefulness":7,"overall":7},"note":"Similar, B more structured"}
+{"id":"compare-02","A":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"B":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"note":"A more complete"}
+{"id":"compare-03","A":{"correctness":7,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B covers lifespan with figures"}
+{"id":"compare-04","A":{"correctness":4,"completeness":4,"usefulness":4,"overall":4},"B":{"correctness":4,"completeness":5,"usefulness":4,"overall":4},"note":"Both muddled and partly wrong on Germany"}
+{"id":"compare-05","A":{"correctness":6,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":6,"completeness":5,"usefulness":5,"overall":5},"note":"A covers both models more fully"}
+{"id":"compare-06","A":{"correctness":6,"completeness":5,"usefulness":5,"overall":5},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B gives actual causes of both wars"}
+{"id":"synth-01","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":8,"completeness":9,"usefulness":8,"overall":8},"note":"Similar, B slightly broader"}
+{"id":"synth-02","A":{"correctness":9,"completeness":8,"usefulness":9,"overall":9},"B":{"correctness":5,"completeness":1,"usefulness":1,"overall":2},"note":"B refuses, A answers well"}
+{"id":"synth-03","A":{"correctness":7,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":7,"completeness":6,"usefulness":6,"overall":6},"note":"A more detailed"}
+{"id":"synth-04","A":{"correctness":6,"completeness":5,"usefulness":5,"overall":5},"B":{"correctness":7,"completeness":8,"usefulness":8,"overall":8},"note":"B gives concrete for/against points"}
+{"id":"synth-05","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":7,"completeness":8,"usefulness":7,"overall":7},"note":"A slightly more precise"}
+{"id":"synth-06","A":{"correctness":7,"completeness":3,"usefulness":3,"overall":4},"B":{"correctness":8,"completeness":5,"usefulness":5,"overall":6},"note":"B adds derivatives link"}
+{"id":"reason-01","A":{"correctness":2,"completeness":3,"usefulness":2,"overall":2},"B":{"correctness":1,"completeness":2,"usefulness":1,"overall":1},"note":"Both wrong (correct about 6.1 h), B absurd 13.6 h"}
+{"id":"reason-02","A":{"correctness":9,"completeness":8,"usefulness":8,"overall":9},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"Both give 19:35, A states it directly"}
+{"id":"reason-03","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":6,"completeness":6,"usefulness":5,"overall":6},"note":"A is more direct and useful"}
+{"id":"reason-04","A":{"correctness":1,"completeness":2,"usefulness":1,"overall":1},"B":{"correctness":10,"completeness":10,"usefulness":10,"overall":10},"note":"A wrong 336, B correct 50400"}
+{"id":"reason-05","A":{"correctness":9,"completeness":8,"usefulness":8,"overall":9},"B":{"correctness":8,"completeness":9,"usefulness":7,"overall":7},"note":"B starts with wrong claim then corrects"}
+{"id":"reason-06","A":{"correctness":7,"completeness":6,"usefulness":6,"overall":6},"B":{"correctness":4,"completeness":5,"usefulness":4,"overall":4},"note":"B wrongly says they could not have met"}
+{"id":"travel-01","A":{"correctness":7,"completeness":6,"usefulness":7,"overall":7},"B":{"correctness":5,"completeness":8,"usefulness":7,"overall":6},"note":"B has geographic errors on areas"}
+{"id":"travel-02","A":{"correctness":6,"completeness":4,"usefulness":4,"overall":5},"B":{"correctness":6,"completeness":3,"usefulness":3,"overall":4},"note":"Both only mention taxi, A slightly fuller"}
+{"id":"travel-03","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":5,"completeness":1,"usefulness":1,"overall":2},"note":"B refuses"}
+{"id":"travel-04","A":{"correctness":7,"completeness":5,"usefulness":5,"overall":6},"B":{"correctness":8,"completeness":6,"usefulness":6,"overall":7},"note":"B adds survey stat"}
+{"id":"travel-05","A":{"correctness":5,"completeness":1,"usefulness":1,"overall":2},"B":{"correctness":7,"completeness":8,"usefulness":8,"overall":8},"note":"A refuses, B lists vaccines"}
+{"id":"travel-06","A":{"correctness":6,"completeness":6,"usefulness":6,"overall":6},"B":{"correctness":6,"completeness":7,"usefulness":7,"overall":7},"note":"B more nuanced"}
+{"id":"health-01","A":{"correctness":7,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B better field improvisation advice"}
+{"id":"health-02","A":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"note":"B compares clearly and urges emergency care"}
+{"id":"health-03","A":{"correctness":7,"completeness":6,"usefulness":6,"overall":6},"B":{"correctness":8,"completeness":7,"usefulness":8,"overall":8},"note":"B lists symptoms and positioning"}
+{"id":"health-04","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":5,"completeness":1,"usefulness":1,"overall":2},"note":"B refuses"}
+{"id":"tech-01","A":{"correctness":7,"completeness":6,"usefulness":6,"overall":6},"B":{"correctness":7,"completeness":7,"usefulness":7,"overall":7},"note":"Similar, B gives version details"}
+{"id":"tech-02","A":{"correctness":8,"completeness":6,"usefulness":6,"overall":7},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B explains why used"}
+{"id":"tech-03","A":{"correctness":8,"completeness":6,"usefulness":6,"overall":7},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B fuller"}
+{"id":"tech-04","A":{"correctness":9,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"note":"A more detailed"}
+{"id":"tech-05","A":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"B":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"note":"A more complete"}
+{"id":"tech-06","A":{"correctness":5,"completeness":1,"usefulness":1,"overall":2},"B":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"note":"A refuses, B correct"}
+{"id":"science-01","A":{"correctness":8,"completeness":6,"usefulness":6,"overall":7},"B":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"note":"Similar"}
+{"id":"science-02","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":7,"completeness":7,"usefulness":7,"overall":7},"note":"A mentions gene editing repurposing better"}
+{"id":"science-03","A":{"correctness":9,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"note":"B includes perihelion point"}
+{"id":"science-04","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":9,"completeness":9,"usefulness":9,"overall":9},"note":"B slightly richer"}
+{"id":"history-01","A":{"correctness":9,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"note":"A adds Tokugawa context"}
+{"id":"history-02","A":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B lists more advantages"}
+{"id":"history-03","A":{"correctness":8,"completeness":7,"usefulness":7,"overall":7},"B":{"correctness":8,"completeness":9,"usefulness":9,"overall":9},"note":"B more detail"}
+{"id":"history-04","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":7,"completeness":7,"usefulness":6,"overall":7},"note":"A explains actual factors"}
+{"id":"places-01","A":{"correctness":7,"completeness":6,"usefulness":6,"overall":6},"B":{"correctness":6,"completeness":7,"usefulness":6,"overall":6},"note":"Similar, B adds unverified details"}
+{"id":"places-02","A":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"B":{"correctness":5,"completeness":4,"usefulness":4,"overall":4},"note":"B confusing and corrects itself"}
+{"id":"places-03","A":{"correctness":8,"completeness":8,"usefulness":7,"overall":7},"B":{"correctness":8,"completeness":8,"usefulness":8,"overall":8},"note":"B adds Jewish Museum"}
+{"id":"places-04","A":{"correctness":4,"completeness":4,"usefulness":4,"overall":4},"B":{"correctness":3,"completeness":5,"usefulness":3,"overall":3},"note":"Both contain dubious hikes, B fabricates more"}

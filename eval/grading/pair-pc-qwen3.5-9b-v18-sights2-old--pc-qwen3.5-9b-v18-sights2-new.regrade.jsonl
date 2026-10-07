@@ -1,0 +1,3 @@
+{"id": "s2-sights-03", "A": {"correctness": 9, "completeness": 8, "usefulness": 9, "overall": 9}, "B": {"correctness": 8, "completeness": 3, "usefulness": 3, "overall": 4}, "note": "A lists the real main sights; B names only Jemaa el-Fnaa."}
+{"id": "s2-sights-07", "A": {"correctness": 8, "completeness": 4, "usefulness": 5, "overall": 5}, "B": {"correctness": 9, "completeness": 8, "usefulness": 8, "overall": 8}, "note": "B gives the classic Copenhagen sights; A covers only Amalienborg, Marble Church and the Opera."}
+{"id": "s2-sights-10", "A": {"correctness": 9, "completeness": 7, "usefulness": 8, "overall": 8}, "B": {"correctness": 9, "completeness": 8, "usefulness": 8, "overall": 8}, "note": "Both correct; B adds Hoan Kiem Lake and Hoa Lo Prison."}
