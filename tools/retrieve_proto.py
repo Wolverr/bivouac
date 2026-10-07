@@ -333,6 +333,8 @@ NEAR_RE = re.compile(r"\b(?:near|around|close to|surrounding|day trips? from|exc
 # The question must ask for things to find, not whether two places are near each other.
 NEAR_ASK = re.compile(r"\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do)\b", re.I)
 DAY_TRIP = re.compile(r"\b(day trips?|excursions?)\b", re.I)
+# "the best way to get around Istanbul" is about transport, not what's near Istanbul.
+GET_AROUND = re.compile(r"\b(get|getting|go|going|travel\w*|mov\w*|driv\w*|cycl\w*|walk\w*)\s+around\b", re.I)
 NAME_JOINERS = {"de", "del", "di", "du", "la", "le", "am", "of"}
 NEARBY_KM, DAY_TRIP_KM = 20.0, 80.0
 NEARBY_CANDIDATES = 60
@@ -365,7 +367,7 @@ def stem(w: str) -> str:
 def nearby_location(pack: "Pack", question: str):
     """ResearchPipeline.nearbyLocation: (article row, lat, lon, km, phrase) for "... near <Place>" when
     the place has coordinates, else None. The longest capitalised phrase that is an article wins."""
-    if not pack.has_rtree or not NEAR_ASK.search(question):
+    if not pack.has_rtree or not NEAR_ASK.search(question) or GET_AROUND.search(question):
         return None
     m = NEAR_RE.search(question)
     if not m:

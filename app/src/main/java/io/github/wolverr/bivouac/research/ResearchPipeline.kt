@@ -430,7 +430,7 @@ class ResearchPipeline(
      * wins. Mirrors tools/retrieve_proto.py nearby_location.
      */
     private suspend fun nearbyLocation(corpus: Corpus, question: String): NearbyLocation? {
-        if (!NEAR_ASK.containsMatchIn(question)) return null
+        if (!NEAR_ASK.containsMatchIn(question) || GET_AROUND.containsMatchIn(question)) return null
         val m = NEAR_RE.find(question) ?: return null
         val names = ArrayList<String>()
         for (w in NAME_WORD.findAll(m.groupValues[1]).map { it.value }) {
@@ -556,6 +556,10 @@ class ResearchPipeline(
         /** The question must ask for things to find, not whether two places are near each other. */
         private val NEAR_ASK = Regex("\\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do)\\b", RegexOption.IGNORE_CASE)
         private val DAY_TRIP = Regex("\\b(day trips?|excursions?)\\b", RegexOption.IGNORE_CASE)
+        /** "The best way to get around Istanbul" is about transport, not what's near Istanbul. */
+        private val GET_AROUND = Regex(
+            "\\b(get|getting|go|going|travel\\w*|mov\\w*|driv\\w*|cycl\\w*|walk\\w*)\\s+around\\b", RegexOption.IGNORE_CASE,
+        )
         private val NAME_WORD = Regex("[\\p{L}\\p{N}_'’\\-]+")
         private val NAME_JOINERS = setOf("de", "del", "di", "du", "la", "le", "am", "of")
         private const val NEARBY_KM = 20.0
