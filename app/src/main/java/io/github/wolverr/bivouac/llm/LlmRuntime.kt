@@ -131,8 +131,9 @@ class LlmRuntime private constructor(context: Context) {
         if (probe.error.isNotEmpty()) return Result.failure(IllegalStateException(probe.error))
         unload()
         val avail = DeviceProfile.availRamBytes(appContext)
-        return MemoryPlanner.plan(fileBytes, probe, avail, safety)?.let { Result.success(it) }
-            ?: Result.failure(IllegalStateException(MemoryPlanner.tooBig(fileBytes, probe, avail)))
+        val total = device.totalRamBytes
+        return MemoryPlanner.plan(fileBytes, probe, avail, total, safety)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException(MemoryPlanner.tooBig(fileBytes, probe, avail, total)))
     }
 
     suspend fun formatChat(system: String, turns: List<ChatTurn>, thinking: Boolean = false): String =

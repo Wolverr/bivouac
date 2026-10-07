@@ -340,9 +340,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * [questionsName] (a .jsonl in the app folder's eval/ directory). Results go to
      * eval/results-<model>.jsonl, resuming if that file exists. See docs/EVAL.md.
      */
+    private var evalJob: kotlinx.coroutines.Job? = null
+
     fun startEval(questionsName: String, modelName: String, thinkHarder: Boolean = false) {
-        if (_eval.value?.startsWith("Eval ") == true && !_eval.value!!.startsWith("Eval finished")) return
-        viewModelScope.launch {
+        if (evalJob?.isActive == true) return
+        evalJob = viewModelScope.launch {
             val dir = File(getApplication<Application>().getExternalFilesDir(null), "eval").apply { mkdirs() }
             val model = models.list().firstOrNull { it.name == modelName }
             if (model == null) {
@@ -351,7 +353,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             if (_library.value.loadedModel != model.id) loadModel(model).join()
-            val info = _library.value.modelInfo ?: return@launch
+            val info = _library.value.modelInfo ?: run {
+                _eval.value = "Eval failed: ${_library.value.error ?: "model did not load"}"
+                android.util.Log.e(EvalRunner.TAG, "load failed: ${_library.value.error}")
+                return@launch
+            }
             val device = runtime.device.let { "${it.model} (${it.soc})" }
             val out = File(dir, "results-${modelName.removeSuffix(".gguf")}${if (thinkHarder) "-think" else ""}.jsonl")
             _eval.value = "Eval starting…"

@@ -1,0 +1,10 @@
+{"id": "fact-01", "cat": "fact", "q": "What is the capital of Kazakhstan, and when did it move from Almaty?", "gold": ["Astana", "Kazakhstan"]}
+{"id": "explain-01", "cat": "explain", "q": "Explain how a heat pump can deliver more heat energy than the electricity it consumes.", "gold": ["Heat pump", "Coefficient of performance"]}
+{"id": "compare-01", "cat": "compare", "q": "Compare the Roman Republic and the Roman Empire in how power was organized.", "gold": ["Roman Republic", "Roman Empire"]}
+{"id": "reason-01", "cat": "reasoning", "q": "If I walk at 5 km/h and need to cover 23 km with a 900 m climb, roughly how long will it take using Naismith's rule?", "gold": ["Naismith's rule"]}
+{"id": "travel-01", "cat": "travel", "q": "What should I know about visiting Kyoto: best areas to stay, etiquette, and getting around?", "gold": ["Kyoto"]}
+{"id": "health-01", "cat": "health", "q": "How do I treat a suspected sprained ankle while hiking far from help?", "gold": ["Sprained ankle"]}
+{"id": "places-01", "cat": "places", "q": "Vegetarian restaurants near the Duomo in Florence?"}
+{"id": "places-02", "cat": "places", "q": "Where can I find a pharmacy near Shinjuku Station in Tokyo?"}
+{"id": "places-03", "cat": "places", "q": "What are the must-see museums in Berlin and what is each known for?"}
+{"id": "h-places-03", "cat": "places", "q": "What are the must-see sights in Barcelona?", "gold": ["Barcelona"]}
