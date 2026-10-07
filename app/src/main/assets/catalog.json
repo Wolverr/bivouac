@@ -52,7 +52,7 @@
       "name": "Wikipedia (English)",
       "file": "wiki.db",
       "url": "https://huggingface.co/datasets/Wolverrr/bivouac-packs/resolve/main/wiki.db",
-      "bytes": 18333319168,
+      "bytes": 18401787904,
       "min_ram_gb": 0,
       "license": "CC BY-SA 4.0",
       "about": "6.49M articles (2025-08); full text for the 2M most-read, intro + infobox for the rest."

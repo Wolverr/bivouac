@@ -1,0 +1,20 @@
+{
+ "old": "results-pc-qwen3.5-9b-v19-nearby-old.jsonl",
+ "new": "results-pc-qwen3.5-9b-v19-nearby-new.jsonl",
+ "questions": 13,
+ "identical": 4,
+ "old_mean": 5.11,
+ "new_mean": 6.56,
+ "mean_diff": 1,
+ "ci95": [
+  -0.15,
+  2.15
+ ],
+ "new_better": 6,
+ "old_better": 2,
+ "ties": 5,
+ "sign_test_p": 0.289,
+ "by_category": {
+  "places": 1
+ }
+}

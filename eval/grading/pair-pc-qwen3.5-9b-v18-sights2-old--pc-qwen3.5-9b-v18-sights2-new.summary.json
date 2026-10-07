@@ -1,0 +1,20 @@
+{
+ "old": "results-pc-qwen3.5-9b-v18-sights2-old.jsonl",
+ "new": "results-pc-qwen3.5-9b-v18-sights2-new.jsonl",
+ "questions": 12,
+ "identical": 9,
+ "old_mean": 5.67,
+ "new_mean": 7.67,
+ "mean_diff": 0.5,
+ "ci95": [
+  -0.39,
+  1.39
+ ],
+ "new_better": 2,
+ "old_better": 1,
+ "ties": 9,
+ "sign_test_p": 1.0,
+ "by_category": {
+  "places": 0.5
+ }
+}

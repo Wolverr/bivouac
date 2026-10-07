@@ -43,7 +43,7 @@ for Android. Download them on the phone, then add them in the app's Library.
 
 | File | Contents | License |
 |---|---|---|
-| `wiki.db` | English Wikipedia, {wiki.get("articles", "?")} articles (FineWiki, Wikipedia dump 2025-08), SQLite + FTS5 + zstd, with {wiki.get("aliases", "?")} alternative names from redirects, {wiki.get("acronyms", "?")} acronyms and coordinates for {wiki.get("coords", "?")} articles (Wikipedia geo_tags) | CC BY-SA 4.0 |
+| `wiki.db` | English Wikipedia, {wiki.get("articles", "?")} articles (FineWiki, Wikipedia dump 2025-08), SQLite + FTS5 + zstd, with {wiki.get("aliases", "?")} alternative names from redirects, {wiki.get("acronyms", "?")} acronyms and coordinates for {wiki.get("coords", "?")} articles (Wikipedia geo_tags, with an R*Tree index) | CC BY-SA 4.0 |
 | `places.db` | {places.get("places", "?")} places worldwide ({places.get("source", "Overture Maps")}), SQLite + R*Tree | CDLA-Permissive-2.0 / Apache-2.0 / CC0-1.0 (per Overture source) |
 
 Built with `tools/run_data_jobs.sh` and `tools/build_aliases.py`, `build_acronyms.py` and `build_coords.py` in the Bivouac repo.
