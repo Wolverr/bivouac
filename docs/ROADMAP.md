@@ -57,10 +57,17 @@ Windows adb, llama-bench, MTP check, app speed questions, `report.py` writes eva
   also with a "no tools" prompt) and with thinking on it writes ~720 tokens per answer, so no faster in the end.
   **Decision: 4B stays for 8 GB, 9B for 12 GB.** The speed gain comes from repacking instead.
 
-**Running / next:**
-1. Held-out eval on the Redmi with repacking (release build, auto-think gated off): results ->
-   eval/results-redmi-qwen3.5-4b-holdout-2026-10-07.jsonl, grade vs baseline (`grade.py packet/score`), put the
-   number and the speeds in README.
+**Results later on 2026-10-07:**
+- **Held-out on the Redmi** (4B, repacked, release build, eval/results-redmi-qwen3.5-4b-holdout.jsonl): **53.9 %**
+  of frontier + web (PC harness 54.0 %), median 93 s per answer, first words 35 s, max 136 s, no memory kill.
+  Weakest: travel 43 %, compare 47 %, tech 49 % (h-travel-03 refused; h-tech-01 confused HTTPS with HTTP/1.1).
+- Day trips: only places >= 15 km away, 5 sources (ab776a1): 9B paired +1.57 on 7 fresh questions (4/1/2).
+- Thinking budget for slow phones: 4B no thinking -> 384 tokens +1.2 (CI -0.6..3.0, one answer looped),
+  384 -> 1,024 +2.8 (CI 0.98..4.62). No short budget; the button says when a question is a calculation (93facd6).
+
+**Next:**
+1. Install the current build on the Redmi (day trips + calculation hint) and test the in-app download
+   (Library -> Download -> Add downloaded files) with the user: the "no PC" claim was never tried on a phone.
 2. When the 12 GB phone arrives: new_phone.sh, then the 9B held-out eval on it.
 3. README: phone speeds (reading 13.4 / writing 3.6 with repacking), release link; GitHub release with the real
    release key (uninstall needed on the Redmi: move files aside first); demo video (user); repo public; claim.
