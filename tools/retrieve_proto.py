@@ -318,6 +318,8 @@ def sights_evidence(pack: "Pack", article) -> tuple[int, str] | None:
         intro = intro[:intro.rindex(". ") + 1]  # whole sentences
     lines = [l[2:].strip()[:LIST_LINE_CHARS] for cid in chunks[:SIGHTS_BULLET_CHUNKS]
              for l in pack.text(cid).split("\n") if l.startswith("- ")][:SIGHTS_LINES]
+    if not lines:
+        return None  # prose-only sections (Lisbon: what the 1755 earthquake destroyed) led answers astray
     text = "\n".join(x for x in [intro] + lines if x)
     return (chunks[0], text) if text else None
 

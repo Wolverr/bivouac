@@ -435,6 +435,7 @@ class ResearchPipeline(
         val lines = chunks.take(SIGHTS_BULLET_CHUNKS)
             .flatMap { c -> c.text.lines().filter { it.startsWith("- ") }.map { it.drop(2).trim().take(LIST_LINE_CHARS) } }
             .take(SIGHTS_LINES)
+        if (lines.isEmpty()) return null  // prose-only sections (Lisbon: what the 1755 earthquake destroyed) led answers astray
         val text = (listOf(intro) + lines).filter { it.isNotEmpty() }.joinToString("\n")
         return if (text.isEmpty()) null else chunks[0] to text
     }
