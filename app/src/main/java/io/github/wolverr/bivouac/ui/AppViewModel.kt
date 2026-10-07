@@ -74,6 +74,8 @@ data class TurnUi(
     val needsLocationPermission: Boolean = false,
     /** Answered with "Think harder" (reasoning first); thinking = hidden tokens so far / budget. */
     val thoughtHarder: Boolean = false,
+    /** A calculation answered without thinking (the phone writes too slowly to start it unasked). */
+    val calculation: Boolean = false,
     val thinking: Pair<Int, Int>? = null,
 )
 
@@ -291,7 +293,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             if (ev.thinkHarder && !it.thoughtHarder) {
                                 it.copy(crisis = ev.decision.crisis, thoughtHarder = true, status = "Thinking harder (calculation)…")
                             } else {
-                                it.copy(crisis = ev.decision.crisis)
+                                it.copy(crisis = ev.decision.crisis, calculation = ev.decision.reasoning)
                             }
                         }
                         is ResearchEvent.Searching -> updateLast { it.copy(status = "Searching the library…", usedLibrary = true) }

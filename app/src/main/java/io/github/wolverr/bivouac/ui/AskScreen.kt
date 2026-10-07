@@ -180,7 +180,14 @@ private fun TurnView(t: TurnUi, running: Boolean, onRetry: () -> Unit, onThinkHa
         }
         t.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         onThinkHarder?.let {
-            TextButton(onClick = it) { Text("Think harder (slower, better at reasoning)") }
+            // On slow phones calculations are not thought through unasked (minutes of writing), but a
+            // 4B with 1,024 thinking tokens gets most of them right (4.7 -> 8.3 of 10, paired, 10 questions).
+            TextButton(onClick = it) {
+                Text(
+                    if (t.calculation) "This looks like a calculation: tap to check it step by step (takes a few minutes)"
+                    else "Think harder (slower, better at reasoning)",
+                )
+            }
         }
 
         t.stats?.let { st ->
