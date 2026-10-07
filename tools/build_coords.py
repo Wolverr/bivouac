@@ -11,7 +11,13 @@ to the city centre. Wikipedia's geo_tags dump has every article's primary coordi
 
 Places.landmark / Places.geocode (and tools/places_proto.py) use it before infobox lines.
 
+It also adds a spatial index over the same points, for "hikes near Interlaken" (the articles
+located within some km, ResearchPipeline.nearbyArticles; ~65 MB for 1.22 M points):
+
+  coord_rtree USING rtree(id, min_lat, max_lat, min_lon, max_lon)   id = article.id
+
 Usage: python build_coords.py out/wiki.db enwiki-latest-geo_tags.sql.gz [--apply]
+       python build_coords.py out/wiki.db --rtree   (only the index, from the existing coord table)
 Without --apply it only counts. Safe to re-run.
 """
 
@@ -28,9 +34,15 @@ ROW_RE = re.compile(rb"\(\d+,(\d+),'earth',1,(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("db")
-    ap.add_argument("dump", help="enwiki-latest-geo_tags.sql.gz")
-    ap.add_argument("--apply", action="store_true", help="write the coord table into the db")
+    ap.add_argument("dump", nargs="?", help="enwiki-latest-geo_tags.sql.gz")
+    ap.add_argument("--apply", action="store_true", help="write the coord table (and its index) into the db")
+    ap.add_argument("--rtree", action="store_true", help="only (re)build coord_rtree from the existing coord table")
     a = ap.parse_args()
+    if a.rtree:
+        build_rtree(a.db)
+        return
+    if not a.dump:
+        ap.error("the geo_tags dump is needed (or --rtree)")
 
     t0 = time.time()
     ro = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True)
@@ -55,6 +67,18 @@ def main():
         rw.execute("INSERT OR REPLACE INTO meta VALUES ('coords', ?)", (str(len(coords)),))
         rw.commit()
         print("coord table written")
+        build_rtree(a.db)
+
+
+def build_rtree(db: str):
+    t0 = time.time()
+    rw = sqlite3.connect(db, timeout=60)
+    rw.execute("DROP TABLE IF EXISTS coord_rtree")
+    rw.execute("CREATE VIRTUAL TABLE coord_rtree USING rtree(id, min_lat, max_lat, min_lon, max_lon)")
+    rw.execute("INSERT INTO coord_rtree SELECT article, lat, lat, lon, lon FROM coord")
+    rw.commit()
+    n = rw.execute("SELECT count(*) FROM coord_rtree").fetchone()[0]
+    print(f"coord_rtree: {n:,} points ({time.time() - t0:.0f} s)")
 
 
 if __name__ == "__main__":

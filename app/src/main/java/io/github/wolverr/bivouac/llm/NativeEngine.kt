@@ -57,6 +57,7 @@ internal object NativeEngine {
     external fun corpusChunk(chunk: Long): ByteArray
     external fun corpusDocFreq(query: ByteArray, cap: Int): Int
     external fun corpusOtherNames(article: Long, limit: Int): ByteArray
+    external fun corpusNearby(lat: Double, lon: Double, dlat: Double, dlon: Double, limit: Int): ByteArray
 
     // Places pack (read-only SQL); returns {"rows":[[...]],"error":""}.
     external fun placesOpen(path: ByteArray): ByteArray

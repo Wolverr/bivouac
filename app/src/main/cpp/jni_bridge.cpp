@@ -222,6 +222,21 @@ JNIEXPORT jbyteArray JNICALL JNI_FN(corpusOtherNames)(JNIEnv * env, jobject, jlo
     return to_bytes(env, o + "]");
 }
 
+// JSON array of articles (as corpusFindArticle) located in the box, most viewed first.
+JNIEXPORT jbyteArray JNICALL JNI_FN(corpusNearby)(JNIEnv * env, jobject, jdouble lat, jdouble lon, jdouble dlat,
+                                                  jdouble dlon, jint limit) {
+    std::lock_guard<std::mutex> lock(g_corpus_mutex);
+    std::string o = "[";
+    char buf[192];
+    for (const auto & n : g_corpus.nearby(lat, lon, dlat, dlon, limit)) {
+        if (o.size() > 1) o += ",";
+        snprintf(buf, sizeof(buf), "{\"id\":%lld,\"first_chunk\":%lld,\"n_chunks\":%d,\"prior\":%.3f,\"lat\":%.6f,\"lon\":%.6f,",
+                 (long long) n.article.id, (long long) n.article.first_chunk, n.article.n_chunks, n.article.prior, n.lat, n.lon);
+        o += std::string(buf) + "\"title\":\"" + json_escape(n.article.title) + "\"}";
+    }
+    return to_bytes(env, o + "]");
+}
+
 JNIEXPORT jint JNICALL JNI_FN(corpusDocFreq)(JNIEnv * env, jobject, jbyteArray query, jint cap) {
     std::lock_guard<std::mutex> lock(g_corpus_mutex);
     return g_corpus.doc_freq(to_string(env, query), cap);

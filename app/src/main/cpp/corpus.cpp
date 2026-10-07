@@ -131,6 +131,10 @@ std::string Corpus::open(const std::string & path) {
         Stmt a(db_, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'coord'");
         has_coord_ = a.ok() && sqlite3_step(a.s) == SQLITE_ROW;
     }
+    {
+        Stmt a(db_, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'coord_rtree'");
+        has_rtree_ = a.ok() && sqlite3_step(a.s) == SQLITE_ROW;
+    }
 
     Stmt st(db_, "SELECT data FROM dict WHERE id = 1");
     if (!st.ok() || sqlite3_step(st.s) != SQLITE_ROW) {
@@ -305,6 +309,32 @@ bool Corpus::coords(int64_t article, double & lat, double & lon) {
     lat = sqlite3_column_double(st.s, 0);
     lon = sqlite3_column_double(st.s, 1);
     return true;
+}
+
+std::vector<NearbyArticle> Corpus::nearby(double lat, double lon, double dlat, double dlon, int limit) {
+    std::vector<NearbyArticle> out;
+    if (!db_ || !has_rtree_) return out;
+    Stmt st(db_, "SELECT a.id, a.title, a.prior, a.first_chunk, a.n_chunks, r.min_lat, r.min_lon FROM coord_rtree r "
+                 "JOIN article a ON a.id = r.id WHERE r.min_lat BETWEEN ?1 AND ?2 AND r.min_lon BETWEEN ?3 AND ?4 "
+                 "ORDER BY a.prior DESC LIMIT ?5");
+    if (!st.ok()) return out;
+    sqlite3_bind_double(st.s, 1, lat - dlat);
+    sqlite3_bind_double(st.s, 2, lat + dlat);
+    sqlite3_bind_double(st.s, 3, lon - dlon);
+    sqlite3_bind_double(st.s, 4, lon + dlon);
+    sqlite3_bind_int(st.s, 5, limit);
+    while (sqlite3_step(st.s) == SQLITE_ROW) {
+        NearbyArticle n;
+        n.article.id = sqlite3_column_int64(st.s, 0);
+        n.article.title = st.text(1);
+        n.article.prior = sqlite3_column_double(st.s, 2);
+        n.article.first_chunk = sqlite3_column_int64(st.s, 3);
+        n.article.n_chunks = sqlite3_column_int(st.s, 4);
+        n.lat = sqlite3_column_double(st.s, 5);
+        n.lon = sqlite3_column_double(st.s, 6);
+        out.push_back(std::move(n));
+    }
+    return out;
 }
 
 int Corpus::doc_freq(const std::string & fts_query, int cap) {

@@ -70,6 +70,8 @@ class Pack:
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='alias'").fetchone() is not None
         self.has_acronym = self.db.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='acronym'").fetchone() is not None
+        self.has_rtree = self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coord_rtree'").fetchone() is not None
 
     def find_article(self, title: str, context: str = ""):
         """(id, title, first_chunk, n_chunks, prior) by exact title, else by alias ("GPS"), else the
@@ -322,6 +324,101 @@ def sights_evidence(pack: "Pack", article) -> tuple[int, str] | None:
         return None  # prose-only sections (Lisbon: what the 1755 earthquake destroyed) led answers astray
     text = "\n".join(x for x in [intro] + lines if x)
     return (chunks[0], text) if text else None
+
+
+# "Hikes near Interlaken", "day trips from Edinburgh", "things to see around Lake Garda": Wikipedia
+# articles whose coordinates lie near the place (coord_rtree, tools/build_coords.py). FTS can't do
+# this: the hikes are separate articles (Harder Kulm, Schynige Platte) that rarely name the town.
+NEAR_RE = re.compile(r"\b(?:near|around|close to|surrounding|day trips? from|excursions? from)\s+(?:the\s+)?(.+)", re.I)
+# The question must ask for things to find, not whether two places are near each other.
+NEAR_ASK = re.compile(r"\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do)\b", re.I)
+DAY_TRIP = re.compile(r"\b(day trips?|excursions?)\b", re.I)
+NAME_JOINERS = {"de", "del", "di", "du", "la", "le", "am", "of"}
+NEARBY_KM, DAY_TRIP_KM = 20.0, 80.0
+NEARBY_CANDIDATES = 60
+NEARBY_SOURCES = 4
+# Not something to visit: events, organisations, people, works. In the title ("Air India Flight 101",
+# "Interlaken Ost railway station") or as what the intro says the article is ("... was a scheduled flight",
+# "... is a national research university", "... is a district").
+_NOT_A_SIGHT = (r"flight|crash|disaster|incident|attack|bombing|battle|siege|massacre|murder|shooting|earthquake|avalanche|"
+                r"company|corporation|manufacturer|brand|university|college|school|airport|station|club|team|band|album|"
+                r"song|film|novel|book|election|treaty|agreement|footballer|politician|player|singer|actor|person|"
+                r"stadium|arena|casino|hotel|motorway|tunnel|championship|tournament")
+NEARBY_SKIP_TITLE = re.compile(rf"\b({_NOT_A_SIGHT})s?\b", re.I)
+NEARBY_SKIP_KIND = re.compile(
+    rf"\b(is|was|are|were) (an?|the)( [\w\-]+){{0,3}} ({_NOT_A_SIGHT}|district|county|province|region|canton|diocese|"
+    rf"parish|constituency|municipality|ward|state|country|venue|highway|road|census-designated place)s?\b", re.I)
+NEARBY_GENERIC = set("""best good great nice top near around close surrounding worth visit visiting see seeing do doing
+things thing places place trip trips day excursion excursions there any some go most can""".split())
+
+
+def stem(w: str) -> str:
+    """hikes / hiking -> hik, lakes -> lak, temples -> templ: matched as substrings."""
+    w = w.lower()
+    for suf in ("ing", "es", "s"):
+        if w.endswith(suf) and len(w) - len(suf) >= 3:
+            w = w[:-len(suf)]
+            break
+    return w[:-1] if w.endswith("e") and len(w) > 3 else w
+
+
+def nearby_location(pack: "Pack", question: str):
+    """ResearchPipeline.nearbyLocation: (article row, lat, lon, km, phrase) for "... near <Place>" when
+    the place has coordinates, else None. The longest capitalised phrase that is an article wins."""
+    if not pack.has_rtree or not NEAR_ASK.search(question):
+        return None
+    m = NEAR_RE.search(question)
+    if not m:
+        return None
+    names = []
+    for w in re.findall(r"[\w'’\-]+", m.group(1)):
+        if not (w[:1].isupper() or (names and w.lower() in NAME_JOINERS)):
+            break
+        names.append(w)
+    for n in range(len(names), 0, -1):
+        phrase = " ".join(names[:n])
+        row = pack.find_article(phrase)
+        c = row and pack.db.execute("SELECT lat, lon FROM coord WHERE article = ?", (row[0],)).fetchone()
+        if c:
+            return row, c[0], c[1], DAY_TRIP_KM if DAY_TRIP.search(question) else NEARBY_KM, phrase
+    return None
+
+
+def intro_chunk(pack: "Pack", first_chunk: int, n_chunks: int) -> int:
+    sec = pack.db.execute("SELECT section FROM chunk WHERE id = ?", (first_chunk,)).fetchone()[0]
+    return first_chunk + 1 if sec == "Infobox" and n_chunks > 1 else first_chunk
+
+
+def nearby_articles(pack: "Pack", question: str, loc) -> list[tuple]:
+    """ResearchPipeline.nearbyArticles: the most viewed articles within the radius that are things to
+    visit, ranked by popularity plus the question's topic words ("hikes", "lakes", "temples") in their
+    title and intro. Returns [(chunk_id, article_id, title, km, intro_text)]."""
+    row, lat, lon, km, phrase = loc
+    dlat = km / 111.0
+    coslat = max(0.1, math.cos(math.radians(lat)))
+    dlon = km / (111.0 * coslat)
+    cands = pack.db.execute(
+        "SELECT a.id, a.title, a.first_chunk, a.n_chunks, a.prior, r.min_lat, r.min_lon FROM coord_rtree r "
+        "JOIN article a ON a.id = r.id WHERE r.min_lat BETWEEN ? AND ? AND r.min_lon BETWEEN ? AND ? "
+        "ORDER BY a.prior DESC LIMIT ?", (lat - dlat, lat + dlat, lon - dlon, lon + dlon, NEARBY_CANDIDATES)).fetchall()
+    place_words = set(keywords(row[1])) | set(keywords(phrase))
+    topic = [stem(w) for w in keywords(question) if w not in NEARBY_GENERIC and w not in place_words]
+    scored = []
+    for aid, title, first, n, prior, alat, alon in cands:
+        if aid == row[0] or title.startswith("List of") or NEARBY_SKIP_TITLE.search(title):
+            continue
+        dist = math.hypot((alat - lat) * 111.0, (alon - lon) * 111.0 * coslat)
+        if dist > km:
+            continue
+        cid = intro_chunk(pack, first, n)
+        text = PADDING_RE.sub(" ", pack.text(cid))
+        if NEARBY_SKIP_KIND.search(SENT_RE.split(text, 1)[0][:300]):
+            continue
+        low_t, low = title.lower(), text.lower()
+        hits = sum(2.0 if t in low_t else 1.0 if t in low else 0.0 for t in topic)
+        scored.append((prior + 2.0 * hits, cid, aid, title, dist, text))
+    scored.sort(key=lambda s: -s[0])
+    return [(cid, aid, title, dist, text) for _, cid, aid, title, dist, text in scored[:NEARBY_SOURCES]]
 
 
 LIST_SKIP_CELL = re.compile(r"^(:?-+:?|name|names|image|picture|photo|rank|no\.?|#)$", re.I)

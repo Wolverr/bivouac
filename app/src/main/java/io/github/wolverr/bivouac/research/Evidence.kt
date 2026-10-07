@@ -14,7 +14,7 @@ object Evidence {
     """.trim().split(Regex("\\s+")).toHashSet()
 
     private val WORD = Regex("[\\p{L}\\p{N}][\\p{L}\\p{N}'\\-]*")
-    private val SENTENCE_END = Regex("(?<=[.!?])\\s+|\\s*\\n\\s*")  // infobox lines are sentences too
+    val SENTENCE_END = Regex("(?<=[.!?])\\s+|\\s*\\n\\s*")  // infobox lines are sentences too
 
     fun keywords(question: String): List<String> =
         WORD.findAll(question.lowercase())

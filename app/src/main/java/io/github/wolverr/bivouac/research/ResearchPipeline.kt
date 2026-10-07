@@ -245,6 +245,14 @@ class ResearchPipeline(
             sights?.let { (p, text) -> whole[p.chunk] = text }  // a city's sights list, whole
             listOfNotNull(lead(corpus, article, words, seen, facts), sights?.first?.copy(section = SIGHTS_SECTION))
         }
+        // "Hikes near Interlaken": articles located nearby, with how far they are.
+        val nearbyLeads = nearbyLocation(corpus, question)?.let { loc ->
+            nearbyArticles(corpus, question, loc).filter { it.passage.article !in namedIds }.map { n ->
+                whole[n.passage.chunk] = Evidence.compress(n.passage.text, words, settings.evidenceChars)
+                expanded += n.passage.article
+                n.passage.copy(section = nearbySection(n.km, loc.article.title))
+            }
+        }.orEmpty()
         // Boosted before the cut to maxSources * 4, as in tools/retrieve_proto.py: boosting afterwards
         // let other articles fill the candidates (6 sources instead of 3 for "capital of Kazakhstan",
         // ~900 prompt tokens instead of ~650: 25 s more on the Redmi), unlike the evaluated harness.
@@ -261,7 +269,7 @@ class ResearchPipeline(
             it.article !in expanded && Evidence.overlap("${it.title} ${it.section} ${it.text}", words) >= needed &&
                 !Evidence.isNamesake(it.title, question)
         }
-        val picked = (leads + relevant).filter { p ->
+        val picked = (leads + nearbyLeads + relevant).filter { p ->
             val n = perArticle.getOrDefault(p.article, 0)
             if (n >= settings.perArticle || !seen.add(p.chunk)) false else { perArticle[p.article] = n + 1; true }
         }.take(settings.maxSources)
@@ -413,6 +421,62 @@ class ResearchPipeline(
         return null
     }
 
+    class NearbyLocation(val article: Article, val lat: Double, val lon: Double, val km: Double, val phrase: String)
+    class NearbyHit(val passage: Passage, val km: Double)
+
+    /**
+     * "... near <Place>" / "day trips from <Place>" when the place is an article with coordinates
+     * and the question asks for things to find. The longest capitalised phrase that is an article
+     * wins. Mirrors tools/retrieve_proto.py nearby_location.
+     */
+    private suspend fun nearbyLocation(corpus: Corpus, question: String): NearbyLocation? {
+        if (!NEAR_ASK.containsMatchIn(question)) return null
+        val m = NEAR_RE.find(question) ?: return null
+        val names = ArrayList<String>()
+        for (w in NAME_WORD.findAll(m.groupValues[1]).map { it.value }) {
+            if (!(w[0].isUpperCase() || (names.isNotEmpty() && w.lowercase() in NAME_JOINERS))) break
+            names += w
+        }
+        for (n in names.size downTo 1) {
+            val phrase = names.take(n).joinToString(" ")
+            val a = corpus.findArticle(phrase) ?: continue
+            if (a.lat == null || a.lon == null) continue
+            return NearbyLocation(a, a.lat, a.lon, if (DAY_TRIP.containsMatchIn(question)) DAY_TRIP_KM else NEARBY_KM, phrase)
+        }
+        return null
+    }
+
+    /**
+     * The most viewed articles within the radius that are things to visit (not flights, battles,
+     * universities, districts), ranked by popularity plus the question's topic words ("hikes",
+     * "lakes", "temples") in their title and intro. FTS can't do this: the hikes are separate
+     * articles (Harder Kulm, Schynige Platte) that rarely name the town. Mirrors
+     * tools/retrieve_proto.py nearby_articles.
+     */
+    private suspend fun nearbyArticles(corpus: Corpus, question: String, loc: NearbyLocation): List<NearbyHit> {
+        val dlat = loc.km / 111.0
+        val coslat = maxOf(0.1, kotlin.math.cos(Math.toRadians(loc.lat)))
+        val dlon = loc.km / (111.0 * coslat)
+        val placeWords = (Evidence.keywords(loc.article.title) + Evidence.keywords(loc.phrase)).toSet()
+        val topic = Evidence.keywords(question).filter { it !in NEARBY_GENERIC && it !in placeWords }.map(::stem)
+        class Scored(val score: Double, val hit: NearbyHit)
+        val scored = ArrayList<Scored>()
+        for (a in corpus.nearby(loc.lat, loc.lon, dlat, dlon, NEARBY_CANDIDATES)) {
+            if (a.id == loc.article.id || a.title.startsWith("List of") || NEARBY_SKIP_TITLE.containsMatchIn(a.title)) continue
+            val km = kotlin.math.hypot((a.lat!! - loc.lat) * 111.0, (a.lon!! - loc.lon) * 111.0 * coslat)
+            if (km > loc.km) continue
+            val first = corpus.chunk(a, 0) ?: continue
+            val intro = if (first.section == "Infobox" && a.n_chunks > 1) corpus.chunk(a, 1) ?: continue else first
+            val text = PADDING.replace(intro.text, " ")
+            if (NEARBY_SKIP_KIND.containsMatchIn(Evidence.SENTENCE_END.split(text, 2)[0].take(300))) continue
+            val lowTitle = a.title.lowercase()
+            val low = text.lowercase()
+            val hits = topic.sumOf { t -> if (t in lowTitle) 2.0 else if (t in low) 1.0 else 0.0 }
+            scored += Scored(a.prior + 2.0 * hits, NearbyHit(intro.copy(text = text), km))
+        }
+        return scored.sortedByDescending { it.score }.take(NEARBY_SOURCES).map { it.hit }
+    }
+
     /** "must-see sights in Barcelona", "landmarks of Rome". Mirrors tools/retrieve_proto.py. */
     private fun isSightsQuestion(question: String): Boolean =
         question.contains("must-see", ignoreCase = true) ||
@@ -486,6 +550,49 @@ class ResearchPipeline(
         private val SIGHTS_SECTION_RE = Regex(
             "(^|> )[^>]*\\b(sights|attractions|landmarks|monuments|points of interest)\\b", RegexOption.IGNORE_CASE,
         )
+        private val NEAR_RE = Regex(
+            "\\b(?:near|around|close to|surrounding|day trips? from|excursions? from)\\s+(?:the\\s+)?(.+)", RegexOption.IGNORE_CASE,
+        )
+        /** The question must ask for things to find, not whether two places are near each other. */
+        private val NEAR_ASK = Regex("\\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do)\\b", RegexOption.IGNORE_CASE)
+        private val DAY_TRIP = Regex("\\b(day trips?|excursions?)\\b", RegexOption.IGNORE_CASE)
+        private val NAME_WORD = Regex("[\\p{L}\\p{N}_'’\\-]+")
+        private val NAME_JOINERS = setOf("de", "del", "di", "du", "la", "le", "am", "of")
+        private const val NEARBY_KM = 20.0
+        private const val DAY_TRIP_KM = 80.0
+        private const val NEARBY_CANDIDATES = 60
+        private const val NEARBY_SOURCES = 4
+        /** Not something to visit: events, organisations, people, works. */
+        private const val NOT_A_SIGHT = "flight|crash|disaster|incident|attack|bombing|battle|siege|massacre|murder|shooting|" +
+            "earthquake|avalanche|company|corporation|manufacturer|brand|university|college|school|airport|station|club|team|" +
+            "band|album|song|film|novel|book|election|treaty|agreement|footballer|politician|player|singer|actor|person|" +
+            "stadium|arena|casino|hotel|motorway|tunnel|championship|tournament"
+        private val NEARBY_SKIP_TITLE = Regex("\\b($NOT_A_SIGHT)s?\\b", RegexOption.IGNORE_CASE)
+        /** What the intro says the article is: "... was a scheduled flight", "... is a district". */
+        private val NEARBY_SKIP_KIND = Regex(
+            "\\b(is|was|are|were) (an?|the)( [\\p{L}\\p{N}_\\-]+){0,3} ($NOT_A_SIGHT|district|county|province|region|canton|" +
+                "diocese|parish|constituency|municipality|ward|state|country|venue|highway|road|census-designated place)s?\\b",
+            RegexOption.IGNORE_CASE,
+        )
+        private val NEARBY_GENERIC = (
+            "best good great nice top near around close surrounding worth visit visiting see seeing do doing things thing " +
+                "places place trip trips day excursion excursions there any some go most can"
+            ).split(" ").toSet()
+        private val PADDING = Regex("[ \\t]{2,}")
+
+        /** hikes / hiking -> hik, lakes -> lak, temples -> templ: matched as substrings. */
+        fun stem(word: String): String {
+            var w = word.lowercase()
+            for (suf in listOf("ing", "es", "s")) {
+                if (w.endsWith(suf) && w.length - suf.length >= 3) { w = w.dropLast(suf.length); break }
+            }
+            return if (w.endsWith("e") && w.length > 3) w.dropLast(1) else w
+        }
+
+        /** "12 km from Interlaken"; mirrored in tools/answer_proto.py nearby_section. */
+        fun nearbySection(km: Double, place: String): String =
+            "${if (km < 1) "under 1" else kotlin.math.round(km).toInt().toString()} km from $place"
+
         private const val SIGHTS_PROSE_CHARS = 600
         private const val SIGHTS_LINES = 8
         private const val SIGHTS_BULLET_CHUNKS = 3  // bullets further down are subsections (a square's history)

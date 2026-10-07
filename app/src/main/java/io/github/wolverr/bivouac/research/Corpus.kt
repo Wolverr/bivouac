@@ -73,6 +73,11 @@ class Corpus {
         json.decodeFromString(NativeEngine.corpusOtherNames(article.id, limit).decodeToString())
     }
 
+    /** Up to [limit] articles located in the box lat ± [dlat], lon ± [dlon], most viewed first (coord_rtree). */
+    suspend fun nearby(lat: Double, lon: Double, dlat: Double, dlon: Double, limit: Int): List<Article> = withContext(Dispatchers.IO) {
+        json.decodeFromString(NativeEngine.corpusNearby(lat, lon, dlat, dlon, limit).decodeToString())
+    }
+
     /** Chunks containing all of [word]'s parts, counted up to [cap]. */
     suspend fun docFreq(word: String, cap: Int): Int = withContext(Dispatchers.IO) {
         val parts = Evidence.parts(word)

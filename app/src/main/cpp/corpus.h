@@ -18,6 +18,12 @@ struct ArticleRef {
     int n_chunks = 0;
 };
 
+struct NearbyArticle {
+    ArticleRef article;
+    double lat = 0;
+    double lon = 0;
+};
+
 struct ChunkHit {
     int64_t chunk = 0;
     int64_t article = 0;
@@ -56,6 +62,9 @@ public:
     std::vector<std::string> other_names(int64_t article, int limit);
     // The article's primary coordinates from the coord table (tools/build_coords.py).
     bool coords(int64_t article, double & lat, double & lon);
+    // Up to `limit` articles located inside the box lat ± dlat, lon ± dlon (coord_rtree), most viewed
+    // first, with their coordinates. Empty for packs without the index.
+    std::vector<NearbyArticle> nearby(double lat, double lon, double dlat, double dlon, int limit);
 
     // Chunk text and metadata.
     bool chunk_text(int64_t chunk, std::string & text, std::string & section, int64_t & article);
@@ -72,6 +81,7 @@ private:
     bool has_alias_ = false;  // packs built before build_aliases.py have no alias table
     bool has_acronym_ = false;  // nor before build_acronyms.py an acronym table
     bool has_coord_ = false;  // nor before build_coords.py a coord table
+    bool has_rtree_ = false;  // nor before 2026-10-07 its spatial index (coord_rtree)
 
     // Small LRU of decompressed blocks: neighbouring chunks share blocks.
     static constexpr size_t kCacheBlocks = 64;

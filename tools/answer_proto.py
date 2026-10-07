@@ -20,7 +20,7 @@ from pathlib import Path
 
 from places_proto import Places, parse_intent
 from retrieve_proto import (Pack, compress, fts_query, is_namesake, is_sights_question, keywords, list_entries,
-                            named_articles, sights_evidence)
+                            named_articles, nearby_articles, nearby_location, sights_evidence)
 
 ROOT = Path(__file__).resolve().parent.parent
 SYSTEM = (ROOT / "app/src/main/assets/prompts/system.txt").read_text().strip()
@@ -100,6 +100,13 @@ def retrieve(pack: Pack, q: str):
         if sights:  # a city's "Main sights" list, whole: its first chunk is the source
             cands.append((sights[0], art_id, title, SIGHTS_SECTION_NAME))
             whole[sights[0]] = sights[1]
+    loc = nearby_location(pack, q)
+    if loc:  # "hikes near Interlaken": articles located nearby, with how far they are
+        for cid, aid, title, km, text in nearby_articles(pack, q, loc):
+            if aid not in named_ids:
+                cands.append((cid, aid, title, nearby_section(km, loc[0][1])))
+                whole[cid] = compress(text, words, EVIDENCE_CHARS)
+                expanded.add(aid)
     n_leads = len(cands)  # named articles' leads (and sights lists) always pass the relevance gate
     for score, cid, title, sec in pack.search(fts_query(words), limit=MAX_SOURCES * 4, per_article=99,
                                               prior_weight=PRIOR_WEIGHT, boost_articles=named_ids, boost=NAMED_BOOST):
@@ -128,6 +135,11 @@ def retrieve(pack: Pack, q: str):
         ev = compress(pack.text(cid), words, EVIDENCE_CHARS - len(f))
         out.append((i + 1, title, sec, f"{f}\n{ev}" if f else ev))
     return out
+
+
+def nearby_section(km: float, place: str) -> str:
+    """ResearchPipeline.nearbySection: "12 km from Interlaken"."""
+    return f"{'under 1' if km < 1 else round(km)} km from {place}"
 
 
 def infobox_facts(infobox: str, words, max_chars: int = INFOBOX_FACT_CHARS) -> str:
