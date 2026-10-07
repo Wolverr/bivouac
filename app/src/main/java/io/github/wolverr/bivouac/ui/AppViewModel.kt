@@ -150,7 +150,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
     }
 
-    fun loadModel(file: LibFile) = viewModelScope.launch {
+    /** [forceRepack] (adb eval/bench only) overrides the planner's weight-repacking choice, for measurements. */
+    fun loadModel(file: LibFile, forceRepack: Boolean? = null) = viewModelScope.launch {
         _library.update { it.copy(busy = "Loading ${file.name}…", error = null, benchResult = null) }
         val lib = _library.value
         val path = models.path(file)
@@ -161,8 +162,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _library.update { it.copy(busy = null, loadedModel = null, modelInfo = null, error = e.message) }
                 return@launch
             }
-            opts = opts.copy(nCtx = plan.nCtx, repack = plan.repack)
-            note = plan.note
+            opts = opts.copy(nCtx = plan.nCtx, repack = forceRepack ?: plan.repack)
+            note = plan.note + (forceRepack?.let { " · repack forced $it" } ?: "")
         }
         runtime.crashGuard.begin(file.id, "loading ${file.name}", note ?: "manual: repack=${opts.repack}")
         runtime.load(path, opts)
@@ -342,7 +343,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private var evalJob: kotlinx.coroutines.Job? = null
 
-    fun startEval(questionsName: String, modelName: String, thinkHarder: Boolean = false) {
+    fun startEval(questionsName: String, modelName: String, thinkHarder: Boolean = false, forceRepack: Boolean? = null) {
         if (evalJob?.isActive == true) return
         evalJob = viewModelScope.launch {
             val dir = File(getApplication<Application>().getExternalFilesDir(null), "eval").apply { mkdirs() }
@@ -352,7 +353,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 android.util.Log.e(EvalRunner.TAG, "model $modelName not found")
                 return@launch
             }
-            if (_library.value.loadedModel != model.id) loadModel(model).join()
+            if (_library.value.loadedModel != model.id || forceRepack != null) loadModel(model, forceRepack).join()
             val info = _library.value.modelInfo ?: run {
                 _eval.value = "Eval failed: ${_library.value.error ?: "model did not load"}"
                 android.util.Log.e(EvalRunner.TAG, "load failed: ${_library.value.error}")
@@ -369,14 +370,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Loads [modelName] like the eval does and logs the engine benchmark (pp256, tg32) for adb. */
-    fun startBench(modelName: String) {
+    fun startBench(modelName: String, forceRepack: Boolean? = null) {
         viewModelScope.launch {
             val model = models.list().firstOrNull { it.name == modelName }
             if (model == null) {
                 android.util.Log.e(EvalRunner.TAG, "bench: model $modelName not found")
                 return@launch
             }
-            if (_library.value.loadedModel != model.id) loadModel(model).join()
+            if (_library.value.loadedModel != model.id || forceRepack != null) loadModel(model, forceRepack).join()
+            android.util.Log.i(EvalRunner.TAG, "load: ${_library.value.loadNote ?: _library.value.error}")
             android.util.Log.i(EvalRunner.TAG, "bench ${model.name}: ${runtime.bench(256, 32)}")
         }
     }

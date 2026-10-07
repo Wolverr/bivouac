@@ -37,16 +37,18 @@ class MainActivity : ComponentActivity() {
     /**
      * adb shell am start -n <pkg>/.ui.MainActivity --es eval questions.jsonl --es model <file>.gguf [--ez think true]
      * adb shell am start -n <pkg>/.ui.MainActivity --ez bench true --es model <file>.gguf   (result in logcat bivouac-eval)
+     * Both take --ez repack true|false to override the memory planner's weight-repacking choice (measurements).
      */
     private fun handleEval(intent: Intent?) {
         val model = intent?.getStringExtra("model") ?: return
+        val repack = if (intent.hasExtra("repack")) intent.getBooleanExtra("repack", false) else null
         if (intent.getBooleanExtra("bench", false)) {
-            vm.startBench(model)
+            vm.startBench(model, repack)
             return
         }
         val questions = intent.getStringExtra("eval") ?: return
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)  // a long run must not sleep
-        vm.startEval(questions, model, thinkHarder = intent.getBooleanExtra("think", false))
+        vm.startEval(questions, model, thinkHarder = intent.getBooleanExtra("think", false), forceRepack = repack)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

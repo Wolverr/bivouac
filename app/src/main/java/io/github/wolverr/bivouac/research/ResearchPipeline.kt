@@ -94,9 +94,18 @@ class ResearchPipeline(
     }
 
     /**
+     * Writing speed of the last answers (tokens/s, smoothed), from the engine's stats; null
+     * until the first answer. Automatic Think harder needs [AUTO_THINK_MIN_TPS]: on the Redmi
+     * (2.7 tok/s) a 1,024-token calculation answer took 474 s, too long to start unasked.
+     */
+    var writeTps: Double? = null
+        private set
+
+    /**
      * [thinkHarder]: let the model reason first (hidden; up to [Settings.thinkBudget] tokens, so a
      * few minutes on a phone). It fixes most multi-step reasoning mistakes. [autoThink]: also for
-     * questions the router finds need reasoning (calculations, timelines), not for place searches.
+     * questions the router finds need reasoning (calculations), not for place searches, on
+     * phones that write fast enough ([writeTps]); slower phones keep the button.
      */
     fun answer(
         question: String,
@@ -107,7 +116,8 @@ class ResearchPipeline(
     ): Flow<ResearchEvent> = flow {
         val decision = Router.decide(question, !conversation.isEmpty)
         val placeIntent = places?.takeIf { it.path != null }?.let { PlaceIntent.parse(question, it.placeNouns) }
-        val think = thinkHarder || (autoThink && decision.reasoning && placeIntent == null)
+        val fastEnough = (writeTps ?: 0.0) >= AUTO_THINK_MIN_TPS
+        val think = thinkHarder || (autoThink && fastEnough && decision.reasoning && placeIntent == null)
         emit(ResearchEvent.Routed(decision, think))
 
         val nearby = if (placeIntent != null) findPlaces(placeIntent) else emptyList()
@@ -179,6 +189,10 @@ class ResearchPipeline(
                 }
                 if (ev.stats.error.isEmpty() && !ev.stats.cancelled) {
                     conversation.turns += Conversation.Turn(question, prompt, answer.toString().trim())
+                    if (ev.stats.n_gen >= 32) {
+                        val tps = ev.stats.genTps
+                        writeTps = writeTps?.let { 0.7 * it + 0.3 * tps } ?: tps
+                    }
                 }
             }
             emit(ResearchEvent.Llm(ev))
@@ -528,6 +542,8 @@ class ResearchPipeline(
             "this diet, without naming places that aren't listed."
         /** Places the model reads; the screen shows all that were found. Mirrored in tools/answer_proto.py. */
         const val PROMPT_PLACES = 8
+        /** Writing speed (tok/s) from which Think harder may start by itself: 1,024 tokens in under 3 min. */
+        const val AUTO_THINK_MIN_TPS = 6.0
 
         /** The diet sentence only when a diet was asked for: otherwise small models add diet notes to pharmacies. */
         fun placesHeader(intent: PlaceIntent): String =
