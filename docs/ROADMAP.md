@@ -16,7 +16,58 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
-## Resume here (handoff, 2026-10-01 ~16:00)
+## Resume here (2026-10-07)
+
+**Situation.** The user did not test a 12 GB phone and will buy one (advice given: used Pixel 9 or Pixel 8 Pro,
+12 GB, GrapheneOS-capable; not the 9 Pro, 16 GB is over the limit). Until it arrives the Redmi (8 GB) is the test
+and demo device. First run on the new phone: `tools/phone/new_phone.sh` (installs, copies models + packs with
+Windows adb, llama-bench, MTP check, app speed questions, `report.py` writes eval/phone-<model>-<date>/report.md).
+
+**Competitors (checked 2026-10-07; prize now 1.53 ETH, 16 contributors, deadline 2026-10-31):**
+- AndroidLM: 63-65 % self-graded, ~1.6 min per cited answer (Pixel 8 Pro), now installs from the browser too
+  (75 min download + 4 min import). Optional Qwen3.8-Flash-Next (75.8 GB) 67 %, 3-4x slower.
+- Commonplace (github.com/0xPD33/commonplace, new 2026-10-06): 53 % self-graded on 63 questions, but fast on a
+  Pixel 10 (GrapheneOS): passage card in 0.9 s, first word ~7 s, 18 tok/s with Ling-3.0-tiny (7.9B MoE, 1.3B
+  active). Wikidata facts, own PDFs, voice, demo video. Polished.
+- offline-research, Offline-Recharge: unmeasured drafts. Our edge left: quality (9B on par with AndroidLM, both
+  our tiers above Commonplace), places / nearby, honest held-out eval, 8 GB phones. Weak spot: speed on 8 GB.
+
+**Done today:**
+- Memory planner (932ed09, 831ec37): budget = max(free, 60 % of total RAM) (the Redmi refused its own tier's
+  4B at 3.1 GB free); repacking costs 1.35x the file, not 2x (measured in the app: 3.1 GB without, 3.9 GB
+  with). The Redmi now repacks the 4B: **prompt reading 6.5 -> 13.4 tok/s, writing 3.2 -> 3.6** (in-app
+  bench, release build). adb eval/bench take `--ez repack true|false`.
+- Auto Think harder only when the phone writes >= 6 tok/s (ecd588c): on the Redmi a calculation answer with
+  thinking took 474 s. The button stays.
+- Eval started from adb logs why a model did not load (it used to stop silently).
+- Release build (R8) runs on the Redmi (installed over the debug build: built with BIVOUAC_KEYSTORE=/nonexistent,
+  so it is debug-signed and installs without wiping the 35 GB of files; the real release key only changes the
+  signature). The held-out eval below runs on it.
+- Speed run, 4B without repack (eval/results-redmi-qwen3.5-4b-speed10-2026-10-07.jsonl): typical answer
+  100-160 s, reading 6.8, writing 2.7-3.1 tok/s (places-03 was slowed by the screen going off).
+- Retrieval (by a helper session, 2a99308, 0c6baec, 3d677a7): sights source only when the section has
+  bullets (12 fresh questions, 9B paired +0.50 over all, independent regrade of the 3 changed answers +2.67);
+  nearby Wikipedia articles for "hikes near X" / "day trips from X" with a coord R-tree (+68 MB pack, re-uploaded;
+  13 fresh questions, 9B +1.00 over all, independent regrade of the 9 changed: +2.00, 7 better / 1 worse).
+  The phone has the new wiki.db (18,401,787,904 bytes).
+- **Fast-model screen (main 60, paired blind vs the 4B, thinking off, frozen 1c50824):** Ling-3.0-tiny Q4_K_M
+  -0.95 (CI -1.62..-0.28; refuses "excerpts don't cover" often), LFM2.5-8B-A1B Q4_K_M -0.80 (CI -1.34..-0.26).
+  Neither fits the Redmi at Q4 (llama-bench thrashed). LFM2.5-2.6B: 2.1x read / 2.4x write speed of the 4B on
+  the Redmi (25.6 / 7.4 tok/s), but with thinking off it answers with tool calls (37 of 60: `google(query=...)`,
+  also with a "no tools" prompt) and with thinking on it writes ~720 tokens per answer, so no faster in the end.
+  **Decision: 4B stays for 8 GB, 9B for 12 GB.** The speed gain comes from repacking instead.
+
+**Running / next:**
+1. Held-out eval on the Redmi with repacking (release build, auto-think gated off): results ->
+   eval/results-redmi-qwen3.5-4b-holdout-2026-10-07.jsonl, grade vs baseline (`grade.py packet/score`), put the
+   number and the speeds in README.
+2. When the 12 GB phone arrives: new_phone.sh, then the 9B held-out eval on it.
+3. README: phone speeds (reading 13.4 / writing 3.6 with repacking), release link; GitHub release with the real
+   release key (uninstall needed on the Redmi: move files aside first); demo video (user); repo public; claim.
+4. Ideas not done: show the best excerpt while the model reads (users wait ~30-45 s for the first word);
+   Edinburgh day trips invented distances (80 km mode).
+
+## Earlier handoff (2026-10-01 ~16:00)
 
 **User direction (16:00):** the **12 GB phone is the main demo device** (user gets one Sunday 2026-10-04,
 model not known yet; keep 8 GB working). The user wants original ideas that improve on the other entries
