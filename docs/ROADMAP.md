@@ -66,8 +66,12 @@ Windows adb, llama-bench, MTP check, app speed questions, `report.py` writes eva
   384 -> 1,024 +2.8 (CI 0.98..4.62). No short budget; the button says when a question is a calculation (93facd6).
 
 **Next:**
-1. Install the current build on the Redmi (day trips + calculation hint) and test the in-app download
-   (Library -> Download -> Add downloaded files) with the user: the "no PC" claim was never tried on a phone.
+1. Done (1763629): the in-app install was broken. A model added from Downloads failed with "not a readable
+   GGUF file": the picker's grant covers the descriptor, but /proc/self/fd/N is reopened as a path and refused.
+   Now "Add downloaded files" asks once for All files access and links every .gguf and wiki/places .db in
+   Downloads by path (no copy). Tested with the user on the Redmi: browser download opened from the Library,
+   access granted, the 2B loaded from /storage/emulated/0/Download and answered. Packs from Downloads use the
+   same path code but were not tried (the phone has them in the app folder); try once on the 12 GB phone.
 2. When the 12 GB phone arrives: new_phone.sh, then the 9B held-out eval on it.
 3. README: phone speeds (reading 13.4 / writing 3.6 with repacking), release link; GitHub release with the real
    release key (uninstall needed on the Redmi: move files aside first); demo video (user); repo public; claim.
