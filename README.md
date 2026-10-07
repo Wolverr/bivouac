@@ -45,7 +45,10 @@ more than half as good as a frontier AI with web search, on a phone with at most
 
 1. Install the APK (*TBD: release link*).
 2. Open **Library → Download** for a model and the packs. Your browser saves them to Downloads.
-3. Tap **Add downloaded files**. Bivouac links them in place, without copying.
+3. Tap **Add downloaded files** and allow "All files access" when asked. Bivouac uses the files
+   where the browser saved them, without copying (no second 25 GB). It needs that permission
+   because llama.cpp and SQLite open files by path; the app has no internet permission, so
+   nothing it reads can leave the phone. Tested on the Redmi Note 15 Pro (Android 16).
 
 Which model to pick:
 

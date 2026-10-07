@@ -1,5 +1,7 @@
 package io.github.wolverr.bivouac.ui
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -53,6 +55,8 @@ data class LibraryState(
     val loadNote: String? = null,
     /** Shown once after Android killed the app while it was busy with a model. */
     val notice: String? = null,
+    /** "Add downloaded files" needs storage access first (see FileStore.hasStorageAccess). */
+    val needsStorageAccess: Boolean = false,
 )
 
 /** One question and its answer in the conversation. */
@@ -138,6 +142,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun refresh() = _library.update { it.copy(models = models.list(), packs = packs.list()) }
+
+    /**
+     * "Add downloaded files": links every model (.gguf) and pack (wiki*.db, places*.db) in Downloads
+     * by path, without copying. Asks for storage access first when the app doesn't have it.
+     */
+    fun addDownloads() = viewModelScope.launch {
+        val app = getApplication<Application>()
+        if (!FileStore.hasStorageAccess(app)) {
+            _library.update { it.copy(needsStorageAccess = true, error = null) }
+            return@launch
+        }
+        _library.update { it.copy(needsStorageAccess = false, error = null, busy = "Looking in Downloads…") }
+        val have = (models.list() + packs.list()).map { it.name }.toSet()
+        val found = withContext(Dispatchers.IO) {
+            FileStore.downloadsDir().listFiles().orEmpty().filter { f ->
+                f.isFile && f.name !in have &&
+                    (f.name.endsWith(".gguf") || (f.name.endsWith(".db") && (f.name.startsWith("wiki") || f.name.startsWith("places"))))
+            }
+        }
+        for (f in found) {
+            val store = if (f.name.endsWith(".db")) packs else models
+            runCatching { store.linkPath(f) }
+                .onSuccess { lf -> if (store === packs) openPack(lf).join() }
+                .onFailure { e -> _library.update { it.copy(error = "${f.name}: ${e.message}") } }
+        }
+        refresh()
+        _library.update {
+            it.copy(
+                busy = null,
+                notice = if (found.isEmpty()) "No new models or packs in Downloads. Download them first (above), " +
+                    "or use \"Pick a file\" if they are somewhere else."
+                else "Added from Downloads: ${found.joinToString { f -> f.name }}",
+            )
+        }
+    }
+
+    /** After the user came back from the storage-access screen. */
+    fun storageAccessChanged() {
+        if (_library.value.needsStorageAccess && FileStore.hasStorageAccess(getApplication())) addDownloads()
+    }
 
     /** Links picked files in place (no copy); .db files are packs, .gguf files are models. */
     fun linkFiles(uris: List<Uri>) = viewModelScope.launch {

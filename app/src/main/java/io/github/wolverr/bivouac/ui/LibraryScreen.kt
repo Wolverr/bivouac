@@ -39,6 +39,28 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) vm.linkFiles(uris)
     }
+    val context = LocalContext.current
+    // Storage access: "All files access" in Settings (Android 11+), the storage permission on Android 10.
+    val allFilesScreen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        vm.storageAccessChanged()
+    }
+    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        vm.storageAccessChanged()
+    }
+    val askStorageAccess: () -> Unit = {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            val intent = Intent(
+                android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                Uri.parse("package:${context.packageName}"),
+            )
+            runCatching { allFilesScreen.launch(intent) }.onFailure {
+                allFilesScreen.launch(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            }
+            Unit
+        } else {
+            storagePermission.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
 
     Column(
         modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
@@ -56,8 +78,22 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 
         GetDataSection(vm, s)
 
-        Button(onClick = { picker.launch(arrayOf("*/*")) }, enabled = s.busy == null) {
-            Text("Add downloaded files (.gguf, .db)")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = vm::addDownloads, enabled = s.busy == null) { Text("Add downloaded files") }
+            TextButton(onClick = { picker.launch(arrayOf("*/*")) }, enabled = s.busy == null) { Text("Pick a file") }
+        }
+        if (s.needsStorageAccess) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "To use the files where your browser saved them, without copying 25 GB, Bivouac needs " +
+                            "\"All files access\". It only reads its models and packs, and it has no internet " +
+                            "permission, so nothing it reads can leave the phone.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Button(onClick = askStorageAccess) { Text("Allow file access") }
+                }
+            }
         }
         s.notice?.let { msg ->
             Card(Modifier.fillMaxWidth()) {
