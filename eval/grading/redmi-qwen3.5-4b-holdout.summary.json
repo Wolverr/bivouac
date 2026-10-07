@@ -1,0 +1,65 @@
+{
+ "results": "results-redmi-qwen3.5-4b-holdout.jsonl",
+ "questions": 40,
+ "bivouac_mean": 5.05,
+ "frontier_mean": 9.38,
+ "parity_pct": 53.9,
+ "bivouac_wins_or_ties": 1,
+ "by_category": {
+  "compare": {
+   "bivouac": 4.5,
+   "frontier": 9.5,
+   "parity_pct": 47.4
+  },
+  "explain": {
+   "bivouac": 5.5,
+   "frontier": 9.75,
+   "parity_pct": 56.4
+  },
+  "fact": {
+   "bivouac": 5.5,
+   "frontier": 9.25,
+   "parity_pct": 59.5
+  },
+  "health": {
+   "bivouac": 6.25,
+   "frontier": 9.5,
+   "parity_pct": 65.8
+  },
+  "history": {
+   "bivouac": 5.67,
+   "frontier": 9.67,
+   "parity_pct": 58.6
+  },
+  "places": {
+   "bivouac": 4.33,
+   "frontier": 8.67,
+   "parity_pct": 50.0
+  },
+  "reasoning": {
+   "bivouac": 5,
+   "frontier": 9,
+   "parity_pct": 55.6
+  },
+  "science": {
+   "bivouac": 5.33,
+   "frontier": 9.67,
+   "parity_pct": 55.2
+  },
+  "synthesis": {
+   "bivouac": 4.67,
+   "frontier": 9,
+   "parity_pct": 51.9
+  },
+  "tech": {
+   "bivouac": 4.75,
+   "frontier": 9.75,
+   "parity_pct": 48.7
+  },
+  "travel": {
+   "bivouac": 4,
+   "frontier": 9.25,
+   "parity_pct": 43.2
+  }
+ }
+}

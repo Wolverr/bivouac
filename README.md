@@ -7,7 +7,7 @@ Google Play Services. Everything runs on the phone.
 Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline tool that is
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
-> Status: work in progress. Numbers marked *TBD* are not measured on a phone yet.
+> Status: work in progress. Numbers marked *TBD* are not measured on a phone yet (the 12 GB tier).
 
 ## What it does
 
@@ -19,9 +19,15 @@ more than half as good as a frontier AI with web search, on a phone with at most
   "ATM near me". Distances come from the phone's GPS or from Wikipedia coordinates, and
   English names work for places the map stores in the local language (Florence → Firenze,
   Moscow → Москва).
+- **What's around a place.** "Best hikes near Interlaken", "temples near Siem Reap", "day trips
+  from Lisbon": Wikipedia articles located near the place (1.2 M articles with coordinates, in a
+  spatial index) become sources, each labelled with its distance, so the answer names real
+  places at real distances. A city's "Main sights" list is used when it has one.
 - **Fast on ordinary phones.** The target is 8 GB phones, not just flagships. The app reads the
-  model's header and the free RAM before loading, then picks the context length and weight
-  layout that fit. If Android ever kills it for memory, the next load uses smaller settings.
+  model's header and the phone's RAM before loading, then picks the context length and weight
+  layout that fit. On an 8 GB phone it repacks the weights into a CPU-friendly layout, which
+  doubles prompt reading (6.5 → 13.4 tokens/s on a Redmi Note 15 Pro) for 0.8 GB more RAM. If
+  Android ever kills it for memory, the next load uses smaller settings.
 - **Conversations.** Follow-up questions ("and its population?") keep the topic; personal or
   casual messages get a normal reply instead of a Wikipedia search.
 - **Think harder.** One tap asks the last question again with the model reasoning first
@@ -29,7 +35,9 @@ more than half as good as a frontier AI with web search, on a phone with at most
   4.2 to 8.7 out of 10 and the 9B from 3.5 to 8.8, for a few minutes more per answer. Over all
   question types it is no better (the answers get shorter) and about 5× slower, so it turns
   on by itself only for calculations ("23 km with a 900 m climb, how long?"), where it gained
-  or tied in all 9 graded cases, including held-out questions.
+  or tied in all 9 graded cases, including held-out questions. It starts by itself only on
+  phones that write at least 6 tokens/s (on a mid-range 8 GB phone a thought-through answer
+  takes several minutes, so there it stays a button).
 - **Private by construction.** The app has no INTERNET permission. Downloads go through the
   phone's browser; the app only reads the files you add.
 
@@ -45,12 +53,12 @@ Which model to pick:
 |---|---|---|---|---|
 | 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 45 % | 20 tok/s reading, 6 tok/s writing |
 | 6 GB | Qwen3.5-4B Q3_K_M | 2.3 GB | slightly below the 4B Q4_K_M¹ | 6 tok/s reading, 2.8 tok/s writing |
-| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | 54 % | 10–12 tok/s reading, 3.7 tok/s writing; ~3 min per answer in the app |
+| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **54 % on the phone** | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 35 s, whole answer 93 s (medians, 40 questions) |
 | 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 63 % | *TBD (12 GB phone)* |
 
 ¹ Graded head-to-head against the 4B Q4_K_M: −0.38 points out of 10 (95 % CI −0.80 to +0.03).
-Reading and writing speeds are llama-bench on the phone's CPU; a warm phone under load runs at
-about half of that (the clocks drop).
+The 8 GB row is the app itself on the phone; the other speeds are llama-bench on the phone's CPU,
+and a warm phone under load runs slower (the clocks drop).
 
 Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the bounty's 50 GB limit.
 
@@ -70,6 +78,8 @@ Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the boun
 
 Place searches parse the kind of place and the location, geocode it (Wikipedia coordinates
 for 1.2 M articles, from the geo_tags dump, then town centroids), and pass the nearest matches with distances to the model.
+"Near X" and "day trips from X" questions also get the most viewed Wikipedia articles within
+20 km (day trips: 15–80 km) of X, from an R-tree over those coordinates.
 
 ## Evaluation
 
@@ -98,7 +108,15 @@ noise), so choices are made head-to-head in one blind packet instead (`tools/gra
 - **Screened out earlier** (main set, older pipeline): LFM2.5-8B-A1B 46 %, Gemma-4-E4B 44 %, both
   below the Qwen3.5-4B of the same run (55 %).
 
-On-phone results: *TBD*. Retrieval finds a correct Wikipedia article in the top 6 for 92 %
+**On the phone:** the 4B in the app on a Redmi Note 15 Pro (8 GB, MediaTek MT6789), release
+build (no INTERNET permission), the 40 held-out questions: **53.9 %** of the frontier + web score, the
+same as the PC harness (54.0 %), so the phone loses nothing. Median 93 s per answer (first words
+after 35 s, search 3.7 s), longest 136 s; the app used 3.9 GB of RAM and never got killed.
+Answers, packet and grades: `eval/results-redmi-qwen3.5-4b-holdout.jsonl`,
+`eval/grading/redmi-qwen3.5-4b-holdout.*`. Weakest there: travel (43 %), comparisons (47 %), tech
+(49 %); strongest: health (66 %), facts (60 %), history (59 %).
+
+Retrieval finds a correct Wikipedia article in the top 6 for 92 %
 of the questions that have one (44/48), and 94 % on the held-out set (34/36).
 
 ## Build from source
