@@ -435,7 +435,10 @@ class ResearchPipeline(
         return null
     }
 
-    class NearbyLocation(val article: Article, val lat: Double, val lon: Double, val km: Double, val phrase: String)
+    class NearbyLocation(
+        val article: Article, val lat: Double, val lon: Double, val km: Double, val phrase: String,
+        val minKm: Double = 0.0, val sources: Int = NEARBY_SOURCES,
+    )
     class NearbyHit(val passage: Passage, val km: Double)
 
     /**
@@ -455,7 +458,11 @@ class ResearchPipeline(
             val phrase = names.take(n).joinToString(" ")
             val a = corpus.findArticle(phrase) ?: continue
             if (a.lat == null || a.lon == null) continue
-            return NearbyLocation(a, a.lat, a.lon, if (DAY_TRIP.containsMatchIn(question)) DAY_TRIP_KM else NEARBY_KM, phrase)
+            return if (DAY_TRIP.containsMatchIn(question)) {
+                NearbyLocation(a, a.lat, a.lon, DAY_TRIP_KM, phrase, DAY_TRIP_MIN_KM, DAY_TRIP_SOURCES)
+            } else {
+                NearbyLocation(a, a.lat, a.lon, NEARBY_KM, phrase)
+            }
         }
         return null
     }
@@ -478,7 +485,7 @@ class ResearchPipeline(
         for (a in corpus.nearby(loc.lat, loc.lon, dlat, dlon, NEARBY_CANDIDATES)) {
             if (a.id == loc.article.id || a.title.startsWith("List of") || NEARBY_SKIP_TITLE.containsMatchIn(a.title)) continue
             val km = kotlin.math.hypot((a.lat!! - loc.lat) * 111.0, (a.lon!! - loc.lon) * 111.0 * coslat)
-            if (km > loc.km) continue
+            if (km > loc.km || km < loc.minKm) continue
             val first = corpus.chunk(a, 0) ?: continue
             val intro = if (first.section == "Infobox" && a.n_chunks > 1) corpus.chunk(a, 1) ?: continue else first
             val text = PADDING.replace(intro.text, " ")
@@ -488,7 +495,7 @@ class ResearchPipeline(
             val hits = topic.sumOf { t -> if (t in lowTitle) 2.0 else if (t in low) 1.0 else 0.0 }
             scored += Scored(a.prior + 2.0 * hits, NearbyHit(intro.copy(text = text), km))
         }
-        return scored.sortedByDescending { it.score }.take(NEARBY_SOURCES).map { it.hit }
+        return scored.sortedByDescending { it.score }.take(loc.sources).map { it.hit }
     }
 
     /** "must-see sights in Barcelona", "landmarks of Rome". Mirrors tools/retrieve_proto.py. */
@@ -580,6 +587,9 @@ class ResearchPipeline(
         private val NAME_JOINERS = setOf("de", "del", "di", "du", "la", "le", "am", "of")
         private const val NEARBY_KM = 20.0
         private const val DAY_TRIP_KM = 80.0
+        /** A day trip leaves the city: Arthur's Seat (2 km) crowded out Stirling, and the model made up the rest. */
+        private const val DAY_TRIP_MIN_KM = 15.0
+        private const val DAY_TRIP_SOURCES = 5
         private const val NEARBY_CANDIDATES = 60
         private const val NEARBY_SOURCES = 4
         /** Not something to visit: events, organisations, people, works. */

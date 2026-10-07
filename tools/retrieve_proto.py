@@ -337,8 +337,11 @@ DAY_TRIP = re.compile(r"\b(day trips?|excursions?)\b", re.I)
 GET_AROUND = re.compile(r"\b(get|getting|go|going|travel\w*|mov\w*|driv\w*|cycl\w*|walk\w*)\s+around\b", re.I)
 NAME_JOINERS = {"de", "del", "di", "du", "la", "le", "am", "of"}
 NEARBY_KM, DAY_TRIP_KM = 20.0, 80.0
+# A day trip leaves the city: Arthur's Seat (2 km) and Edinburgh Castle crowded out Stirling and
+# St Andrews, and the model filled the list from memory with made-up distances.
+DAY_TRIP_MIN_KM = 15.0
 NEARBY_CANDIDATES = 60
-NEARBY_SOURCES = 4
+NEARBY_SOURCES, DAY_TRIP_SOURCES = 4, 5
 # Not something to visit: events, organisations, people, works. In the title ("Air India Flight 101",
 # "Interlaken Ost railway station") or as what the intro says the article is ("... was a scheduled flight",
 # "... is a national research university", "... is a district").
@@ -382,7 +385,9 @@ def nearby_location(pack: "Pack", question: str):
         row = pack.find_article(phrase)
         c = row and pack.db.execute("SELECT lat, lon FROM coord WHERE article = ?", (row[0],)).fetchone()
         if c:
-            return row, c[0], c[1], DAY_TRIP_KM if DAY_TRIP.search(question) else NEARBY_KM, phrase
+            if DAY_TRIP.search(question):
+                return row, c[0], c[1], DAY_TRIP_KM, phrase, DAY_TRIP_MIN_KM, DAY_TRIP_SOURCES
+            return row, c[0], c[1], NEARBY_KM, phrase, 0.0, NEARBY_SOURCES
     return None
 
 
@@ -395,7 +400,7 @@ def nearby_articles(pack: "Pack", question: str, loc) -> list[tuple]:
     """ResearchPipeline.nearbyArticles: the most viewed articles within the radius that are things to
     visit, ranked by popularity plus the question's topic words ("hikes", "lakes", "temples") in their
     title and intro. Returns [(chunk_id, article_id, title, km, intro_text)]."""
-    row, lat, lon, km, phrase = loc
+    row, lat, lon, km, phrase, min_km, n_sources = loc
     dlat = km / 111.0
     coslat = max(0.1, math.cos(math.radians(lat)))
     dlon = km / (111.0 * coslat)
@@ -410,7 +415,7 @@ def nearby_articles(pack: "Pack", question: str, loc) -> list[tuple]:
         if aid == row[0] or title.startswith("List of") or NEARBY_SKIP_TITLE.search(title):
             continue
         dist = math.hypot((alat - lat) * 111.0, (alon - lon) * 111.0 * coslat)
-        if dist > km:
+        if dist > km or dist < min_km:
             continue
         cid = intro_chunk(pack, first, n)
         text = PADDING_RE.sub(" ", pack.text(cid))
@@ -420,7 +425,7 @@ def nearby_articles(pack: "Pack", question: str, loc) -> list[tuple]:
         hits = sum(2.0 if t in low_t else 1.0 if t in low else 0.0 for t in topic)
         scored.append((prior + 2.0 * hits, cid, aid, title, dist, text))
     scored.sort(key=lambda s: -s[0])
-    return [(cid, aid, title, dist, text) for _, cid, aid, title, dist, text in scored[:NEARBY_SOURCES]]
+    return [(cid, aid, title, dist, text) for _, cid, aid, title, dist, text in scored[:n_sources]]
 
 
 LIST_SKIP_CELL = re.compile(r"^(:?-+:?|name|names|image|picture|photo|rank|no\.?|#)$", re.I)
