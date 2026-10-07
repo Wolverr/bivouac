@@ -26,8 +26,19 @@ class MemoryPlannerTest {
             val plan = MemoryPlanner.plan(model.first, model.second, idleAvail, total)
             assertNotNull("total $total", plan)
             assertEquals(8192, plan!!.nCtx)
-            assertFalse(plan.repack)
         }
+    }
+
+    @Test fun eightGbPhoneRepacksThe4b() {
+        // Measured on the Redmi: 3.9 GB with repacking, prompt reading 2x faster.
+        val plan = MemoryPlanner.plan(2_740_937_888L, qwen4b, 3_100_000_000L, 8_020_000_000L)!!
+        assertEquals(true, plan.repack)
+        assertEquals(8192, plan.nCtx)
+    }
+
+    @Test fun twelveGbPhoneRunsThe9bWithoutRepackWhenLittleIsFree() {
+        val plan = MemoryPlanner.plan(5_680_522_464L, qwen4b, idleAvail, 11_500_000_000L)!!
+        assertFalse(plan.repack)
     }
 
     @Test fun redmiAtIdleLoadsThe4b() {

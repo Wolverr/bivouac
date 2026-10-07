@@ -31,10 +31,13 @@ data class ModelProbe(
  * 4B Q4_K_M (3.2 GB at ctx 8192, no repack) runs there. So the budget is the larger of
  * availMem and [USABLE_FRACTION] of total RAM; CrashGuard shrinks it after a memory kill.
  *
- * Measured on the Redmi (Qwen3.5-2B): the mmapped weights count about the file size,
- * repacking adds a heap copy of about the same size, and it roughly doubles prompt
- * reading speed. So repacking is worth more than a long context, down to 4096 tokens
- * (what one question with six excerpts plus a little history needs).
+ * Repacking copies the weights into a CPU-friendlier layout on the heap; llama.cpp then
+ * unmaps the file pages it replaced, so it costs far less than a second copy. Measured in
+ * the app on the Redmi (4B Q4_K_M, ctx 8192): 3.1 GB without, 3.9 GB with repacking
+ * (heap 3.0 GB + 0.9 GB of tensors still mapped), i.e. about [REPACK_FACTOR] x the file,
+ * for 2.06x faster prompt reading (6.5 -> 13.4 tok/s) and 13 % faster writing. So
+ * repacking is worth more than a long context, down to 4096 tokens (what one question
+ * with six excerpts plus a little history needs).
  */
 object MemoryPlanner {
     data class Plan(val nCtx: Int, val repack: Boolean, val needBytes: Long, val availBytes: Long, val note: String)
@@ -42,6 +45,9 @@ object MemoryPlanner {
     private val CONTEXTS = listOf(8192, 6144, 4096, 3072, 2048)
     private const val MIN_REPACK_CTX = 4096
     private const val MB = 1_000_000L
+
+    /** Weights in memory with repacking, relative to the file size (1.28 measured on the 4B; padded). */
+    const val REPACK_FACTOR = 1.35
 
     /** Share of total RAM a foreground app can count on (4 GB phone: 2B, 6 GB: 4B Q3, 8 GB: 4B Q4, 12 GB: 9B). */
     const val USABLE_FRACTION = 0.6
@@ -55,7 +61,7 @@ object MemoryPlanner {
     private const val RESERVE = 450 * MB
 
     fun need(fileBytes: Long, probe: ModelProbe, nCtx: Int, repack: Boolean, nBatch: Int): Long =
-        fileBytes * (if (repack) 2 else 1) + probe.kvBytes(nCtx, nBatch) + OVERHEAD
+        (if (repack) (fileBytes * REPACK_FACTOR).toLong() else fileBytes) + probe.kvBytes(nCtx, nBatch) + OVERHEAD
 
     /**
      * [safety] below 1 shrinks the budget after Android killed us for memory
