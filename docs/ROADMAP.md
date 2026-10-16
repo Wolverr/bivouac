@@ -16,6 +16,20 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
+## Resume here (2026-10-17): user direction
+
+- **No 12 GB phone before the deadline.** Stop waiting for it: the 12 GB tier stays the 9B on PC evidence
+  (9B beat Gemma-4-12B and its own Q5); state in the README that 12 GB numbers come from the PC harness.
+  Drop step 2 below; packs-from-Downloads gets tried on the Redmi instead.
+- **Quality over speed.** The user would rather wait longer offline for a better answer. Next work: raise
+  the held-out score (weakest: travel 43 %, compare 47 %, tech 49 %), checked with paired blind grading and
+  confirmed on fresh questions. Speed only where it costs no quality.
+- **Differentiate:** finish the ideas in step 4 below that help quality/trust (best excerpt while the model
+  reads, Edinburgh invented distances), plus anything that sets us apart from AndroidLM / Commonplace.
+- **Visual restyle:** a more colorful, genuine theme inspired by Vitalik Buterin's own taste (his blog,
+  pastel/rainbow Ethereum look); function first, but polish counts.
+- **Push every step** to GitHub: the user switches between two PCs and a laptop.
+
 ## Resume here (2026-10-07)
 
 **Situation.** The user did not test a 12 GB phone and will buy one (advice given: used Pixel 9 or Pixel 8 Pro,
