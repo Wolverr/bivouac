@@ -29,6 +29,11 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Visual restyle:** a more colorful, genuine theme inspired by Vitalik Buterin's own taste (his blog,
   pastel/rainbow Ethereum look); function first, but polish counts.
 - **Push every step** to GitHub: the user switches between two PCs and a laptop.
+- **Restyle done (7113547, built and rendered on a third PC, not yet on a phone).** Check on the Redmi:
+  launcher icon (also a themed icon), Inter weights (variable font: bold and semibold must look
+  different), dark mode, the example questions on the start screen ask at once, colored [n]
+  markers while an answer streams. Screens: `./gradlew :app:testDebugUnitTest --tests '*ScreenshotTest*'`
+  writes app/build/screenshots/ (no phone or model needed); docs/screenshots/ holds the README copies.
 
 ## Resume here (2026-10-07)
 
