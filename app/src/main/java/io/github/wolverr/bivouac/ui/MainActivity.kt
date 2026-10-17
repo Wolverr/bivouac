@@ -7,24 +7,26 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -56,23 +58,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleEval(intent)
         setContent {
-            MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
+            BivouacTheme {
                 var tab by rememberSaveable { mutableIntStateOf(0) }
-                Scaffold(
-                    bottomBar = {
-                        NavigationBar {
-                            NavigationBarItem(
-                                selected = tab == 0, onClick = { tab = 0 },
-                                icon = { Icon(Icons.Outlined.Search, null) }, label = { Text("Ask") },
-                            )
-                            NavigationBarItem(
-                                selected = tab == 1, onClick = { tab = 1 },
-                                icon = { Icon(Icons.Outlined.Storage, null) }, label = { Text("Library") },
-                            )
-                        }
-                    },
-                ) { padding ->
-                    val m = Modifier.padding(padding)
+                AppFrame(tab, onTab = { tab = it }) { m ->
                     when (tab) {
                         0 -> AskScreen(vm, m)
                         else -> LibraryScreen(vm, m)
@@ -81,4 +69,33 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+/** Bottom tabs around a screen; also used by the screenshot tests. */
+@Composable
+fun AppFrame(tab: Int, onTab: (Int) -> Unit, content: @Composable (Modifier) -> Unit) {
+    val rb = LocalRainbow.current
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            Column {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                    val colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = rb.pastel(if (tab == 0) 5 else 6).copy(alpha = 0.55f),
+                        selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    )
+                    NavigationBarItem(
+                        selected = tab == 0, onClick = { onTab(0) }, colors = colors,
+                        icon = { Icon(Icons.Outlined.Search, null) }, label = { Text("Ask") },
+                    )
+                    NavigationBarItem(
+                        selected = tab == 1, onClick = { onTab(1) }, colors = colors,
+                        icon = { Icon(Icons.Outlined.Storage, null) }, label = { Text("Library") },
+                    )
+                }
+            }
+        },
+    ) { padding -> content(Modifier.padding(padding)) }
 }

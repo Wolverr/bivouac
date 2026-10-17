@@ -7,13 +7,24 @@ Google Play Services. Everything runs on the phone.
 Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline tool that is
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
+<p align="center">
+  <img src="docs/screenshots/ask-empty.png" width="24%" alt="Start screen with example questions">
+  <img src="docs/screenshots/ask-answer.png" width="24%" alt="A cited answer about HTTPS">
+  <img src="docs/screenshots/ask-places.png" width="24%" alt="Vegetarian places near the Duomo in Florence">
+  <img src="docs/screenshots/ask-answer-dark.png" width="24%" alt="The same answer in dark mode">
+</p>
+<p align="center"><sub>The app's screens rendered from its code with sample data
+(<code>app/src/test/…/ScreenshotTest.kt</code>); light or dark follows the phone.</sub></p>
+
 > Status: work in progress. Numbers marked *TBD* are not measured on a phone yet (the 12 GB tier).
 
 ## What it does
 
 - **Cited answers from all of English Wikipedia.** 6.49 M articles (2025-08) in an 18.3 GB
   pack: full text for the 2 M most-read articles, intro and infobox for the rest. Every
-  answer is written from numbered excerpts and cites them, like `[1][3]`.
+  answer is written from numbered excerpts and cites them, like `[1][3]`. Each source has its
+  own color, and its markers in the answer are highlighted in the same color, so you can see
+  at a glance which sentence rests on which excerpt; tap a source to read the whole excerpt.
 - **Places, including "near me".** 30 M places worldwide (Overture Maps, 5.3 GB):
   "vegetarian restaurants near the Duomo in Florence", "pharmacy near Shinjuku Station",
   "ATM near me". Distances come from the phone's GPS or from Wikipedia coordinates, and
@@ -151,5 +162,7 @@ tools/status.sh                  # progress
 - Models: Qwen3.5 (Apache-2.0) as GGUF files.
 - Engine: [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT), SQLite (public domain),
   zstd (BSD).
+- Font: [Inter](https://github.com/rsms/inter), SIL Open Font License 1.1
+  ([third_party/fonts/Inter-OFL.txt](third_party/fonts/Inter-OFL.txt)).
 
 App code: [MIT](LICENSE). The data packs and models keep their own licenses (above).

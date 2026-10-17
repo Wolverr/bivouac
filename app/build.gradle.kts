@@ -91,6 +91,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true }
+    // Screenshot tests (ScreenshotTest.kt) render the screens on the JVM with Robolectric.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        // Roborazzi writes the images only in record mode.
+        unitTests.all { it.systemProperty("roborazzi.test.record", "true") }
+    }
 }
 
 kotlin {
@@ -110,4 +116,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

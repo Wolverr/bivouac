@@ -1,18 +1,27 @@
 package io.github.wolverr.bivouac.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -21,16 +30,32 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
-import android.content.Intent
-import android.net.Uri
-import io.github.wolverr.bivouac.llm.Catalog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.wolverr.bivouac.llm.Catalog
+import io.github.wolverr.bivouac.llm.CatalogItem
 import io.github.wolverr.bivouac.llm.LibFile
 import java.util.Locale
+
+/** What the Library screen can ask for; the view model in the app, no-ops in screenshot tests. */
+class LibraryActions(
+    val addDownloads: () -> Unit = {},
+    val pickFile: () -> Unit = {},
+    val askStorageAccess: () -> Unit = {},
+    val dismissNotice: () -> Unit = {},
+    val loadModel: (LibFile) -> Unit = {},
+    val openPack: (LibFile) -> Unit = {},
+    val delete: (LibFile) -> Unit = {},
+    val bench: () -> Unit = {},
+    val setAllCores: (Boolean) -> Unit = {},
+    val setAutoMemory: (Boolean) -> Unit = {},
+    val setRepack: (Boolean) -> Unit = {},
+    val setAutoThink: (Boolean) -> Unit = {},
+    val download: (String) -> Unit = {},
+)
 
 @Composable
 fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
@@ -61,64 +86,96 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             storagePermission.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
         }
     }
+    val catalog = remember { Catalog.load(context) }
+    LibraryContent(
+        s,
+        device = String.format(
+            Locale.US, "%s · %s · %.1f GB RAM · fast cores %s",
+            device.model, device.soc, device.totalRamGb, device.bigCores.joinToString(","),
+        ),
+        ramGb = device.totalRamGb,
+        catalog = catalog,
+        actions = LibraryActions(
+            addDownloads = { vm.addDownloads() },
+            pickFile = { picker.launch(arrayOf("*/*")) },
+            askStorageAccess = askStorageAccess,
+            dismissNotice = { vm.dismissNotice() },
+            loadModel = { vm.loadModel(it) },
+            openPack = { vm.openPack(it) },
+            delete = { vm.delete(it) },
+            bench = { vm.bench() },
+            setAllCores = vm::setAllCores,
+            setAutoMemory = vm::setAutoMemory,
+            setRepack = vm::setRepack,
+            setAutoThink = vm::setAutoThink,
+            download = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
+        ),
+        modifier = modifier,
+    )
+}
 
-    Column(
-        modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Library", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            String.format(
-                Locale.US, "%s · %s · %.1f GB RAM · fast cores %s",
-                device.model, device.soc, device.totalRamGb, device.bigCores.joinToString(","),
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        GetDataSection(vm, s)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = vm::addDownloads, enabled = s.busy == null) { Text("Add downloaded files") }
-            TextButton(onClick = { picker.launch(arrayOf("*/*")) }, enabled = s.busy == null) { Text("Pick a file") }
+/** The Library screen from state alone (no view model), so it can be rendered in tests. */
+@Composable
+fun LibraryContent(
+    s: LibraryState,
+    device: String,
+    ramGb: Double,
+    catalog: List<CatalogItem>,
+    actions: LibraryActions,
+    modifier: Modifier = Modifier,
+) {
+    val a = actions
+    Column(modifier.fillMaxSize()) {
+        Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 10.dp)) {
+            Text("Library", style = MaterialTheme.typography.headlineSmall)
+            Text(device, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (s.needsStorageAccess) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        RainbowRule()
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            GetDataSection(s, ramGb, catalog, a)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = a.addDownloads, enabled = s.busy == null) { Text("Add downloaded files") }
+                TextButton(onClick = a.pickFile, enabled = s.busy == null) { Text("Pick a file") }
+            }
+            if (s.needsStorageAccess) {
+                Panel {
                     Text(
                         "To use the files where your browser saved them, without copying 25 GB, Bivouac needs " +
                             "\"All files access\". It only reads its models and packs, and it has no internet " +
                             "permission, so nothing it reads can leave the phone.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(onClick = askStorageAccess) { Text("Allow file access") }
+                    Button(onClick = a.askStorageAccess) { Text("Allow file access") }
                 }
             }
-        }
-        s.notice?.let { msg ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
+            s.notice?.let { msg ->
+                Panel {
                     Text(msg, style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = vm::dismissNotice) { Text("OK") }
+                    TextButton(onClick = a.dismissNotice) { Text("OK") }
                 }
             }
-        }
-        s.busy?.let { Text(it) }
-        s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            s.busy?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+                RainbowProgress(null)
+            }
+            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-        Text("Models", style = MaterialTheme.typography.titleMedium)
-        if (s.models.isEmpty()) {
-            Text("No models yet. Download a .gguf file to the phone, then import it here.", style = MaterialTheme.typography.bodyMedium)
-        }
-        s.models.forEach { f ->
-            val loaded = s.loadedModel == f.id
-            FileCard(f, active = loaded, activeLabel = "Loaded", actionLabel = if (loaded) "Reload" else "Load",
-                enabled = s.busy == null, onAction = { vm.loadModel(f) }, onDelete = { vm.delete(f) })
-        }
+            Heading("Models")
+            if (s.models.isEmpty()) {
+                Text("No models yet. Download a .gguf file to the phone, then import it here.", style = MaterialTheme.typography.bodyMedium)
+            }
+            s.models.forEach { f ->
+                val loaded = s.loadedModel == f.id
+                FileCard(f, active = loaded, activeLabel = "Loaded", actionLabel = if (loaded) "Reload" else "Load",
+                    enabled = s.busy == null, onAction = { a.loadModel(f) }, onDelete = { a.delete(f) })
+            }
 
-        s.modelInfo?.let { info ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            s.modelInfo?.let { info ->
+                Panel {
                     Text(info.desc, style = MaterialTheme.typography.titleSmall)
                     Text(
                         String.format(
@@ -129,35 +186,41 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.bodySmall,
                     )
                     s.loadNote?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    Text(info.system, style = MaterialTheme.typography.labelSmall)
-                    OutlinedButton(onClick = vm::bench, enabled = s.busy == null) { Text("Benchmark (256 prompt / 64 gen)") }
+                    Text(info.system, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = a.bench, enabled = s.busy == null) { Text("Benchmark (256 prompt / 64 gen)") }
                     s.benchResult?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 }
             }
-        }
 
-        Text("Performance (applies on next Load)", style = MaterialTheme.typography.titleMedium)
-        SettingRow("Use all cores for reading", "Faster reading of sources; answers still use the fast cores", s.allCores, vm::setAllCores)
-        SettingRow("Automatic memory settings", "Chooses context length and repacking from the RAM free when loading", s.autoMemory, vm::setAutoMemory)
-        if (!s.autoMemory) {
-            SettingRow("Repack weights", "Faster math, but uses extra RAM about the model's size", s.repack, vm::setRepack)
-        }
+            Heading("Knowledge packs")
+            if (s.packs.isEmpty()) {
+                Text("No knowledge pack. Without one, answers come from the model's memory only.", style = MaterialTheme.typography.bodyMedium)
+            }
+            s.packs.forEach { f ->
+                val inUse = s.openPack == f.id || s.openPlaces == f.id
+                FileCard(f, active = inUse, activeLabel = "In use",
+                    actionLabel = if (inUse) null else "Use",
+                    enabled = s.busy == null, onAction = { a.openPack(f) }, onDelete = { a.delete(f) })
+            }
+            s.packInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            s.placesInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
-        Text("Answers", style = MaterialTheme.typography.titleMedium)
-        SettingRow("Think harder for calculations", "Reasons first on questions with numbers to work out: right far more often, a few minutes slower", s.autoThink, vm::setAutoThink)
+            Heading("Answers")
+            Panel {
+                SettingRow("Think harder for calculations", "Reasons first on questions with numbers to work out: right far more often, a few minutes slower", s.autoThink, a.setAutoThink)
+            }
 
-        Text("Knowledge packs", style = MaterialTheme.typography.titleMedium)
-        if (s.packs.isEmpty()) {
-            Text("No knowledge pack. Without one, answers come from the model's memory only.", style = MaterialTheme.typography.bodyMedium)
+            Heading("Performance (applies on next Load)")
+            Panel {
+                SettingRow("Use all cores for reading", "Faster reading of sources; answers still use the fast cores", s.allCores, a.setAllCores)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingRow("Automatic memory settings", "Chooses context length and repacking from the RAM free when loading", s.autoMemory, a.setAutoMemory)
+                if (!s.autoMemory) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SettingRow("Repack weights", "Faster math, but uses extra RAM about the model's size", s.repack, a.setRepack)
+                }
+            }
         }
-        s.packs.forEach { f ->
-            val inUse = s.openPack == f.id || s.openPlaces == f.id
-            FileCard(f, active = inUse, activeLabel = "In use",
-                actionLabel = if (inUse) null else "Use",
-                enabled = s.busy == null, onAction = { vm.openPack(f) }, onDelete = { vm.delete(f) })
-        }
-        s.packInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        s.placesInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -166,15 +229,13 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
  * app itself never needs network access; the downloaded files are then linked in place.
  */
 @Composable
-private fun GetDataSection(vm: AppViewModel, s: LibraryState) {
-    val context = LocalContext.current
-    val items = remember { Catalog.load(context) }
+private fun GetDataSection(s: LibraryState, ramGb: Double, items: List<CatalogItem>, a: LibraryActions) {
     if (items.isEmpty()) return
+    val rb = LocalRainbow.current
     val have = (s.models + s.packs).map { it.name }.toSet()
-    val ramGb = vm.runtime.device.totalRamGb
     // The biggest model that fits: the catalog lists them from small to large.
     val recommended = items.filter { it.kind == "model" && it.min_ram_gb <= ramGb }.maxByOrNull { it.min_ram_gb }?.id
-    Text("Get data", style = MaterialTheme.typography.titleMedium)
+    Heading("Get data")
     Text(
         "1. Tap Download: your browser saves the file to Downloads.  2. Come back and tap \"Add downloaded files\". " +
             "Bivouac itself has no internet permission.",
@@ -182,33 +243,47 @@ private fun GetDataSection(vm: AppViewModel, s: LibraryState) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     items.forEach { item ->
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.name, style = MaterialTheme.typography.titleSmall)
-                if (item.id == recommended) {
-                    Text("Recommended for this phone", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                }
+        Panel {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(item.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                if (item.file in have) Pill("Added", rb.pastel(5))
+            }
+            if (item.id == recommended) Pill("Recommended for this phone", rb.pastel(4))
+            Text(
+                String.format(Locale.US, "%.1f GB · %s", item.bytes / 1e9, item.license),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(item.about, style = MaterialTheme.typography.bodySmall)
+            if (item.min_ram_gb > ramGb) {
                 Text(
-                    String.format(Locale.US, "%.1f GB · %s", item.bytes / 1e9, item.license),
+                    String.format(Locale.US, "Needs about %.0f GB RAM; this phone has %.1f GB.", item.min_ram_gb, ramGb),
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
-                Text(item.about, style = MaterialTheme.typography.bodySmall)
-                if (item.min_ram_gb > ramGb) {
-                    Text(
-                        String.format(Locale.US, "Needs about %.0f GB RAM; this phone has %.1f GB.", item.min_ram_gb, ramGb),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                if (item.file in have) {
-                    Text("Added", color = MaterialTheme.colorScheme.primary)
-                } else {
-                    TextButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url)))
-                    }) { Text("Download") }
-                }
+            }
+            if (item.file !in have) {
+                FilledTonalButton(onClick = { a.download(item.url) }) { Text("Download") }
             }
         }
+    }
+}
+
+@Composable
+private fun Heading(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
+}
+
+/** A bordered card in the blog's callout style. */
+@Composable
+private fun Panel(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
 }
 
@@ -219,6 +294,7 @@ private fun SettingRow(title: String, subtitle: String, checked: Boolean, onChan
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Spacer(Modifier.width(12.dp))
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }
@@ -233,18 +309,20 @@ private fun FileCard(
     onAction: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Text(f.name, style = MaterialTheme.typography.titleSmall)
-            Text(
-                String.format(Locale.US, "%.2f GB", f.size / 1e9) + if (f.linked) " · linked in place" else "",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (active) Text(activeLabel, color = MaterialTheme.colorScheme.primary)
-                if (actionLabel != null) TextButton(onClick = onAction, enabled = enabled) { Text(actionLabel) }
-                TextButton(onClick = onDelete, enabled = enabled) { Text(if (f.linked) "Remove" else "Delete") }
-            }
+    val rb = LocalRainbow.current
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(f.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            if (active) Pill(activeLabel, rb.pastel(4))
+        }
+        Text(
+            String.format(Locale.US, "%.2f GB", f.size / 1e9) + if (f.linked) " · linked in place" else "",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (actionLabel != null) FilledTonalButton(onClick = onAction, enabled = enabled) { Text(actionLabel) }
+            TextButton(onClick = onDelete, enabled = enabled) { Text(if (f.linked) "Remove" else "Delete") }
         }
     }
 }

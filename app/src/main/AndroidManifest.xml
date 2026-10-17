@@ -21,7 +21,8 @@
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.Bivouac">
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"

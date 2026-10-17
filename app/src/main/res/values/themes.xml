@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="icon_background">#FFFDF8</color>
+    <!-- Same page color as the Compose theme, so the window does not flash on start. -->
+    <style name="Theme.Bivouac" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFFFF</item>
+    </style>
+</resources>
