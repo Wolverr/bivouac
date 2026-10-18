@@ -8,10 +8,11 @@ Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline to
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
 <p align="center">
-  <img src="docs/screenshots/ask-empty.png" width="24%" alt="Start screen with example questions">
-  <img src="docs/screenshots/ask-answer.png" width="24%" alt="A cited answer about HTTPS">
-  <img src="docs/screenshots/ask-places.png" width="24%" alt="Vegetarian places near the Duomo in Florence">
-  <img src="docs/screenshots/ask-answer-dark.png" width="24%" alt="The same answer in dark mode">
+  <img src="docs/screenshots/ask-empty.png" width="19%" alt="Start screen with example questions">
+  <img src="docs/screenshots/ask-reading.png" width="19%" alt="While the model reads: the source sentence that answers the question">
+  <img src="docs/screenshots/ask-answer.png" width="19%" alt="A cited answer about HTTPS">
+  <img src="docs/screenshots/ask-places.png" width="19%" alt="Vegetarian places near the Duomo in Florence">
+  <img src="docs/screenshots/ask-answer-dark.png" width="19%" alt="The same answer in dark mode">
 </p>
 <p align="center"><sub>The app's screens rendered from its code with sample data
 (<code>app/src/test/…/ScreenshotTest.kt</code>); light or dark follows the phone.</sub></p>
@@ -32,8 +33,14 @@ more than half as good as a frontier AI with web search, on a phone with at most
   Moscow → Москва).
 - **What's around a place.** "Best hikes near Interlaken", "temples near Siem Reap", "day trips
   from Lisbon": Wikipedia articles located near the place (1.2 M articles with coordinates, in a
-  spatial index) become sources, each labelled with its distance, so the answer names real
-  places at real distances. A city's "Main sights" list is used when it has one.
+  spatial index) become sources, each labelled with its distance and direction ("51 km west of
+  Edinburgh"), so the answer names real places at real distances instead of guessing. Castles,
+  lakes, temples and towns rank above events, companies and racetracks, and a day-trip list
+  names each destination once (Florence: Pisa, San Gimignano, Siena, Lucca, Volterra). A city's
+  "Main sights" list is used when it has one.
+- **Something useful while it thinks.** An 8 GB phone reads the excerpts for 30–45 s before
+  the first word. Meanwhile the app shows the one source sentence that best answers the
+  question (for "what should I do" questions, the treatment section), in that source's color.
 - **Fast on ordinary phones.** The target is 8 GB phones, not just flagships. The app reads the
   model's header and the phone's RAM before loading, then picks the context length and weight
   layout that fit. On an 8 GB phone it repacks the weights into a CPU-friendly layout, which
@@ -85,13 +92,17 @@ Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the boun
    from Wikipedia redirects ("GPS", "WW2"), 40 k acronyms mined from article intros for the ones
    Wikipedia only has as disambiguation pages ("TCP", "BMI"; the question picks the meaning), and
    list articles for list questions, read as their most viewed entries ("must-see museums in
-   Berlin" → Pergamon Museum, …) or in rank order ("tallest buildings in Dubai").
+   Berlin" → Pergamon Museum, …) or in rank order ("tallest buildings in Dubai"). Albums,
+   songs and films that merely share the question's words are left out unless the question is
+   about one ("why does ice float" is not about the jazz album *Floating Ice*).
 3. **Compress:** each source is cut down to the sentences that match the question.
 4. **Answer:** llama.cpp on the phone's CPU. The fixed instructions are evaluated once and
    reused from a cache, so only the question and excerpts are read each time.
 
 Place searches parse the kind of place and the location, geocode it (Wikipedia coordinates
 for 1.2 M articles, from the geo_tags dump, then town centroids), and pass the nearest matches with distances to the model.
+When the "place" isn't on the map ("the deepest lake in the world"), the question goes to
+Wikipedia instead.
 "Near X" and "day trips from X" questions also get the most viewed Wikipedia articles within
 20 km (day trips: 15–80 km) of X, from an R-tree over those coordinates.
 
