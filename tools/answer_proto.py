@@ -251,7 +251,7 @@ def generate(port: int, user: str, think: bool = False, system: str = ""):
     body = json.dumps({
         "messages": [{"role": "system", "content": system or SYSTEM}, {"role": "user", "content": user}],
         "chat_template_kwargs": {"enable_thinking": think},
-        **SAMPLING, "seed": SEED,
+        **SAMPLING, "seed": SEED, "cache_prompt": False,
         **({"max_tokens": THINK_MAX_TOKENS} if think else {}),
     }).encode()
     req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions", body, {"Content-Type": "application/json"})
