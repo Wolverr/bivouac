@@ -617,7 +617,7 @@ class ResearchPipeline(
             "\\b(?:near|around|close to|surrounding|day trips? from|excursions? from)\\s+(?:the\\s+)?(.+)", RegexOption.IGNORE_CASE,
         )
         /** The question must ask for things to find, not whether two places are near each other. */
-        private val NEAR_ASK = Regex("\\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do)\\b", RegexOption.IGNORE_CASE)
+        private val NEAR_ASK = Regex("\\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do|recommend|suggest|top|list|hikes?|walks?)\\b", RegexOption.IGNORE_CASE)
         private val DAY_TRIP = Regex("\\b(day trips?|excursions?)\\b", RegexOption.IGNORE_CASE)
         /** "The best way to get around Istanbul" is about transport, not what's near Istanbul. */
         private val GET_AROUND = Regex(

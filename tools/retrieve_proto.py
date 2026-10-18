@@ -379,7 +379,7 @@ def sights_evidence(pack: "Pack", article) -> tuple[int, str] | None:
 # this: the hikes are separate articles (Harder Kulm, Schynige Platte) that rarely name the town.
 NEAR_RE = re.compile(r"\b(?:near|around|close to|surrounding|day trips? from|excursions? from)\s+(?:the\s+)?(.+)", re.I)
 # The question must ask for things to find, not whether two places are near each other.
-NEAR_ASK = re.compile(r"\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do)\b", re.I)
+NEAR_ASK = re.compile(r"\b(what|which|where|any|best|good|some|things|places|worth|visit|see|do|recommend|suggest|top|list|hikes?|walks?)\b", re.I)
 DAY_TRIP = re.compile(r"\b(day trips?|excursions?)\b", re.I)
 # "the best way to get around Istanbul" is about transport, not what's near Istanbul.
 GET_AROUND = re.compile(r"\b(get|getting|go|going|travel\w*|mov\w*|driv\w*|cycl\w*|walk\w*)\s+around\b", re.I)
