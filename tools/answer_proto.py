@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 from places_proto import Places, parse_intent
-from retrieve_proto import (Pack, aspect_sections, compress, fts_query, is_namesake, is_work, is_sights_question, keywords, list_entries,
+from retrieve_proto import (Pack, compress, fts_query, is_namesake, is_work, is_sights_question, keywords, list_entries,
                             named_articles, nearby_articles, nearby_location, sights_evidence)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -100,9 +100,6 @@ def retrieve(pack: Pack, q: str):
         if sights:  # a city's "Main sights" list, whole: its first chunk is the source
             cands.append((sights[0], art_id, title, SIGHTS_SECTION_NAME))
             whole[sights[0]] = sights[1]
-        # "monsoon season in Thailand" without a Climate of Thailand article: Thailand's climate section.
-        for cid, sec in aspect_sections(pack, (art_id, title, first_chunk, n_chunks), q, [a[1] for a in named]):
-            cands.append((cid, art_id, title, sec))
     loc = nearby_location(pack, q)
     if loc:  # "hikes near Interlaken": articles located nearby, with how far they are
         for cid, aid, title, km, text, direction in nearby_articles(pack, q, loc):

@@ -237,9 +237,8 @@ class ResearchPipeline(
         val t0 = System.currentTimeMillis()
 
         // Articles named in the question lead with their intro: that's where definitions live.
-        val allNamed = (listOfNotNull(listArticle(corpus, question)) + titleMatches(corpus, question)).distinctBy { it.id }
-        // Topic sub-articles don't take a name's place: "climates of Seattle and Denver" keeps Denver.
-        val named = allNamed.take(minOf(3 + allNamed.count { Evidence.isAspectTitle(it.title) }, 5))
+        val named = (listOfNotNull(listArticle(corpus, question)) + titleMatches(corpus, question))
+            .distinctBy { it.id }.take(3)
         val namedIds = named.map { it.id }.toSet()
         val seen = HashSet<Long>()
         val facts = HashMap<Long, String>()
@@ -258,9 +257,7 @@ class ResearchPipeline(
             }
             val sights = if (sightsQuestion) sightsEvidence(corpus, article) else null
             sights?.let { (p, text) -> whole[p.chunk] = text }  // a city's sights list, whole
-            listOfNotNull(lead(corpus, article, words, seen, facts), sights?.first?.copy(section = SIGHTS_SECTION)) +
-                // "monsoon season in Thailand" without a Climate of Thailand article: Thailand's climate section.
-                aspectSections(corpus, article, question, named.map { it.title })
+            listOfNotNull(lead(corpus, article, words, seen, facts), sights?.first?.copy(section = SIGHTS_SECTION))
         }
         // "Hikes near Interlaken": articles located nearby, with how far they are.
         val nearbyLeads = nearbyLocation(corpus, question)?.let { loc ->
@@ -398,9 +395,6 @@ class ResearchPipeline(
                             break
                         }
                     }
-                    // "monsoon season in Thailand" -> Climate of Thailand, "get around Istanbul" -> Transport
-                    // in Istanbul: the main article only touches these; ahead of the bare name.
-                    if (named) aspectArticles(corpus, hit.title, question).forEach { if (it.id !in found) found[it.id] = it }
                     found[hit.id] = hit
                     // Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
                     namedHit = namedHit || named
@@ -579,43 +573,6 @@ class ResearchPipeline(
     private suspend fun isWork(corpus: Corpus, title: String, question: String): Boolean {
         if (Evidence.asksAboutMedia(question)) return false
         return corpus.findArticle(title)?.let { isWork(corpus, it, question) } ?: false
-    }
-
-    /**
-     * Topic sub-articles the question asks about ("Climate of Thailand", "Transport in Istanbul").
-     * Redirects count when they keep the topic word ("Cuisine of Thailand" -> Thai cuisine).
-     * Mirrors tools/retrieve_proto.py aspect_articles.
-     */
-    private suspend fun aspectArticles(corpus: Corpus, title: String, question: String): List<Article> =
-        Evidence.ASPECTS.filter { it.words.containsMatchIn(question) }.mapNotNull { aspect ->
-            aspect.titles.firstNotNullOfOrNull { form ->
-                corpus.findArticle(form.format(title))
-                    ?.takeIf { it.title.contains(form.substringBefore(' '), ignoreCase = true) }
-            }
-        }
-
-    /**
-     * When no sub-article was found, the article's own section for the topic ("Thailand — Geography >
-     * Climate"), first chunk only; [titles]: the articles already picked ("Climate of Seattle" makes
-     * Seattle's section redundant, not Denver's). Mirrors tools/retrieve_proto.py aspect_sections.
-     */
-    private suspend fun aspectSections(corpus: Corpus, article: Article, question: String, titles: List<String>): List<Passage> {
-        val mine = titles.map { it.lowercase() }.filter { article.title.lowercase() in it }
-        val headings = Evidence.ASPECTS.filter { a ->
-            a.heading != null && a.words.containsMatchIn(question) &&
-                mine.none { a.titles[0].substringBefore(' ').lowercase() in it }
-        }.mapNotNull { it.heading }.toMutableList()
-        if (headings.isEmpty()) return emptyList()
-        val out = ArrayList<Passage>()
-        for (i in 0 until article.n_chunks) {
-            val p = corpus.chunk(article, i) ?: continue
-            val last = p.section.lowercase().substringAfterLast('>')  // "Geography > Climate", not "Climate > Flora"
-            val h = headings.firstOrNull { it in last } ?: continue
-            out += p
-            headings -= h
-            if (headings.isEmpty()) break
-        }
-        return out
     }
 
     companion object {

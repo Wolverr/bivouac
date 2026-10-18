@@ -123,33 +123,6 @@ object Evidence {
     fun describesWork(intro: String) =
         WORK_KIND.containsMatchIn(intro.replace(PADDING, " ").trim().split(SENTENCE_END, 2)[0].take(250))
 
-    /** Question words -> topic sub-article titles, and the section heading to use when there is none. */
-    class Aspect(val words: Regex, val titles: List<String>, val heading: String?)
-
-    /** Mirrors tools/retrieve_proto.py ASPECTS. */
-    val ASPECTS = listOf(
-        Aspect(Regex("\\b(climates?|weather|rain\\w*|monsoons?|seasons?|temperatures?|humid\\w*|snow\\w*|typhoons?|hurricanes?)\\b",
-            RegexOption.IGNORE_CASE), listOf("Climate of %s"), "climate"),
-        Aspect(Regex("\\b(get(ting)? around|transport\\w*|metro|subway|bus|buses|trams?|taxis?|ferr(y|ies)|public transit)\\b",
-            RegexOption.IGNORE_CASE), listOf("Transport in %s", "Public transport in %s", "Transportation in %s"), "transport"),
-        Aspect(Regex("\\b(food|foods|eat|eating|dish(es)?|cuisine|meals?)\\b", RegexOption.IGNORE_CASE), listOf("Cuisine of %s"), "cuisine"),
-        Aspect(Regex("\\b(economy|economic|gdp|industr\\w*)\\b", RegexOption.IGNORE_CASE), listOf("Economy of %s"), "economy"),
-        Aspect(Regex("\\b(history|historical|independen\\w*)\\b", RegexOption.IGNORE_CASE), listOf("History of %s"), null),
-        Aspect(Regex("\\b(culture|customs?|etiquette|tipping|traditions?)\\b", RegexOption.IGNORE_CASE), listOf("Culture of %s"), "culture"),
-        Aspect(Regex("\\b(languages?|speak|spoken)\\b", RegexOption.IGNORE_CASE), listOf("Languages of %s"), "language"),
-        Aspect(Regex("\\b(religions?|religious)\\b", RegexOption.IGNORE_CASE), listOf("Religion in %s"), "religion"),
-        Aspect(Regex("\\b(population|demographics?|ethnic\\w*)\\b", RegexOption.IGNORE_CASE), listOf("Demographics of %s"), "demographic"),
-        Aspect(Regex("\\b(tap water|drinking water|drink the water)\\b", RegexOption.IGNORE_CASE),
-            listOf("Water supply and sanitation in %s"), null),
-    )
-    private val ASPECT_TITLE = Regex(
-        "^(climate|transport|public transport|transportation|cuisine|economy|history|culture|languages|religion|" +
-            "demographics|water supply and sanitation) (of|in) |.* cuisine$", RegexOption.IGNORE_CASE,
-    )
-
-    /** "Climate of Thailand", "Thai cuisine": a topic sub-article, which doesn't take a named article's place. */
-    fun isAspectTitle(title: String) = ASPECT_TITLE.containsMatchIn(title)
-
     private val ASKS_ADVICE = Regex(
         "\\b(what (should|do|can) (i|you|we) do|what to do|how (do|can|should) (i|you|we) (treat|stop|prevent|avoid|help)|" +
             "first aid|treat\\w*)\\b", RegexOption.IGNORE_CASE,

@@ -233,13 +233,6 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                             seen.add(about[0])
                             used[k] = True
                             break
-                # "monsoon season in Thailand" -> Climate of Thailand, "get around Istanbul" -> Transport
-                # in Istanbul: the main article only touches these; ahead of the bare name.
-                if named:
-                    for about in aspect_articles(pack, row[1], question):
-                        if about[0] not in seen:
-                            found.append(about[:4])
-                            seen.add(about[0])
                 found.append(row[:4])
                 seen.add(row[0])
                 named_hit = named_hit or named
@@ -292,58 +285,6 @@ def is_work(pack: "Pack", row, question: str) -> bool:
         sent = SENT_RE.split(PADDING_RE.sub(" ", pack.text(cid)).strip(), 1)[0][:250]
         cache[row[0]] = bool(WORK_KIND.search(sent))
     return cache[row[0]]
-
-
-# Topic sub-articles of a named place or thing: question words -> Wikipedia's title forms.
-ASPECTS = [  # (question words, sub-article titles, section heading in the main article or None)
-    (re.compile(r"\b(climates?|weather|rain\w*|monsoons?|seasons?|temperatures?|humid\w*|snow\w*|typhoons?|hurricanes?)\b", re.I),
-     ("Climate of {}",), "climate"),
-    (re.compile(r"\b(get(ting)? around|transport\w*|metro|subway|bus|buses|trams?|taxis?|ferr(y|ies)|public transit)\b", re.I),
-     ("Transport in {}", "Public transport in {}", "Transportation in {}"), "transport"),
-    (re.compile(r"\b(food|foods|eat|eating|dish(es)?|cuisine|meals?)\b", re.I), ("Cuisine of {}",), "cuisine"),
-    (re.compile(r"\b(economy|economic|gdp|industr\w*)\b", re.I), ("Economy of {}",), "economy"),
-    (re.compile(r"\b(history|historical|independen\w*)\b", re.I), ("History of {}",), None),
-    (re.compile(r"\b(culture|customs?|etiquette|tipping|traditions?)\b", re.I), ("Culture of {}",), "culture"),
-    (re.compile(r"\b(languages?|speak|spoken)\b", re.I), ("Languages of {}",), "language"),
-    (re.compile(r"\b(religions?|religious)\b", re.I), ("Religion in {}",), "religion"),
-    (re.compile(r"\b(population|demographics?|ethnic\w*)\b", re.I), ("Demographics of {}",), "demographic"),
-    (re.compile(r"\b(tap water|drinking water|drink the water)\b", re.I), ("Water supply and sanitation in {}",), None),
-]
-ASPECT_TITLE = re.compile(r"^(climate|transport|public transport|transportation|cuisine|economy|history|culture|languages|"
-                          r"religion|demographics|water supply and sanitation) (of|in) |.* cuisine$", re.I)
-
-
-def aspect_articles(pack: "Pack", title: str, question: str) -> list:
-    """ResearchPipeline.aspectArticles: [(id, title, first_chunk, n_chunks, prior)] for the topics the
-    question asks about ("Climate of Thailand"). Redirects count when they keep the topic word
-    ("Cuisine of Thailand" -> Thai cuisine)."""
-    out = []
-    for pat, forms, _ in ASPECTS:
-        if not pat.search(question):
-            continue
-        for form in forms:
-            row = pack.find_article(form.format(title))
-            if row and form.split()[0].lower() in row[1].lower():
-                out.append(row)
-                break
-    return out
-
-
-def aspect_sections(pack: "Pack", article, question: str, titles) -> list[tuple[int, str]]:
-    """ResearchPipeline.aspectSections: when no sub-article was found, the main article's own section
-    for the topic ("Thailand — Geography > Climate"), first chunk only. titles: the articles already
-    picked (a "Climate of X" makes the section redundant). Returns [(chunk_id, section)]."""
-    out = []
-    mine = [t.lower() for t in titles if article[1].lower() in t.lower()]  # "Climate of Seattle" is not Denver's
-    for pat, forms, heading in ASPECTS:
-        if heading is None or not pat.search(question) or any(forms[0].split()[0].lower() in t for t in mine):
-            continue
-        for row in pack.db.execute("SELECT id, section FROM chunk WHERE article = ? AND lower(section) LIKE ? "
-                                   "ORDER BY id", (article[0], f"%{heading}%")):
-            if heading in row[1].lower().rsplit(">", 1)[-1]:  # "Geography > Climate", not "Climate > Flora"
-                out.append(row)
-                break
-    return out
 
 
 def sentence_starts(question: str) -> list[bool]:
@@ -643,9 +584,7 @@ def named_articles(pack: "Pack", question: str, k: int = 3):
         if row and row[0] not in seen:
             out.append(row)
             seen.add(row[0])
-    # Topic sub-articles don't take a name's place: "climates of Seattle and Denver" keeps Denver.
-    extra = sum(1 for r in out if ASPECT_TITLE.match(r[1]))
-    return out[:min(k + extra, 5)]
+    return out[:k]
 
 
 QUALIFIER = re.compile(r"^(.*?)\s*\(([^()]*)\)\s*$")

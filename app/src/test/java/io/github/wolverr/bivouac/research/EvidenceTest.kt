@@ -139,14 +139,4 @@ class EvidenceTest {
         )
         assertEquals(1, snake?.first)
     }
-
-    @Test
-    fun topicSubArticles() {
-        assertTrue(Evidence.isAspectTitle("Climate of Seattle"))
-        assertTrue(Evidence.isAspectTitle("Public transport in Istanbul"))
-        assertTrue(Evidence.isAspectTitle("Thai cuisine"))
-        assertFalse(Evidence.isAspectTitle("Seattle"))
-        val asked = Evidence.ASPECTS.filter { it.words.containsMatchIn("When is the monsoon season in Thailand?") }
-        assertEquals(listOf("climate"), asked.map { it.heading })
-    }
 }
