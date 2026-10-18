@@ -193,7 +193,7 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
             if any(used[i:i + n]):
                 continue
             words = toks[i:i + n]
-            if all(w.lower() in STOP for w in words) or (n == 1 and len(words[0]) < 3):
+            if all(w.lower() in STOP for w in words) or (n == 1 and len(words[0]) < 3 and not words[0].isupper()):
                 continue
             # "in Mexico" (a photo book) inside "in Mexico City"; "The Hague" as written still counts.
             if n > 1 and (words[0] in STOP or words[-1] in STOP):
@@ -217,6 +217,9 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                 if n == 1 and words[0].lower() in NUMBER_WORDS:
                     continue
                 if not named and is_work(pack, row, question):
+                    continue
+                # A plain word's redirect must keep the word: "doctor" is not ELIZA (its DOCTOR script).
+                if not named and not shares_word(row[1], c):
                     continue
                 # A name and the lowercase noun after it: "Soviet Union collapse" -> "Collapse of the
                 # Soviet Union", "UK parliament" -> "Parliament of the UK"; ahead of the bare name.
