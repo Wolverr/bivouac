@@ -121,8 +121,11 @@ class ResearchPipeline(
         emit(ResearchEvent.Routed(decision, think))
 
         val nearby = if (placeIntent != null) findPlaces(placeIntent) else emptyList()
+        // "the deepest lake in the world" reads like a places search ("lake in the world"); when the place
+        // isn't on the map, answer from Wikipedia instead of from no sources at all.
+        val notAPlace = placeIntent != null && !placeIntent.nearMe && nearby.isEmpty()
 
-        val sources = if (placeIntent == null && decision.route == Router.Route.LOOKUP && corpus?.path != null) {
+        val sources = if ((placeIntent == null || notAPlace) && decision.route == Router.Route.LOOKUP && corpus?.path != null) {
             // A short follow-up ("and its population?") needs the earlier topic to search well.
             val query = if (decision.followUp) "${conversation.lastQuestion.orEmpty()} $question" else question
             retrieve(query, settings)
@@ -204,7 +207,8 @@ class ResearchPipeline(
         emit(ResearchEvent.Searching("places"))
         val center = if (intent.nearMe) locate() else places.geocode(intent.location!!, corpus?.takeIf { it.path != null })
         val found = if (center != null) places.nearby(center, places.categoriesFor(intent)) else emptyList()
-        emit(ResearchEvent.PlacesFound(intent, center, found))
+        // A written place with nothing found falls back to Wikipedia: no "couldn't find the world" card.
+        if (intent.nearMe || found.isNotEmpty()) emit(ResearchEvent.PlacesFound(intent, center, found))
         return found
     }
 

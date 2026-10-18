@@ -304,6 +304,10 @@ def main():
         r = route(q["q"])
         hit = find_places(places, q["q"]) if places else None
         found = None
+        # ResearchPipeline.notAPlace: a written place that isn't on the map ("the deepest lake in the
+        # world") falls back to Wikipedia; "near me" (no GPS here) stays a places question.
+        if hit is not None and not hit[1] and hit[0]["location"] is not None:
+            hit = None
         if hit is not None:
             intent, found = hit
             r, sources = "places", []
