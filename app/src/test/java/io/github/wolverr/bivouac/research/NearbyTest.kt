@@ -23,6 +23,14 @@ class NearbyTest {
     }
 
     @Test
+    fun firstSentenceSkipsPronunciation() {
+        assertEquals(
+            "Scuderia Toro Rosso SpA was an Italian Formula One racing team.",
+            ResearchPipeline.firstSentence("Scuderia Toro Rosso SpA (Italian pronunciation: [skudeˈriːa]; lit. Red Bull Team) was an Italian Formula One racing team. It raced from 2006."),
+        )
+    }
+
+    @Test
     fun compassPoints() {
         assertEquals("north", ResearchPipeline.compass(10.0, 0.5))
         assertEquals("west", ResearchPipeline.compass(1.0, -50.0))

@@ -502,12 +502,13 @@ class ResearchPipeline(
             if (km > loc.km || km < loc.minKm) continue
             val first = corpus.chunk(a, 0) ?: continue
             val intro = if (first.section == "Infobox" && a.n_chunks > 1) corpus.chunk(a, 1) ?: continue else first
-            val text = PADDING.replace(intro.text, " ")
-            if (NEARBY_SKIP_KIND.containsMatchIn(Evidence.SENTENCE_END.split(text, 2)[0].take(300))) continue
+            val text = COORD_PREFIX.replace(PADDING.replace(intro.text, " "), "")
+            val firstSentence = firstSentence(text)
+            if (NEARBY_SKIP_KIND.containsMatchIn(firstSentence)) continue
             val lowTitle = a.title.lowercase()
             val low = text.lowercase()
             val hits = topic.sumOf { t -> if (t in lowTitle) 2.0 else if (t in low) 1.0 else 0.0 }
-            val sight = if (SIGHT_KIND.containsMatchIn("${a.title} ${Evidence.SENTENCE_END.split(text, 2)[0].take(300)}")) SIGHT_BONUS else 0.0
+            val sight = if (SIGHT_KIND.containsMatchIn("${a.title} $firstSentence")) SIGHT_BONUS else 0.0
             val direction = compass((a.lat - loc.lat) * 111.0, (a.lon!! - loc.lon) * 111.0 * coslat)
             scored += Scored(a.prior + 2.0 * hits + sight, NearbyHit(intro.copy(text = text), km, direction, a.lat, a.lon))
         }
@@ -675,15 +676,25 @@ class ResearchPipeline(
             "earthquake|avalanche|company|corporation|manufacturer|brand|university|college|school|airport|station|club|team|" +
             "band|album|song|film|novel|book|election|treaty|agreement|footballer|politician|player|singer|actor|person|" +
             "stadium|arena|casino|hotel|motorway|tunnel|championship|tournament|" +
-            "assassination|death|funeral|riot|protest|explosion|region|prefecture"
+            "assassination|death|funeral|riot|protest|explosion|region|prefecture|circuit|racetrack|speedway|" +
+            "race|festival|constructor|roller coaster"
         private val NEARBY_SKIP_TITLE = Regex("\\b($NOT_A_SIGHT)s?\\b", RegexOption.IGNORE_CASE)
-        /** What the intro says the article is: "... was a scheduled flight", "... is a district". */
+        /** What the intro says the article is: "... was a scheduled flight", "... is an Italian Formula One racing team". */
         private val NEARBY_SKIP_KIND = Regex(
-            "\\b(is|was|are|were) (an?|the)( [\\p{L}\\p{N}_\\-]+){0,3} ($NOT_A_SIGHT|district|county|province|region|canton|" +
+            "\\b(is|was|are|were) (an?|the)( [\\p{L}\\p{N}_\\-]+){0,4} ($NOT_A_SIGHT|district|county|province|region|canton|" +
                 "diocese|parish|constituency|municipality|ward|state|country|venue|highway|road|census-designated place)s?\\b",
             RegexOption.IGNORE_CASE,
         )
-        /** Things people go and see: Stirling Castle and St Andrews ("a town") ahead of the Stone of Scone on popularity alone. */
+        /** Intros that open with coordinates ("44°18′28″N 11°51′42″E / 44.30°N 11.86°E Scuderia Toro Rosso SpA ..."). */
+        private val COORD_PREFIX = Regex(
+            "^\\s*\\d{1,3}°[^A-Za-z]{0,60}[NS][^A-Za-z]{0,60}[EW](?:[^A-Za-z]{0,60}[NS][^A-Za-z]{0,60}[EW])?\\W*",
+        )
+        private val PARENS = Regex("\\s*\\([^()]*\\)")
+
+        /** Without parentheses, where "(Italian pronunciation: ...; lit. ...)" would end the sentence early. */
+        fun firstSentence(text: String): String = Evidence.SENTENCE_END.split(PARENS.replace(text, ""), 2)[0].take(300)
+
+        /** Things people go and see:Stirling Castle and St Andrews ("a town") ahead of the Stone of Scone on popularity alone. */
         private val SIGHT_KIND = Regex(
             "\\b(castle|palace|abbey|cathedral|church|chapel|temple|shrine|monastery|loch|lake|national park|island|bridge|" +
                 "monument|museum|gardens?|ruins?|mountain|peak|hill|beach|waterfall|falls|valley|glen|gorge|fort|fortress|" +

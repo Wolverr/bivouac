@@ -456,11 +456,25 @@ _NOT_A_SIGHT = (r"flight|crash|disaster|incident|attack|bombing|battle|siege|mas
                 r"company|corporation|manufacturer|brand|university|college|school|airport|station|club|team|band|album|"
                 r"song|film|novel|book|election|treaty|agreement|footballer|politician|player|singer|actor|person|"
                 r"stadium|arena|casino|hotel|motorway|tunnel|championship|tournament|"
-                r"assassination|death|funeral|riot|protest|explosion|region|prefecture")
+                r"assassination|death|funeral|riot|protest|explosion|region|prefecture|circuit|racetrack|speedway|"
+                r"race|festival|constructor|roller coaster")
 NEARBY_SKIP_TITLE = re.compile(rf"\b({_NOT_A_SIGHT})s?\b", re.I)
+# Four words before the kind: "is an Italian Formula One racing team".
 NEARBY_SKIP_KIND = re.compile(
-    rf"\b(is|was|are|were) (an?|the)( [\w\-]+){{0,3}} ({_NOT_A_SIGHT}|district|county|province|region|canton|diocese|"
+    rf"\b(is|was|are|were) (an?|the)( [\w\-]+){{0,4}} ({_NOT_A_SIGHT}|district|county|province|region|canton|diocese|"
     rf"parish|constituency|municipality|ward|state|country|venue|highway|road|census-designated place)s?\b", re.I)
+# Intros that open with the article's coordinates ("44°18′28″N 11°51′42″E / 44.30°N 11.86°E Scuderia Toro Rosso
+# SpA is ..."): without them the first sentence says what the article is.
+PARENS = re.compile(r"\s*\([^()]*\)")
+
+
+def first_sentence(text: str) -> str:
+    """ResearchPipeline.firstSentence: without parentheses, where "(Italian pronunciation: ...; lit. ...)"
+    would end the sentence before "was an Italian Formula One racing team"."""
+    return SENT_RE.split(PARENS.sub("", text), 1)[0][:300]
+
+
+COORD_PREFIX = re.compile(r"^\s*\d{1,3}°[^A-Za-z]{0,60}[NS][^A-Za-z]{0,60}[EW](?:[^A-Za-z]{0,60}[NS][^A-Za-z]{0,60}[EW])?\W*")
 NEARBY_GENERIC = set("""best good great nice top near around close surrounding worth visit visiting see seeing do doing
 things thing places place trip trips day excursion excursions there any some go most can""".split())
 # Things people go and see, in the title or the intro's first sentence: Stirling Castle and St Andrews
@@ -540,12 +554,13 @@ def nearby_articles(pack: "Pack", question: str, loc) -> list[tuple]:
         if dist > km or dist < min_km:
             continue
         cid = intro_chunk(pack, first, n)
-        text = PADDING_RE.sub(" ", pack.text(cid))
-        if NEARBY_SKIP_KIND.search(SENT_RE.split(text, 1)[0][:300]):
+        text = COORD_PREFIX.sub("", PADDING_RE.sub(" ", pack.text(cid)))
+        first_sent = first_sentence(text)
+        if NEARBY_SKIP_KIND.search(first_sent):
             continue
         low_t, low = title.lower(), text.lower()
         hits = sum(2.0 if t in low_t else 1.0 if t in low else 0.0 for t in topic)
-        sight = SIGHT_BONUS if SIGHT_KIND.search(f"{title} {SENT_RE.split(text, 1)[0][:300]}") else 0.0
+        sight = SIGHT_BONUS if SIGHT_KIND.search(f"{title} {first_sent}") else 0.0
         direction = compass((alat - lat) * 111.0, (alon - lon) * 111.0 * coslat)
         scored.append((prior + 2.0 * hits + sight, cid, aid, title, dist, text, direction, alat, alon))
     scored.sort(key=lambda s: -s[0])
