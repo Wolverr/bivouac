@@ -1,0 +1,21 @@
+{
+ "old": "results-pc-qwen3.5-9b-v24-old.jsonl",
+ "new": "results-pc-qwen3.5-9b-v24-new.jsonl",
+ "questions": 26,
+ "identical": 1,
+ "old_mean": 5.56,
+ "new_mean": 6,
+ "mean_diff": 0.42,
+ "ci95": [
+  -0.1,
+  0.95
+ ],
+ "new_better": 11,
+ "old_better": 8,
+ "ties": 7,
+ "sign_test_p": 0.648,
+ "by_category": {
+  "places": 0,
+  "travel": 0.85
+ }
+}

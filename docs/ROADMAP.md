@@ -16,6 +16,41 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
+## Resume here (2026-10-18, home PC)
+
+**Branch `quality`** (from main f376cc7; not merged yet, waiting for the clean check below):
+- Title-match junk filters (harness + app): creative works (album/song/film... by title qualifier or the
+  intro's first sentence) unless the question asks about media or names them ("ice floats" -> no "Floating
+  Ice" album, "monsoon season" -> no mixtape); "I" is not a name ("should I try" -> no song "I Try");
+  phrases with a lowercase stop word at an edge ("in Mexico" photo book inside "in Mexico City"); number
+  words ("two a day" -> no article "2"); two-letter capitals match alone (UK); a plain word's redirect must
+  share a 3-letter stem ("doctor" -> no ELIZA, "diesel" -> no Shaquille O'Neal).
+- Nearby / day trips: compass direction in the label ("51 km west of Edinburgh": the model had put Perth
+  and St Andrews south); +1 for sight kinds (castle, lake, temple, town...) in title or first sentence;
+  one pick per destination on day trips (5 km apart); skip events, regions, circuits, races, festivals,
+  F1 constructors, roller coasters; the first sentence drops coordinates and parentheses ("(Italian
+  pronunciation: ...; lit. ...)" ended it early). Paired 9B, 26 q: +0.42 (CI -0.10..0.95), 11/8/7;
+  Edinburgh 4 -> 7. Florence after the later filter fix: Pisa, San Gimignano, Siena, Lucca, Volterra.
+- "While you wait" card (app only): Evidence.bestExcerpt picks the source sentence that answers most of
+  the question (number/month bonus for when/how-much, Treatment/First aid sections for what-to-do), shown
+  above the progress bar while the model reads. Rendered in ScreenshotTest (ask-reading), not yet on a phone.
+- **Tried and dropped: topic sub-articles** ("Climate of X", "Transport in X", "History of X", "Cuisine of X",
+  or the place's own section). Paired 9B on the 40 changed main/held-out/fresh prompts: -0.47 (CI -1.02..0.07,
+  13/21/6): travel/climate gained (Istanbul, Thailand monsoon 5 -> 7) but broad articles pushed out precise
+  excerpts (Iceland independence 9 -> 4, Bronze Age collapse 7 -> 4). Travel-only variant on 12 fresh
+  questions: +0.25 (CI -1.14..1.64), no better than the filters alone (+0.42). Also rejected without a run:
+  "best-matching chunk of each named article" (word overlap picked Tokyo's 1973 history for a flight
+  question, radiation burns for a kitchen burn).
+- **Eval harness fix: `cache_prompt: false`.** llama-server reused the previous prompt's prefix, so the same
+  seeded prompt gave different answers depending on the question before it (3 of 3 differed between a
+  12-question and a 3-question run). With it off, alone vs after 5 others: identical. Earlier paired runs
+  carried this noise; treat small differences in them (< ~0.5) as noise.
+- Running at handoff: queue28, the clean main-vs-quality check on all sets (60 changed prompts).
+  Grade with `grade.py pair` on eval/results-pc-qwen3.5-9b-v28-*-{asp-old,q-new}.jsonl (concatenate the sets).
+
+Next: merge `quality` if the clean check is not negative; then the Redmi check (restyle, excerpt card,
+packs from Downloads), release build with the real key, final held-out run for the README.
+
 ## Resume here (2026-10-17): user direction
 
 - **No 12 GB phone before the deadline.** Stop waiting for it: the 12 GB tier stays the 9B on PC evidence

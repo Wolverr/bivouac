@@ -1,0 +1,24 @@
+{
+ "old": "results-pc-qwen3.5-9b-v25-f2-asp-old.jsonl",
+ "new": "results-pc-qwen3.5-9b-v25-f2-split-travel.jsonl",
+ "questions": 12,
+ "identical": 0,
+ "old_mean": 5.92,
+ "new_mean": 6.17,
+ "mean_diff": 0.25,
+ "ci95": [
+  -1.14,
+  1.64
+ ],
+ "new_better": 5,
+ "old_better": 6,
+ "ties": 1,
+ "sign_test_p": 1.0,
+ "by_category": {
+  "compare": 1,
+  "explain": -2,
+  "reasoning": -4,
+  "synthesis": 5,
+  "travel": 0.38
+ }
+}
