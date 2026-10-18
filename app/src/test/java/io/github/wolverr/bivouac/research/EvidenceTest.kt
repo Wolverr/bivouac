@@ -95,4 +95,35 @@ class EvidenceTest {
         assertTrue(out, out.contains("capital of Kazakhstan"))
         assertFalse(out, out.contains("Football"))
     }
+
+    @Test
+    fun plainWordRedirectsMustKeepTheWord() {
+        assertTrue(Evidence.sameStem("Litre", "liters"))
+        assertTrue(Evidence.sameStem("Cat", "cat"))
+        assertTrue(Evidence.sameStem("Snakebite", "snake bite"))
+        assertFalse(Evidence.sameStem("ELIZA", "doctor"))
+        assertFalse(Evidence.sameStem("Shaquille O'Neal", "diesel"))
+    }
+
+    @Test
+    fun creativeWorksAreRecognised() {
+        assertTrue(Evidence.describesWork("Floating Ice is an album by American jazz bassist Michael Bisio. It was recorded in 2012."))
+        assertTrue(Evidence.describesWork("Monsoon Season is the debut mixtape from Hanumankind."))
+        assertFalse(Evidence.describesWork("Ice is water that is frozen into a solid state. It is the subject of many songs."))
+        assertTrue(Evidence.isWorkTitle("Big (film)"))
+        assertTrue(Evidence.isWorkTitle("Northern Light (song)"))
+        assertFalse(Evidence.isWorkTitle("Rome, New York"))
+        assertTrue(Evidence.asksAboutMedia("Who sang Bohemian Rhapsody?"))
+        assertFalse(Evidence.asksAboutMedia("Why does ice float on water?"))
+    }
+
+    @Test
+    fun topicSubArticles() {
+        assertTrue(Evidence.isAspectTitle("Climate of Seattle"))
+        assertTrue(Evidence.isAspectTitle("Public transport in Istanbul"))
+        assertTrue(Evidence.isAspectTitle("Thai cuisine"))
+        assertFalse(Evidence.isAspectTitle("Seattle"))
+        val asked = Evidence.ASPECTS.filter { it.words.containsMatchIn("When is the monsoon season in Thailand?") }
+        assertEquals(listOf("climate"), asked.map { it.heading })
+    }
 }

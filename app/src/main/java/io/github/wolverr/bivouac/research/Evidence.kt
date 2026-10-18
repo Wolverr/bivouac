@@ -83,6 +83,73 @@ object Evidence {
 
     fun isStop(word: String) = word.lowercase() in STOP
 
+    private val NUMBER_WORDS =
+        "one two three four five six seven eight nine ten eleven twelve hundred thousand million".split(" ").toHashSet()
+
+    /** "two a day" is not about the number 2. */
+    fun isNumberWord(word: String) = word.lowercase() in NUMBER_WORDS
+
+    /**
+     * A word of each starts with the same three letters ("liters" / Litre, "cats" / Cat, "snake bite" /
+     * Snakebite), unlike "doctor" / ELIZA or "diesel" / Shaquille O'Neal: a plain word's redirect must
+     * keep the word. Mirrors tools/retrieve_proto.py same_stem.
+     */
+    fun sameStem(title: String, phrase: String): Boolean {
+        val tw = title.lowercase().split(NON_WORD).filter { it.length >= 3 }
+        return phrase.lowercase().split(NON_WORD).filter { it.length >= 3 }.any { p -> tw.any { it.take(3) == p.take(3) } }
+    }
+
+    // Creative works: by the title's qualifier ("Big (film)") or what the intro says the article is
+    // ("Floating Ice is an album by ...", "Monsoon Season is the debut mixtape from ..."). Mirrors tools/retrieve_proto.py.
+    private val WORK_TITLE = Regex(
+        "\\((?:[^()]* )?(album|song|single|film|movie|novel|band|EP|mixtape|TV series|series|video game|musical|opera|" +
+            "painting|poem|book|soundtrack)\\)$", RegexOption.IGNORE_CASE,
+    )
+    private val WORK_KIND = Regex(
+        "\\b(is|was|are|were) (an?|the)\\b[^.]{0,60}?\\b(album|song|single|mixtape|EP|film|movie|novel|novella|" +
+            "television series|TV series|sitcom|soap opera|video game|band|musical|opera|painting|poem|short story|" +
+            "documentary|comic|manga|anime|magazine|podcast|soundtrack)s?\\b",
+    )
+    private val MEDIA_ASK = Regex(
+        "\\b(albums?|songs?|singles?|mixtapes?|films?|movies?|novels?|bands?|books?|shows?|series|episodes?|games?|sang|" +
+            "sing|singers?|lyrics|directed|director|starring|actors?|plot|wrote|written|authors?|paintings?|poems?|operas?|" +
+            "musicals?|soundtracks?|rapper|tracks?|records?)\\b", RegexOption.IGNORE_CASE,
+    )
+
+    /** The question asks about works, so albums and films stay ("which album has the song Floating Ice"). */
+    fun asksAboutMedia(question: String) = MEDIA_ASK.containsMatchIn(question)
+    fun isWorkTitle(title: String) = WORK_TITLE.containsMatchIn(title)
+    /** [intro]: the article's intro text; only its first sentence counts. */
+    fun describesWork(intro: String) =
+        WORK_KIND.containsMatchIn(intro.replace(PADDING, " ").trim().split(SENTENCE_END, 2)[0].take(250))
+
+    /** Question words -> topic sub-article titles, and the section heading to use when there is none. */
+    class Aspect(val words: Regex, val titles: List<String>, val heading: String?)
+
+    /** Mirrors tools/retrieve_proto.py ASPECTS. */
+    val ASPECTS = listOf(
+        Aspect(Regex("\\b(climates?|weather|rain\\w*|monsoons?|seasons?|temperatures?|humid\\w*|snow\\w*|typhoons?|hurricanes?)\\b",
+            RegexOption.IGNORE_CASE), listOf("Climate of %s"), "climate"),
+        Aspect(Regex("\\b(get(ting)? around|transport\\w*|metro|subway|bus|buses|trams?|taxis?|ferr(y|ies)|public transit)\\b",
+            RegexOption.IGNORE_CASE), listOf("Transport in %s", "Public transport in %s", "Transportation in %s"), "transport"),
+        Aspect(Regex("\\b(food|foods|eat|eating|dish(es)?|cuisine|meals?)\\b", RegexOption.IGNORE_CASE), listOf("Cuisine of %s"), "cuisine"),
+        Aspect(Regex("\\b(economy|economic|gdp|industr\\w*)\\b", RegexOption.IGNORE_CASE), listOf("Economy of %s"), "economy"),
+        Aspect(Regex("\\b(history|historical|independen\\w*)\\b", RegexOption.IGNORE_CASE), listOf("History of %s"), null),
+        Aspect(Regex("\\b(culture|customs?|etiquette|tipping|traditions?)\\b", RegexOption.IGNORE_CASE), listOf("Culture of %s"), "culture"),
+        Aspect(Regex("\\b(languages?|speak|spoken)\\b", RegexOption.IGNORE_CASE), listOf("Languages of %s"), "language"),
+        Aspect(Regex("\\b(religions?|religious)\\b", RegexOption.IGNORE_CASE), listOf("Religion in %s"), "religion"),
+        Aspect(Regex("\\b(population|demographics?|ethnic\\w*)\\b", RegexOption.IGNORE_CASE), listOf("Demographics of %s"), "demographic"),
+        Aspect(Regex("\\b(tap water|drinking water|drink the water)\\b", RegexOption.IGNORE_CASE),
+            listOf("Water supply and sanitation in %s"), null),
+    )
+    private val ASPECT_TITLE = Regex(
+        "^(climate|transport|public transport|transportation|cuisine|economy|history|culture|languages|religion|" +
+            "demographics|water supply and sanitation) (of|in) |.* cuisine$", RegexOption.IGNORE_CASE,
+    )
+
+    /** "Climate of Thailand", "Thai cuisine": a topic sub-article, which doesn't take a named article's place. */
+    fun isAspectTitle(title: String) = ASPECT_TITLE.containsMatchIn(title)
+
     /** A token's word parts ("don't" -> don, t): punctuated tokens would be FTS phrase queries. */
     fun parts(word: String): List<String> = word.lowercase().split(NON_WORD).filter { it.isNotEmpty() }
 
