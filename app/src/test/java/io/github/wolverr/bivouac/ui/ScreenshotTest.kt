@@ -47,7 +47,7 @@ class ScreenshotTest {
     @Test fun askAnswer() = shot("ask-answer") { Ask(AskState(turns = listOf(HTTPS)), it) }
     @Test fun askAnswerDark() = shot("ask-answer-dark", dark = true) { Ask(AskState(turns = listOf(HTTPS)), it) }
     @Test fun askReading() = shot("ask-reading") {
-        Ask(AskState(running = true, turns = listOf(TurnUi(SNAKE, prefill = 312 to 649))), it)
+        Ask(AskState(running = true, turns = listOf(TurnUi(SNAKE, prefill = 312 to 649, sources = SNAKE_SOURCES))), it)
     }
     @Test fun askPlaces() = shot("ask-places") { Ask(AskState(turns = listOf(FLORENCE)), it) }
 
@@ -63,6 +63,11 @@ class ScreenshotTest {
 
         fun src(n: Int, title: String, section: String, evidence: String) =
             Source(n, Passage(chunk = n.toLong(), article = n.toLong(), title = title, section = section, text = evidence), evidence)
+
+        val SNAKE_SOURCES = listOf(
+            src(1, "Snakebite", "", "A snakebite is an injury caused by the bite of a snake. The most common symptom of any snakebite is overwhelming fear."),
+            src(2, "Snakebite", "Treatment", "Keep the bitten limb still and below the heart, remove rings and watches, and get to hospital as fast as possible; do not cut the wound or try to suck out the venom."),
+        )
 
         val HTTPS = TurnUi(
             question = "How does HTTPS keep my connection private?",

@@ -150,6 +150,49 @@ object Evidence {
     /** "Climate of Thailand", "Thai cuisine": a topic sub-article, which doesn't take a named article's place. */
     fun isAspectTitle(title: String) = ASPECT_TITLE.containsMatchIn(title)
 
+    private val ASKS_ADVICE = Regex(
+        "\\b(what (should|do|can) (i|you|we) do|what to do|how (do|can|should) (i|you|we) (treat|stop|prevent|avoid|help)|" +
+            "first aid|treat\\w*)\\b", RegexOption.IGNORE_CASE,
+    )
+    private val ADVICE_SECTION = Regex("\\b(treatment|management|first aid|prevention|therapy)\\b", RegexOption.IGNORE_CASE)
+    private val INFOBOX_LINE =Regex("^[\\p{L} ]{1,30}: ")  // "Released: 2012", "Official languages: German ..."
+    private val ASKS_NUMBER = Regex("\\b(when|what year|how (much|many|deep|tall|high|long|far|old|big|hot|cold))\\b", RegexOption.IGNORE_CASE)
+    // A number, or a month or season for "when" questions ("from mid-May to October").
+    private val HAS_DIGIT = Regex(
+        "\\d|\\b(January|February|March|April|May|June|July|August|September|October|November|December|spring|summer|autumn|winter)\\b",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /**
+     * The sentence of the sources that answers most of the question, shown while the model reads them
+     * (30-45 s on an 8 GB phone before the first word). [evidences]: each source's evidence, in order.
+     * Returns (index into [evidences], sentence), or null when nothing matches well enough.
+     */
+    fun bestExcerpt(evidences: List<String>, question: String, sections: List<String> = emptyList()): Pair<Int, String>? {
+        val words = keywords(question).map { if (it.length > 5) it.take(5) else it }
+        if (words.isEmpty()) return null
+        val wantsNumber = ASKS_NUMBER.containsMatchIn(question)
+        val wantsAdvice = ASKS_ADVICE.containsMatchIn(question)
+        var best: Triple<Double, Int, String>? = null
+        evidences.forEachIndexed { i, ev ->
+            // "What should I do after a snake bite?": the treatment, not "the most common symptom is fear".
+            val advice = if (wantsAdvice && ADVICE_SECTION.containsMatchIn(sections.getOrElse(i) { "" })) 2.5 else 0.0
+            for (raw in ev.replace(PADDING, " ").split(SENTENCE_END)) {
+                val s = raw.trim()
+                if (s.length !in 40..320 || s.startsWith("|") || s.startsWith("- ") || INFOBOX_LINE.containsMatchIn(s)) continue
+                val low = s.lowercase()
+                val hits = words.count { it in low }
+                if (hits == 0 && advice == 0.0) continue
+                // Ties go to the more detailed sentence, not "X's climate is influenced by monsoon winds."
+                val score = hits + advice + (if (wantsNumber && HAS_DIGIT.containsMatchIn(s)) 0.5 else 0.0) +
+                    minOf(s.length, 200) / 500.0 - 0.1 * i
+                if (best == null || score > best!!.first) best = Triple(score, i, s)
+            }
+        }
+        val needed = maxOf(1.0, words.size / 3.0)
+        return best?.takeIf { it.first >= needed }?.let { it.second to it.third }
+    }
+
     /** A token's word parts ("don't" -> don, t): punctuated tokens would be FTS phrase queries. */
     fun parts(word: String): List<String> = word.lowercase().split(NON_WORD).filter { it.isNotEmpty() }
 

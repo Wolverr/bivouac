@@ -118,6 +118,29 @@ class EvidenceTest {
     }
 
     @Test
+    fun bestExcerptAnswersTheQuestion() {
+        val evidences = listOf(
+            "Thailand is a country in Southeast Asia. It is officially known as the Kingdom of Thailand.",
+            "Official languages: Thai\nThailand's climate is influenced by monsoon winds. The southwest monsoon brings rain " +
+                "from mid-May to October, while the east coast gets most of its rain from October to December.",
+        )
+        val (i, s) = Evidence.bestExcerpt(evidences, "When is the monsoon season in Thailand, and which coast is affected?")!!
+        assertEquals(1, i)
+        assertTrue(s, s.contains("mid-May to October"))
+        assertEquals(null, Evidence.bestExcerpt(listOf("Released: 2012\nGenre: Jazz"), "Why does ice float?"))
+
+        // What to do: the treatment section, not "the most common symptom is fear".
+        val snake = Evidence.bestExcerpt(
+            listOf(
+                "A snakebite is an injury caused by the bite of a snake. The most common symptom of any snakebite is overwhelming fear.",
+                "Keep the bitten limb still and below the heart, and get to hospital as fast as possible.",
+            ),
+            "What should I do after a snake bite?", listOf("", "Treatment"),
+        )
+        assertEquals(1, snake?.first)
+    }
+
+    @Test
     fun topicSubArticles() {
         assertTrue(Evidence.isAspectTitle("Climate of Seattle"))
         assertTrue(Evidence.isAspectTitle("Public transport in Istanbul"))

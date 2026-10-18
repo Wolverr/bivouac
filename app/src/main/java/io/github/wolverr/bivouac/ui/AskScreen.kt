@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.wolverr.bivouac.places.Place
 import io.github.wolverr.bivouac.research.CrisisResources
+import io.github.wolverr.bivouac.research.Evidence
 import io.github.wolverr.bivouac.research.ResearchPipeline
 import io.github.wolverr.bivouac.research.Source
 import java.util.Locale
@@ -274,6 +275,11 @@ private fun TurnView(t: TurnUi, running: Boolean, onRetry: () -> Unit, onThinkHa
         val prefill = t.prefill
         val thinking = t.thinking
         if (running && t.answer.isEmpty()) {
+            // The model reads for 30-45 s on an 8 GB phone: meanwhile, the sentence that answers most of the question.
+            val excerpt = remember(t.sources) {
+                Evidence.bestExcerpt(t.sources.map { it.evidence }, t.question, t.sources.map { it.passage.section })?.let { (i, s) -> t.sources[i] to s }
+            }
+            excerpt?.let { (src, sentence) -> ExcerptCard(src, sentence) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     when {
@@ -418,6 +424,29 @@ private fun CrisisCard() {
             CrisisResources.lines.forEach {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
             }
+        }
+    }
+}
+
+@Composable
+private fun ExcerptCard(src: Source, sentence: String) {
+    val rb = LocalRainbow.current
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = rb.pastel(src.n).copy(alpha = 0.22f)),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SourceBadge(src.n)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "While the answer is written: from ${src.passage.title}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(sentence, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
