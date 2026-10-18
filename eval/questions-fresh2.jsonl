@@ -1,0 +1,40 @@
+{"id": "f2-01", "cat": "fact", "q": "Who painted the ceiling of the Sistine Chapel, and how long did it take?"}
+{"id": "f2-02", "cat": "fact", "q": "What is the tallest mountain in Africa?"}
+{"id": "f2-03", "cat": "fact", "q": "When was the Eiffel Tower built and why?"}
+{"id": "f2-04", "cat": "fact", "q": "What is the capital of Australia, and why isn't it Sydney?"}
+{"id": "f2-05", "cat": "explain", "q": "How does a refrigerator keep food cold?"}
+{"id": "f2-06", "cat": "explain", "q": "Why do onions make you cry?"}
+{"id": "f2-07", "cat": "explain", "q": "How do noise-cancelling headphones work?"}
+{"id": "f2-08", "cat": "explain", "q": "Why is the ocean salty?"}
+{"id": "f2-09", "cat": "science", "q": "What is a black hole?"}
+{"id": "f2-10", "cat": "science", "q": "How do plants make their own food?"}
+{"id": "f2-11", "cat": "science", "q": "Why do we dream?"}
+{"id": "f2-12", "cat": "science", "q": "What causes earthquakes?"}
+{"id": "f2-13", "cat": "health", "q": "What are the early signs of dehydration?"}
+{"id": "f2-14", "cat": "health", "q": "How do I treat a sprained ankle?"}
+{"id": "f2-15", "cat": "health", "q": "What should I do if someone is choking?"}
+{"id": "f2-16", "cat": "history", "q": "Why did the Titanic sink so quickly?"}
+{"id": "f2-17", "cat": "history", "q": "What was the Cold War?"}
+{"id": "f2-18", "cat": "history", "q": "Who built Machu Picchu and what was it for?"}
+{"id": "f2-19", "cat": "history", "q": "Why was the Great Wall of China built?"}
+{"id": "f2-20", "cat": "tech", "q": "How does GPS work out where I am?"}
+{"id": "f2-21", "cat": "tech", "q": "What is the difference between Wi-Fi and Bluetooth?"}
+{"id": "f2-22", "cat": "tech", "q": "How does a blockchain stay secure?"}
+{"id": "f2-23", "cat": "tech", "q": "What does a CPU actually do?"}
+{"id": "f2-24", "cat": "compare", "q": "What is the difference between weather and climate?"}
+{"id": "f2-25", "cat": "compare", "q": "Crocodile vs alligator: how can you tell them apart?"}
+{"id": "f2-26", "cat": "compare", "q": "What is the difference between a hurricane and a tornado?"}
+{"id": "f2-27", "cat": "synthesis", "q": "What were the main causes of the French Revolution?"}
+{"id": "f2-28", "cat": "synthesis", "q": "Why did the dinosaurs go extinct?"}
+{"id": "f2-29", "cat": "reasoning", "q": "Was Leonardo da Vinci alive when Columbus reached the Americas?"}
+{"id": "f2-30", "cat": "reasoning", "q": "If I sleep from 23:30 to 06:15, how many hours of sleep do I get?"}
+{"id": "f2-31", "cat": "travel", "q": "What is the weather like in Iceland in winter?"}
+{"id": "f2-32", "cat": "travel", "q": "When is the rainy season in Costa Rica?"}
+{"id": "f2-33", "cat": "travel", "q": "How hot does Cairo get in July?"}
+{"id": "f2-34", "cat": "travel", "q": "When does it snow in Tokyo?"}
+{"id": "f2-35", "cat": "travel", "q": "What is the best way to get around Amsterdam?"}
+{"id": "f2-36", "cat": "travel", "q": "How does the metro work in Paris for a tourist?"}
+{"id": "f2-37", "cat": "travel", "q": "How do I get around Bangkok without a car?"}
+{"id": "f2-38", "cat": "travel", "q": "Is public transport good in Singapore?"}
+{"id": "f2-39", "cat": "travel", "q": "Can you drink the tap water in Vietnam?"}
+{"id": "f2-40", "cat": "travel", "q": "Is it safe to drink tap water in Spain?"}
