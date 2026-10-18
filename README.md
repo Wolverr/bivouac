@@ -72,10 +72,10 @@ Which model to pick:
 
 | Phone RAM | Model | File | Quality (% of frontier + web, held-out questions) | Speed on phone (Redmi Note 15 Pro, 8 GB) |
 |---|---|---|---|---|
-| 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 45 % | 20 tok/s reading, 6 tok/s writing |
+| 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 44 % | 20 tok/s reading, 6 tok/s writing |
 | 6 GB | Qwen3.5-4B Q3_K_M | 2.3 GB | slightly below the 4B Q4_K_M¹ | 6 tok/s reading, 2.8 tok/s writing |
-| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **54 % on the phone** | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 35 s, whole answer 93 s (medians, 40 questions) |
-| 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 63 % | *TBD (12 GB phone)* |
+| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **66 %** (PC harness, current build); 54 % on the phone with the 2026-10-07 build | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 35 s, whole answer 93 s (medians, 40 questions) |
+| 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 62 % (PC harness; head-to-head with the 4B: a tie, see below) | not measured: no 12 GB test phone |
 
 ¹ Graded head-to-head against the 4B Q4_K_M: −0.38 points out of 10 (95 % CI −0.80 to +0.03).
 The 8 GB row is the app itself on the phone; the other speeds are llama-bench on the phone's CPU,
@@ -117,15 +117,26 @@ completeness and usefulness. Details and how to reproduce: [docs/EVAL.md](docs/E
 PC harness (same pipeline and prompt as the app, llama.cpp on a desktop CPU), as % of the
 frontier + web answers' score:
 
-| Model | Held-out (40 questions, never tuned on) | Main set (60 questions) |
-|---|---|---|
-| Qwen3.5-9B Q4_K_M | **62.7 %** | 60.7 % |
-| Qwen3.5-4B Q4_K_M | **54.0 %** | 60.2 % |
-| Qwen3.5-2B Q4_K_M | 45.2 % | 40.7 % |
+| Model | Held-out, current build (2026-10-19) | Held-out, 2026-10-02 build | Main set (60 questions, 2026-10-02 build) |
+|---|---|---|---|
+| Qwen3.5-9B Q4_K_M | **62.0 %** | 62.7 % | 60.7 % |
+| Qwen3.5-4B Q4_K_M | **66.5 %** | 54.0 % | 60.2 % |
+| Qwen3.5-2B Q4_K_M | 44.5 % | 45.2 % | 40.7 % |
 
 The 4B and the 9B clear the bounty's 50 % bar on questions that were never used for tuning;
-the 2B, for 4 GB phones, does not. A single run varies by about ±3 points (grader and sampling
-noise), so choices are made head-to-head in one blind packet instead (`tools/grade.py pair`):
+the 2B, for 4 GB phones, does not. A single run varies by about ±3 points (grader noise), so
+choices are made head-to-head in one blind packet instead (`tools/grade.py pair`). Graded that
+way, the 4B and the 9B are a tie on the held-out set (9B −0.28 points out of 10, 95 % CI −1.13
+to +0.58): the 9B gets more facts right (Lake Baikal's depth, which Thai coast gets which
+monsoon), the 4B writes fuller answers. Since 2026-10-02 the build fixed questions that were
+answered without any sources: "what first aid should I give?" and "when should I see a doctor?"
+were taken for personal chat, and "the deepest lake in the world" or "RAM and storage in a phone"
+for map searches. That and the retrieval changes are most of the 4B's gain.
+
+The eval harness sends every question with prompt caching off: with the server reusing the
+previous prompt's prefix, the same seeded question gave different answers depending on the
+question before it. Current-build answers, packets and grades: `eval/results-pc-*-v29-holdout.jsonl`,
+`eval/grading/pc-*-v29-holdout.*`.
 
 - **12 GB model:** Gemma-4-12B (QAT) scored 1.73 points out of 10 below the 9B (95 % CI −2.43 to
   −1.04) and needs more RAM; the 9B at Q5 instead of Q4 was no better (+0.02, CI −0.31 to +0.34)
@@ -133,9 +144,10 @@ noise), so choices are made head-to-head in one blind packet instead (`tools/gra
 - **Screened out earlier** (main set, older pipeline): LFM2.5-8B-A1B 46 %, Gemma-4-E4B 44 %, both
   below the Qwen3.5-4B of the same run (55 %).
 
-**On the phone:** the 4B in the app on a Redmi Note 15 Pro (8 GB, MediaTek MT6789), release
+**On the phone** (2026-10-07 build, before the fixes above; to be re-run with the current build):
+the 4B in the app on a Redmi Note 15 Pro (8 GB, MediaTek MT6789), release
 build (no INTERNET permission), the 40 held-out questions: **53.9 %** of the frontier + web score, the
-same as the PC harness (54.0 %), so the phone loses nothing. Median 93 s per answer (first words
+same as the PC harness of that time (54.0 %), so the phone loses nothing. Median 93 s per answer (first words
 after 35 s, search 3.7 s), longest 136 s; the app used 3.9 GB of RAM and never got killed.
 Answers, packet and grades: `eval/results-redmi-qwen3.5-4b-holdout.jsonl`,
 `eval/grading/redmi-qwen3.5-4b-holdout.*`. Weakest there: travel (43 %), comparisons (47 %), tech
