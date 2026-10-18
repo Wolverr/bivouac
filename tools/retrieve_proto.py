@@ -163,7 +163,7 @@ def is_named(tok: str, first: bool) -> bool:
     """Written as a name: capitalized mid-sentence, or any inner capital ("GPS", "mRNA")."""
     if any(c.isupper() for c in tok[1:]):
         return True
-    return tok[:1].isupper() and not first
+    return tok[:1].isupper() and not first and tok != "I"  # "should I try" is not the song "I Try"
 
 
 def doc_freq(pack: "Pack", word: str, cap: int = COMMON_DF + 1) -> int:
@@ -195,6 +195,9 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
             words = toks[i:i + n]
             if all(w.lower() in STOP for w in words) or (n == 1 and len(words[0]) < 3):
                 continue
+            # "in Mexico" (a photo book) inside "in Mexico City"; "The Hague" as written still counts.
+            if n > 1 and (words[0] in STOP or words[-1] in STOP):
+                continue
             phrase = " ".join(words)
             cands = [phrase]
             if phrase.lower().endswith("'s"):
@@ -209,6 +212,12 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                 obscure = row[4] < math.log1p(COMMON_MIN_VIEWS)
                 if common and obscure:
                     continue
+                named = any(is_named(w, s) for w, s in zip(words, starts[i:i + n]))
+                # "two a day" is not about the number 2; "monsoon season" is not the mixtape.
+                if n == 1 and words[0].lower() in NUMBER_WORDS:
+                    continue
+                if not named and is_work(pack, row, question):
+                    continue
                 # A name and the lowercase noun after it: "Soviet Union collapse" -> "Collapse of the
                 # Soviet Union", "UK parliament" -> "Parliament of the UK"; ahead of the bare name.
                 k = i + n
@@ -221,9 +230,15 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                             seen.add(about[0])
                             used[k] = True
                             break
+                # "monsoon season in Thailand" -> Climate of Thailand, "get around Istanbul" -> Transport
+                # in Istanbul: the main article only touches these; ahead of the bare name.
+                if named:
+                    for about in aspect_articles(pack, row[1], question):
+                        if about[0] not in seen:
+                            found.append(about[:4])
+                            seen.add(about[0])
                 found.append(row[:4])
                 seen.add(row[0])
-                named = any(is_named(w, s) for w, s in zip(words, starts[i:i + n]))
                 named_hit = named_hit or named
                 # Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
                 if common or (n == 1 and obscure and not named):
@@ -237,6 +252,88 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
     if named_hit:
         found = [r for r in found if r[0] not in plain]
     return found
+
+
+NUMBER_WORDS = set("one two three four five six seven eight nine ten eleven twelve hundred thousand million".split())
+
+# Creative works: by the title's qualifier ("Big (film)") or what the intro says the article is
+# ("Floating Ice is an album by ...", "Monsoon Season is the debut mixtape from ...").
+WORK_TITLE = re.compile(r"\((?:[^()]* )?(album|song|single|film|movie|novel|band|EP|mixtape|TV series|series|"
+                        r"video game|musical|opera|painting|poem|book|soundtrack)\)$", re.I)
+WORK_KIND = re.compile(r"\b(is|was|are|were) (an?|the)\b[^.]{0,60}?\b(album|song|single|mixtape|EP|film|movie|novel|"
+                       r"novella|television series|TV series|sitcom|soap opera|video game|band|musical|opera|painting|"
+                       r"poem|short story|documentary|comic|manga|anime|magazine|podcast|soundtrack)s?\b")
+# The question asks about works, so they stay ("which album has the song Floating Ice").
+MEDIA_ASK = re.compile(r"\b(albums?|songs?|singles?|mixtapes?|films?|movies?|novels?|bands?|books?|shows?|series|"
+                       r"episodes?|games?|sang|sing|singers?|lyrics|directed|director|starring|actors?|plot|wrote|"
+                       r"written|authors?|paintings?|poems?|operas?|musicals?|soundtracks?|rapper|tracks?|records?)\b", re.I)
+
+
+def is_work(pack: "Pack", row, question: str) -> bool:
+    """Evidence.isWork: an album, song, film... that the question doesn't ask about."""
+    if MEDIA_ASK.search(question):
+        return False
+    if WORK_TITLE.search(row[1]):
+        return True
+    cache = pack.__dict__.setdefault("work_cache", {})
+    if row[0] not in cache:
+        first, n = row[2], row[3]
+        cid = intro_chunk(pack, first, n)
+        sent = SENT_RE.split(PADDING_RE.sub(" ", pack.text(cid)).strip(), 1)[0][:250]
+        cache[row[0]] = bool(WORK_KIND.search(sent))
+    return cache[row[0]]
+
+
+# Topic sub-articles of a named place or thing: question words -> Wikipedia's title forms.
+ASPECTS = [  # (question words, sub-article titles, section heading in the main article or None)
+    (re.compile(r"\b(climates?|weather|rain\w*|monsoons?|seasons?|temperatures?|humid\w*|snow\w*|typhoons?|hurricanes?)\b", re.I),
+     ("Climate of {}",), "climate"),
+    (re.compile(r"\b(get(ting)? around|transport\w*|metro|subway|bus|buses|trams?|taxis?|ferr(y|ies)|public transit)\b", re.I),
+     ("Transport in {}", "Public transport in {}", "Transportation in {}"), "transport"),
+    (re.compile(r"\b(food|foods|eat|eating|dish(es)?|cuisine|meals?)\b", re.I), ("Cuisine of {}",), "cuisine"),
+    (re.compile(r"\b(economy|economic|gdp|industr\w*)\b", re.I), ("Economy of {}",), "economy"),
+    (re.compile(r"\b(history|historical|independen\w*)\b", re.I), ("History of {}",), None),
+    (re.compile(r"\b(culture|customs?|etiquette|tipping|traditions?)\b", re.I), ("Culture of {}",), "culture"),
+    (re.compile(r"\b(languages?|speak|spoken)\b", re.I), ("Languages of {}",), "language"),
+    (re.compile(r"\b(religions?|religious)\b", re.I), ("Religion in {}",), "religion"),
+    (re.compile(r"\b(population|demographics?|ethnic\w*)\b", re.I), ("Demographics of {}",), "demographic"),
+    (re.compile(r"\b(tap water|drinking water|drink the water)\b", re.I), ("Water supply and sanitation in {}",), None),
+]
+ASPECT_TITLE = re.compile(r"^(climate|transport|public transport|transportation|cuisine|economy|history|culture|languages|"
+                          r"religion|demographics|water supply and sanitation) (of|in) |.* cuisine$", re.I)
+
+
+def aspect_articles(pack: "Pack", title: str, question: str) -> list:
+    """ResearchPipeline.aspectArticles: [(id, title, first_chunk, n_chunks, prior)] for the topics the
+    question asks about ("Climate of Thailand"). Redirects count when they keep the topic word
+    ("Cuisine of Thailand" -> Thai cuisine)."""
+    out = []
+    for pat, forms, _ in ASPECTS:
+        if not pat.search(question):
+            continue
+        for form in forms:
+            row = pack.find_article(form.format(title))
+            if row and form.split()[0].lower() in row[1].lower():
+                out.append(row)
+                break
+    return out
+
+
+def aspect_sections(pack: "Pack", article, question: str, titles) -> list[tuple[int, str]]:
+    """ResearchPipeline.aspectSections: when no sub-article was found, the main article's own section
+    for the topic ("Thailand — Geography > Climate"), first chunk only. titles: the articles already
+    picked (a "Climate of X" makes the section redundant). Returns [(chunk_id, section)]."""
+    out = []
+    mine = [t.lower() for t in titles if article[1].lower() in t.lower()]  # "Climate of Seattle" is not Denver's
+    for pat, forms, heading in ASPECTS:
+        if heading is None or not pat.search(question) or any(forms[0].split()[0].lower() in t for t in mine):
+            continue
+        for row in pack.db.execute("SELECT id, section FROM chunk WHERE article = ? AND lower(section) LIKE ? "
+                                   "ORDER BY id", (article[0], f"%{heading}%")):
+            if heading in row[1].lower().rsplit(">", 1)[-1]:  # "Geography > Climate", not "Climate > Flora"
+                out.append(row)
+                break
+    return out
 
 
 def sentence_starts(question: str) -> list[bool]:
@@ -496,7 +593,9 @@ def named_articles(pack: "Pack", question: str, k: int = 3):
         if row and row[0] not in seen:
             out.append(row)
             seen.add(row[0])
-    return out[:k]
+    # Topic sub-articles don't take a name's place: "climates of Seattle and Denver" keeps Denver.
+    extra = sum(1 for r in out if ASPECT_TITLE.match(r[1]))
+    return out[:min(k + extra, 5)]
 
 
 QUALIFIER = re.compile(r"^(.*?)\s*\(([^()]*)\)\s*$")
