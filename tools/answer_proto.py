@@ -31,7 +31,7 @@ PERSONAL = re.compile(
     r"\b(i feel|i'm feeling|im feeling|i am feeling|i feel like|i'm (so )?(sad|stressed|anxious|lonely|bored|tired|upset|angry|scared|worried)|"
     r"im (so )?(sad|stressed|anxious|lonely|bored|tired|upset|angry|scared|worried)|feeling (bad|down|low|sad|lonely)|"
     r"my (girlfriend|boyfriend|wife|husband|partner|friend|mom|mum|dad|mother|father|boss|family)|"
-    r"should i|do you think i|can you help me|help me (write|decide|with)|write (me|a)|rewrite|translate|"
+    r"^should i|do you think i|can you help me|help me (write|decide|with)|write (me|a)|rewrite|translate|"
     r"how are you|who are you|what are you)\b"
 )
 

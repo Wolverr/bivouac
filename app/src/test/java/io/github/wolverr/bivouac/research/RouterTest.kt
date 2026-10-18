@@ -17,6 +17,11 @@ class RouterTest {
             "Compare the Roman Republic and the Roman Empire",
             "Why did the Bronze Age collapse happen?",
             "vegetarian restaurants near the Duomo in Florence",
+            // "should I" inside a question is not asking for personal advice (these used to skip Wikipedia).
+            "How can I tell if a snake bite is venomous, and what first aid should I give?",
+            "What are the symptoms of heat stroke and what should I do first?",
+            "How do I treat a minor burn at home, and when should I see a doctor?",
+            "What should I know about altitude sickness before trekking to Everest Base Camp?",
         ).forEach { assertEquals(it, Route.LOOKUP, route(it).route) }
     }
 

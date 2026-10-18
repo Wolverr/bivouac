@@ -18,7 +18,7 @@ object Router {
         "\\b(i feel|i'm feeling|im feeling|i am feeling|i feel like|i'm (so )?(sad|stressed|anxious|lonely|bored|tired|upset|angry|scared|worried)|" +
             "im (so )?(sad|stressed|anxious|lonely|bored|tired|upset|angry|scared|worried)|feeling (bad|down|low|sad|lonely)|" +
             "my (girlfriend|boyfriend|wife|husband|partner|friend|mom|mum|dad|mother|father|boss|family)|" +
-            "should i|do you think i|can you help me|help me (write|decide|with)|write (me|a)|rewrite|translate|" +
+            "^should i|do you think i|can you help me|help me (write|decide|with)|write (me|a)|rewrite|translate|" +
             "how are you|who are you|what are you)\\b",
     )
     private val CRISIS = Regex(
