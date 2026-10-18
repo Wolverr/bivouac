@@ -16,6 +16,34 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
+## Resume here (2026-10-19 night, home PC)
+
+**Fixed and pushed (main f0d7542), all in harness + app with tests:**
+- Router: "should I" counts as personal only at the start ("Should I text my ex"); "what first aid
+  should I give", "when should I see a doctor", "what should I do first", "what should I know about
+  altitude sickness" had gone to chat with no sources (4 held-out health/travel + travel-01).
+- Places: a written place not on the map falls back to Wikipedia ("deepest lake in the world",
+  "RAM and storage in a phone", "the century after Gutenberg", a train timetable: no sources before).
+- Places intent: how/why/when explanations unless they ask the way ("get to"), "safe to"/"tap water",
+  and sights at a named place (castle, waterfall, mountain, lake, temple...) are not map searches;
+  near-me sight searches stay on the map. Changes a-03, f2-36, f2-39, n-near-05/08/09 (not measured yet).
+- Nearby trigger words: recommend, suggest, top, list, hikes, walks ("Recommend hikes near Chamonix").
+
+**Held-out, current build (PC harness, cache_prompt off, graded blind vs frontier + web):** 2B 44.5 %,
+4B 66.5 %, 9B 62.0 % (README updated, 7dba8b1). 4B vs 9B paired: -0.28 (CI -1.13..0.58), a tie: the 9B is
+more accurate on facts but sometimes writes one-line answers (WWI causes: 164 chars) under its calc2 prompt.
+
+**Interrupted overnight** (Claude Code reaped the WSL keep-alive shells on low memory, WSL stopped):
+the 9B main set (55/60 in ~/bivouac-final/eval/results-pc-qwen3.5-9b-v29-main.jsonl), queue30 (re-routed
+questions, old 83c5f5b vs new) and queue31 (prompt length experiment: branch `prompt-complete`, "be thorough
+but focused" instead of "be concise", worktree ~/bivouac-pc) never ran. Scripts: ~/bivouac-queue30.sh,
+~/bivouac-queue31.sh (drop their wait-for-previous loops when starting them by hand). Memory: the 9B under
+the 12 GB service cap plus Windows filled the PC; run one queue at a time and watch `free`.
+
+**Next:** (1) prompt length experiment on the main set, then held-out if it wins (user wants quality over
+speed); (2) re-route check; (3) Redmi: install, check restyle + excerpt card, re-run the on-phone held-out
+(the published 53.9 % predates the no-sources fixes), packs from Downloads; (4) release with the real key.
+
 ## Resume here (2026-10-18, home PC)
 
 **Merged into main (df58ef6)** after the clean check: 9B paired, cache_prompt off, 60 changed prompts over all sets: **+0.45 (CI 0.12..0.78), 25 better / 12 worse / 13 same**; day trips + nearby +1.05 (20 q), everything else +0.2 (30 q). Contents:
