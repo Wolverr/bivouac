@@ -219,7 +219,7 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                 if not named and is_work(pack, row, question):
                     continue
                 # A plain word's redirect must keep the word: "doctor" is not ELIZA (its DOCTOR script).
-                if not named and not shares_word(row[1], c):
+                if not named and not same_stem(row[1], c):
                     continue
                 # A name and the lowercase noun after it: "Soviet Union collapse" -> "Collapse of the
                 # Soviet Union", "UK parliament" -> "Parliament of the UK"; ahead of the bare name.
@@ -270,6 +270,13 @@ WORK_KIND = re.compile(r"\b(is|was|are|were) (an?|the)\b[^.]{0,60}?\b(album|song
 MEDIA_ASK = re.compile(r"\b(albums?|songs?|singles?|mixtapes?|films?|movies?|novels?|bands?|books?|shows?|series|"
                        r"episodes?|games?|sang|sing|singers?|lyrics|directed|director|starring|actors?|plot|wrote|"
                        r"written|authors?|paintings?|poems?|operas?|musicals?|soundtracks?|rapper|tracks?|records?)\b", re.I)
+
+
+def same_stem(title: str, phrase: str) -> bool:
+    """Evidence.sameStem: a word of each starts with the same three letters ("liters" / Litre, "cats" / Cat,
+    "snake bite" / Snakebite), unlike "doctor" / ELIZA or "diesel" / Shaquille O'Neal."""
+    tw = [w for w in re.findall(r"\w+", title.lower()) if len(w) >= 3]
+    return any(t[:3] == p[:3] for p in re.findall(r"\w+", phrase.lower()) if len(p) >= 3 for t in tw)
 
 
 def is_work(pack: "Pack", row, question: str) -> bool:
