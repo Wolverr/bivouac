@@ -18,7 +18,7 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 
 ## Resume here (2026-10-18, home PC)
 
-**Branch `quality`** (from main f376cc7; not merged yet, waiting for the clean check below):
+**Merged into main (df58ef6)** after the clean check: 9B paired, cache_prompt off, 60 changed prompts over all sets: **+0.45 (CI 0.12..0.78), 25 better / 12 worse / 13 same**; day trips + nearby +1.05 (20 q), everything else +0.2 (30 q). Contents:
 - Title-match junk filters (harness + app): creative works (album/song/film... by title qualifier or the
   intro's first sentence) unless the question asks about media or names them ("ice floats" -> no "Floating
   Ice" album, "monsoon season" -> no mixtape); "I" is not a name ("should I try" -> no song "I Try");
@@ -45,10 +45,9 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
   seeded prompt gave different answers depending on the question before it (3 of 3 differed between a
   12-question and a 3-question run). With it off, alone vs after 5 others: identical. Earlier paired runs
   carried this noise; treat small differences in them (< ~0.5) as noise.
-- Running at handoff: queue28, the clean main-vs-quality check on all sets (60 changed prompts).
-  Grade with `grade.py pair` on eval/results-pc-qwen3.5-9b-v28-*-{asp-old,q-new}.jsonl (concatenate the sets).
+- Clean check results: eval/results-pc-qwen3.5-9b-v28-{asp-old,q-new}.jsonl and eval/grading/pair-*v28*.
 
-Next: merge `quality` if the clean check is not negative; then the Redmi check (restyle, excerpt card,
+Next: the Redmi check (restyle, excerpt card,
 packs from Downloads), release build with the real key, final held-out run for the README.
 
 ## Resume here (2026-10-17): user direction
