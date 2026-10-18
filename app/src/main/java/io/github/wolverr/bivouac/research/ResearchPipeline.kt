@@ -267,7 +267,7 @@ class ResearchPipeline(
             nearbyArticles(corpus, question, loc).filter { it.passage.article !in namedIds }.map { n ->
                 whole[n.passage.chunk] = Evidence.compress(n.passage.text, words, settings.evidenceChars)
                 expanded += n.passage.article
-                n.passage.copy(section = nearbySection(n.km, loc.article.title))
+                n.passage.copy(section = nearbySection(n.km, loc.article.title, n.direction))
             }
         }.orEmpty()
         // Boosted before the cut to maxSources * 4, as in tools/retrieve_proto.py: boosting afterwards
@@ -453,7 +453,7 @@ class ResearchPipeline(
         val article: Article, val lat: Double, val lon: Double, val km: Double, val phrase: String,
         val minKm: Double = 0.0, val sources: Int = NEARBY_SOURCES,
     )
-    class NearbyHit(val passage: Passage, val km: Double)
+    class NearbyHit(val passage: Passage, val km: Double, val direction: String, val lat: Double, val lon: Double)
 
     /**
      * "... near <Place>" / "day trips from <Place>" when the place is an article with coordinates
@@ -507,9 +507,18 @@ class ResearchPipeline(
             val lowTitle = a.title.lowercase()
             val low = text.lowercase()
             val hits = topic.sumOf { t -> if (t in lowTitle) 2.0 else if (t in low) 1.0 else 0.0 }
-            scored += Scored(a.prior + 2.0 * hits, NearbyHit(intro.copy(text = text), km))
+            val sight = if (SIGHT_KIND.containsMatchIn("${a.title} ${Evidence.SENTENCE_END.split(text, 2)[0].take(300)}")) SIGHT_BONUS else 0.0
+            val direction = compass((a.lat - loc.lat) * 111.0, (a.lon!! - loc.lon) * 111.0 * coslat)
+            scored += Scored(a.prior + 2.0 * hits + sight, NearbyHit(intro.copy(text = text), km, direction, a.lat, a.lon))
         }
-        return scored.sortedByDescending { it.score }.take(loc.sources).map { it.hit }
+        val out = ArrayList<NearbyHit>()
+        for (s in scored.sortedByDescending { it.score }) {
+            val h = s.hit
+            if (loc.minKm > 0 && out.any { kotlin.math.hypot((h.lat - it.lat) * 111.0, (h.lon - it.lon) * 111.0 * coslat) < DAY_TRIP_SPREAD_KM }) continue
+            out += h
+            if (out.size >= loc.sources) break
+        }
+        return out
     }
 
     /** "must-see sights in Barcelona", "landmarks of Rome". Mirrors tools/retrieve_proto.py. */
@@ -665,7 +674,8 @@ class ResearchPipeline(
         private const val NOT_A_SIGHT = "flight|crash|disaster|incident|attack|bombing|battle|siege|massacre|murder|shooting|" +
             "earthquake|avalanche|company|corporation|manufacturer|brand|university|college|school|airport|station|club|team|" +
             "band|album|song|film|novel|book|election|treaty|agreement|footballer|politician|player|singer|actor|person|" +
-            "stadium|arena|casino|hotel|motorway|tunnel|championship|tournament"
+            "stadium|arena|casino|hotel|motorway|tunnel|championship|tournament|" +
+            "assassination|death|funeral|riot|protest|explosion|region|prefecture"
         private val NEARBY_SKIP_TITLE = Regex("\\b($NOT_A_SIGHT)s?\\b", RegexOption.IGNORE_CASE)
         /** What the intro says the article is: "... was a scheduled flight", "... is a district". */
         private val NEARBY_SKIP_KIND = Regex(
@@ -673,6 +683,22 @@ class ResearchPipeline(
                 "diocese|parish|constituency|municipality|ward|state|country|venue|highway|road|census-designated place)s?\\b",
             RegexOption.IGNORE_CASE,
         )
+        /** Things people go and see: Stirling Castle and St Andrews ("a town") ahead of the Stone of Scone on popularity alone. */
+        private val SIGHT_KIND = Regex(
+            "\\b(castle|palace|abbey|cathedral|church|chapel|temple|shrine|monastery|loch|lake|national park|island|bridge|" +
+                "monument|museum|gardens?|ruins?|mountain|peak|hill|beach|waterfall|falls|valley|glen|gorge|fort|fortress|" +
+                "village|town|old town|world heritage)s?\\b", RegexOption.IGNORE_CASE,
+        )
+        private const val SIGHT_BONUS = 1.0
+        private const val DAY_TRIP_SPREAD_KM = 5.0  // one pick per destination: Stirling or Stirling Castle, not both
+        private val COMPASS = listOf("north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest")
+
+        /** "northwest" for a point [north] km up and [east] km to the right (negative: down, left). */
+        fun compass(north: Double, east: Double): String {
+            val deg = (Math.toDegrees(kotlin.math.atan2(east, north)) + 360.0) % 360.0
+            return COMPASS[((deg + 22.5) / 45.0).toInt() % 8]
+        }
+
         private val NEARBY_GENERIC = (
             "best good great nice top near around close surrounding worth visit visiting see seeing do doing things thing " +
                 "places place trip trips day excursion excursions there any some go most can"
@@ -689,8 +715,9 @@ class ResearchPipeline(
         }
 
         /** "12 km from Interlaken"; mirrored in tools/answer_proto.py nearby_section. */
-        fun nearbySection(km: Double, place: String): String =
-            "${if (km < 1) "under 1" else kotlin.math.round(km).toInt().toString()} km from $place"
+        /** "12 km southeast of Interlaken": the direction keeps the model from guessing one (St Andrews is north of Edinburgh). */
+        fun nearbySection(km: Double, place: String, direction: String): String =
+            if (km < 1) "under 1 km from $place" else "${kotlin.math.round(km).toInt()} km $direction of $place"
 
         private const val SIGHTS_PROSE_CHARS = 600
         private const val SIGHTS_LINES = 8

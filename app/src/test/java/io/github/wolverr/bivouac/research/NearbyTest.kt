@@ -17,8 +17,16 @@ class NearbyTest {
     }
 
     @Test
-    fun sectionSaysHowFar() {
-        assertEquals("12 km from Interlaken", ResearchPipeline.nearbySection(11.6, "Interlaken"))
-        assertEquals("under 1 km from Füssen", ResearchPipeline.nearbySection(0.4, "Füssen"))
+    fun sectionSaysHowFarAndWhichWay() {
+        assertEquals("12 km southeast of Interlaken", ResearchPipeline.nearbySection(11.6, "Interlaken", "southeast"))
+        assertEquals("under 1 km from Füssen", ResearchPipeline.nearbySection(0.4, "Füssen", "north"))
+    }
+
+    @Test
+    fun compassPoints() {
+        assertEquals("north", ResearchPipeline.compass(10.0, 0.5))
+        assertEquals("west", ResearchPipeline.compass(1.0, -50.0))
+        assertEquals("southeast", ResearchPipeline.compass(-10.0, 10.0))
+        assertEquals("northwest", ResearchPipeline.compass(10.0, -10.0))
     }
 }

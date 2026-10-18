@@ -455,13 +455,28 @@ NEARBY_SOURCES, DAY_TRIP_SOURCES = 4, 5
 _NOT_A_SIGHT = (r"flight|crash|disaster|incident|attack|bombing|battle|siege|massacre|murder|shooting|earthquake|avalanche|"
                 r"company|corporation|manufacturer|brand|university|college|school|airport|station|club|team|band|album|"
                 r"song|film|novel|book|election|treaty|agreement|footballer|politician|player|singer|actor|person|"
-                r"stadium|arena|casino|hotel|motorway|tunnel|championship|tournament")
+                r"stadium|arena|casino|hotel|motorway|tunnel|championship|tournament|"
+                r"assassination|death|funeral|riot|protest|explosion|region|prefecture")
 NEARBY_SKIP_TITLE = re.compile(rf"\b({_NOT_A_SIGHT})s?\b", re.I)
 NEARBY_SKIP_KIND = re.compile(
     rf"\b(is|was|are|were) (an?|the)( [\w\-]+){{0,3}} ({_NOT_A_SIGHT}|district|county|province|region|canton|diocese|"
     rf"parish|constituency|municipality|ward|state|country|venue|highway|road|census-designated place)s?\b", re.I)
 NEARBY_GENERIC = set("""best good great nice top near around close surrounding worth visit visiting see seeing do doing
 things thing places place trip trips day excursion excursions there any some go most can""".split())
+# Things people go and see, in the title or the intro's first sentence: Stirling Castle and St Andrews
+# ("a town") ahead of the Stone of Scone and Dundee on popularity alone.
+SIGHT_KIND = re.compile(r"\b(castle|palace|abbey|cathedral|church|chapel|temple|shrine|monastery|loch|lake|national park|"
+                        r"island|bridge|monument|museum|gardens?|ruins?|mountain|peak|hill|beach|waterfall|falls|valley|"
+                        r"glen|gorge|fort|fortress|village|town|old town|world heritage)s?\b", re.I)
+SIGHT_BONUS = 1.0
+DAY_TRIP_SPREAD_KM = 5.0  # one pick per destination: Stirling or Stirling Castle, not both
+COMPASS = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
+
+
+def compass(dlat: float, dlon_km: float) -> str:
+    """ResearchPipeline.compass: "northwest" for a point 51 km away up and to the left."""
+    deg = math.degrees(math.atan2(dlon_km, dlat)) % 360
+    return COMPASS[int((deg + 22.5) // 45) % 8]
 
 
 def stem(w: str) -> str:
@@ -506,7 +521,7 @@ def intro_chunk(pack: "Pack", first_chunk: int, n_chunks: int) -> int:
 def nearby_articles(pack: "Pack", question: str, loc) -> list[tuple]:
     """ResearchPipeline.nearbyArticles: the most viewed articles within the radius that are things to
     visit, ranked by popularity plus the question's topic words ("hikes", "lakes", "temples") in their
-    title and intro. Returns [(chunk_id, article_id, title, km, intro_text)]."""
+    title and intro, and kinds of sights. Returns [(chunk_id, article_id, title, km, intro_text, direction)]."""
     row, lat, lon, km, phrase, min_km, n_sources = loc
     dlat = km / 111.0
     coslat = max(0.1, math.cos(math.radians(lat)))
@@ -530,9 +545,19 @@ def nearby_articles(pack: "Pack", question: str, loc) -> list[tuple]:
             continue
         low_t, low = title.lower(), text.lower()
         hits = sum(2.0 if t in low_t else 1.0 if t in low else 0.0 for t in topic)
-        scored.append((prior + 2.0 * hits, cid, aid, title, dist, text))
+        sight = SIGHT_BONUS if SIGHT_KIND.search(f"{title} {SENT_RE.split(text, 1)[0][:300]}") else 0.0
+        direction = compass((alat - lat) * 111.0, (alon - lon) * 111.0 * coslat)
+        scored.append((prior + 2.0 * hits + sight, cid, aid, title, dist, text, direction, alat, alon))
     scored.sort(key=lambda s: -s[0])
-    return [(cid, aid, title, dist, text) for _, cid, aid, title, dist, text in scored[:n_sources]]
+    out = []
+    for _, cid, aid, title, dist, text, direction, alat, alon in scored:
+        if min_km > 0 and any(math.hypot((alat - o[0]) * 111.0, (alon - o[1]) * 111.0 * coslat) < DAY_TRIP_SPREAD_KM
+                              for o in [x[-2:] for x in out]):
+            continue
+        out.append((cid, aid, title, dist, text, direction, alat, alon))
+        if len(out) >= n_sources:
+            break
+    return [x[:6] for x in out]
 
 
 LIST_SKIP_CELL = re.compile(r"^(:?-+:?|name|names|image|picture|photo|rank|no\.?|#)$", re.I)

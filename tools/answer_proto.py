@@ -105,9 +105,9 @@ def retrieve(pack: Pack, q: str):
             cands.append((cid, art_id, title, sec))
     loc = nearby_location(pack, q)
     if loc:  # "hikes near Interlaken": articles located nearby, with how far they are
-        for cid, aid, title, km, text in nearby_articles(pack, q, loc):
+        for cid, aid, title, km, text, direction in nearby_articles(pack, q, loc):
             if aid not in named_ids:
-                cands.append((cid, aid, title, nearby_section(km, loc[0][1])))
+                cands.append((cid, aid, title, nearby_section(km, loc[0][1], direction)))
                 whole[cid] = compress(text, words, EVIDENCE_CHARS)
                 expanded.add(aid)
     n_leads = len(cands)  # named articles' leads (and sights lists) always pass the relevance gate
@@ -144,9 +144,10 @@ def retrieve(pack: Pack, q: str):
     return out
 
 
-def nearby_section(km: float, place: str) -> str:
-    """ResearchPipeline.nearbySection: "12 km from Interlaken"."""
-    return f"{'under 1' if km < 1 else round(km)} km from {place}"
+def nearby_section(km: float, place: str, direction: str) -> str:
+    """ResearchPipeline.nearbySection: "12 km southeast of Interlaken". The direction keeps the model from
+    guessing one ("St Andrews, about 50 km southeast" of Edinburgh: it's north)."""
+    return f"under 1 km from {place}" if km < 1 else f"{round(km)} km {direction} of {place}"
 
 
 def infobox_facts(infobox: str, words, max_chars: int = INFOBOX_FACT_CHARS) -> str:
