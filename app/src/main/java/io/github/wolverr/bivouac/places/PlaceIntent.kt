@@ -45,7 +45,15 @@ data class PlaceIntent(
         )
 
         /** Questions about what a place is or means belong to Wikipedia, not the map. */
-        private val KNOWLEDGE = Regex("\\b(must[- ]see|famous|known for|history|worth (?:a )?visit|most important)\\b")
+        private val KNOWLEDGE = Regex("\\b(must[- ]see|famous|known for|history|worth (?:a )?visit|most important|safe to|tap water)\\b")
+        /** "How does the metro work in Paris?": an explanation, unless it asks the way ("how do I get to the nearest ..."). */
+        private val EXPLAIN_ASK = Regex("^\\s*(how (does|do|did|is|are|can|should|would|much|many)\\b|why\\b|when\\b)")
+        private val GOES_TO = Regex("\\b(get to|go to|walk to|find|reach)\\b")
+        /** Sights at a named place come from Wikipedia's nearby articles; the map only has their names. Near me stays on the map. */
+        private val SIGHT_NOUNS = setOf(
+            "castle", "waterfall", "mountain", "peak", "lake", "temple", "beach", "viewpoint", "trail", "hike",
+            "island", "cathedral", "palace", "ruin", "monument", "glacier", "volcano", "cave",
+        )
         /** Modifiers that are about diet (after synonym expansion). */
         val DIET_WORDS = setOf("vegetarian", "vegan", "halal", "kosher", "gluten", "gluten-free")
 
@@ -67,6 +75,8 @@ data class PlaceIntent(
 
             if (KNOWLEDGE.containsMatchIn(lower)) return null
             val nearMe = NEAR_ME.containsMatchIn(lower)
+            if (!nearMe && (singular[nounAt] in SIGHT_NOUNS ||
+                    (EXPLAIN_ASK.containsMatchIn(lower) && !GOES_TO.containsMatchIn(lower)))) return null
             val loc = if (nearMe) null else LOCATION.find(q.substring(textIndexAfter(q, words, nounAt)))?.groupValues?.get(1)
             if (!nearMe && loc.isNullOrBlank()) return null
 

@@ -47,6 +47,20 @@ class PlaceIntentTest {
     }
 
     @Test
+    fun explanationsAndSightsAreNotMapSearches() {
+        val n = nouns + setOf("airport", "metro", "water", "castle", "waterfall")
+        assertNull(PlaceIntent.parse("How do I get from the airport to the city centre in Tokyo?", n))
+        assertNull(PlaceIntent.parse("How does the metro work in Paris for a tourist?", n))
+        assertNull(PlaceIntent.parse("Can you drink the tap water in Vietnam?", n))
+        assertNull(PlaceIntent.parse("What castles are near Füssen?", n))
+        assertNull(PlaceIntent.parse("Are there any waterfalls near Reykjavík?", n))
+        // Still map searches: the way to something, and sights near me.
+        assertNotNull(PlaceIntent.parse("How do I get to the nearest pharmacy?", n))
+        assertNotNull(PlaceIntent.parse("castles near me", n))
+        assertNotNull(PlaceIntent.parse("Where can I find a pharmacy near Shinjuku Station in Tokyo?", n))
+    }
+
+    @Test
     fun supermarketsAndDiets() {
         val nouns = nouns + "grocery"
         val i = PlaceIntent.parse("supermarket in Genova", nouns)

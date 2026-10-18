@@ -31,7 +31,15 @@ SYNONYMS = {
     "accommodation": ["hotel", "hostel", "guest"], "stay": ["hotel", "hostel", "guest"],
     "eat": ["restaurant"], "food": ["restaurant"], "petrol": ["gas"], "fuel": ["gas"], "wifi": ["internet", "cafe"],
 }
-KNOWLEDGE = re.compile(r"\b(must[- ]see|famous|known for|history|worth (?:a )?visit|most important)\b")
+KNOWLEDGE = re.compile(r"\b(must[- ]see|famous|known for|history|worth (?:a )?visit|most important|safe to|tap water)\b")
+# "How does the metro work in Paris?", "How do I get from the airport to the city centre?": explanations,
+# unless they ask the way to something ("how do I get to the nearest pharmacy").
+EXPLAIN_ASK = re.compile(r"^\s*(how (does|do|did|is|are|can|should|would|much|many)\b|why\b|when\b)")
+GOES_TO = re.compile(r"\b(get to|go to|walk to|find|reach)\b")
+# Sights at a named place come from Wikipedia's nearby articles, which say what they are; the map only
+# has names ("waterfalls near Reykjavík", "castles near Füssen"). Near me stays on the map (GPS).
+SIGHT_NOUNS = {"castle", "waterfall", "mountain", "peak", "lake", "temple", "beach", "viewpoint", "trail", "hike",
+               "island", "cathedral", "palace", "ruin", "monument", "glacier", "volcano", "cave"}
 GENERIC_ENDINGS = {"store", "shop", "station", "center", "centre", "office"}
 CLAUSE = re.compile(r"\s+(?:and|that|which|where|with|for|so|because|to)\s+|[;:]")
 NEAR_ME = re.compile(r"\b(near me|nearby|near here|around here|close by|closest|nearest|around me)\b")
@@ -63,6 +71,8 @@ def parse_intent(question, place_nouns):
     if KNOWLEDGE.search(lower):
         return None
     near_me = bool(NEAR_ME.search(lower))
+    if not near_me and (singular[noun_at] in SIGHT_NOUNS or (EXPLAIN_ASK.search(lower) and not GOES_TO.search(lower))):
+        return None
     loc = None
     if not near_me:
         frm = 0
