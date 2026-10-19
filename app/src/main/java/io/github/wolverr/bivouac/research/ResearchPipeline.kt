@@ -70,8 +70,8 @@ class ResearchPipeline(
         /** Score bonus for passages from articles named in the question. */
         val namedBoost: Double = 4.0,
         /** Rough prompt budget in characters (~4 chars/token) for history + new turn. */
-        val historyChars: Int = 9_000,
-        val sampling: Sampling = Sampling(temperature = 0.4f, maxTokens = 700),
+        val historyChars: Int = 8_100,
+        val sampling: Sampling = Sampling(temperature = 0.4f, maxTokens = 1000),
         /**
          * "Think harder": tokens of reasoning before the engine makes the model answer. 1,024 kept
          * nearly all of unbounded thinking's gain on the reasoning questions (4B 4.2 -> 8.7, 9B 3.5 -> 8.8
@@ -81,13 +81,13 @@ class ResearchPipeline(
     ) {
         companion object {
             /**
-             * Fits the prompt to the loaded context: the answer (700) and system prompt
+             * Fits the prompt to the loaded context: the answer (1,000) and system prompt
              * (~400 tokens) come first, the rest at ~3 chars/token goes to history + excerpts.
              * 4096 gives the defaults; small contexts also read fewer sources.
              */
             fun forContext(nCtx: Int) = Settings(
                 maxSources = if (nCtx < 3072) 3 else 6,
-                historyChars = maxOf(0, (nCtx - 1100) * 3),
+                historyChars = maxOf(0, (nCtx - 1400) * 3),
                 thinkBudget = (nCtx - 1700).coerceIn(256, 1024),
             )
         }

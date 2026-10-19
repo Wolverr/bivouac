@@ -40,7 +40,7 @@ MAX_SOURCES, PER_ARTICLE, EVIDENCE_CHARS, PRIOR_WEIGHT, NAMED_BOOST = 6, 2, 300,
 INFOBOX_FACT_CHARS = 200
 LIST_SECTION = "Most viewed entries"  # ResearchPipeline.LIST_SECTION
 SIGHTS_SECTION_NAME = "Main sights"  # ResearchPipeline.SIGHTS_SECTION
-SAMPLING = dict(temperature=0.4, top_p=0.95, top_k=20, min_p=0.0, repeat_penalty=1.05, max_tokens=700)
+SAMPLING = dict(temperature=0.4, top_p=0.95, top_k=20, min_p=0.0, repeat_penalty=1.05, max_tokens=1000)
 # Fixed seed: an unchanged prompt gives an unchanged answer, so a before/after comparison
 # (grade.py pair) measures the change instead of sampling luck. Unseeded reruns of identical
 # prompts moved the 4B's paired mean by -0.48 on their own.
