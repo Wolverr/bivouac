@@ -44,9 +44,12 @@ for Android. Download them on the phone, then add them in the app's Library.
 | File | Contents | License |
 |---|---|---|
 | `wiki.db` | English Wikipedia, {wiki.get("articles", "?")} articles (FineWiki, Wikipedia dump 2025-08), SQLite + FTS5 + zstd, with {wiki.get("aliases", "?")} alternative names from redirects, {wiki.get("acronyms", "?")} acronyms and coordinates for {wiki.get("coords", "?")} articles (Wikipedia geo_tags, with an R*Tree index) | CC BY-SA 4.0 |
+| `wiki.db` (also) | {wiki.get("supplements", "no supplements")}, appended by `tools/build_supplements.py` + `append_supplements.py` (titles "EIP-…", "Ethereum docs: …", "Upgrading Ethereum: …", "Wikivoyage: …") | as listed |
 | `places.db` | {places.get("places", "?")} places worldwide ({places.get("source", "Overture Maps")}), SQLite + R*Tree | CDLA-Permissive-2.0 / Apache-2.0 / CC0-1.0 (per Overture source) |
 
 Built with `tools/run_data_jobs.sh` and `tools/build_aliases.py`, `build_acronyms.py` and `build_coords.py` in the Bivouac repo.
+Wikivoyage text is © Wikivoyage contributors, CC BY-SA 4.0; Upgrading Ethereum © Ben Edgington, CC BY-SA 4.0;
+changes: wikitext/markdown converted to text and split into sections.
 Wikipedia text is © Wikipedia contributors, CC BY-SA 4.0; changes: HTML converted to text,
 split into sections, compressed. Places data © Overture Maps Foundation and its sources.
 """
