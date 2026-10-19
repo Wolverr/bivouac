@@ -150,8 +150,6 @@ TOKEN_RE = re.compile(r"[\w][\w'\-.]*", re.UNICODE)
 # and is skipped when obscure ("Determine" 272 views/month, "Broad Strokes" 87).
 COMMON_DF = 20_000
 COMMON_MIN_VIEWS = 3_000
-
-
 def everyday(pack: "Pack", words: list[str], starts: list[bool]) -> bool:
     """No name-like word and every content word common. starts[k]: words[k] begins a sentence."""
     if any(is_named(w, s) for w, s in zip(words, starts)):
@@ -591,10 +589,42 @@ def list_entries(pack: "Pack", article, k: int = 8, max_chunks: int = 80, max_na
 LIST_LINE_CHARS = 160
 
 
+# Travel questions about a named place have their own Wikipedia articles: "the best way to get around
+# Istanbul" is answered by Transport in Istanbul, "the monsoon season in Thailand" by Climate of Thailand.
+TOPIC_FORMS = [
+    (re.compile(r"\b(get|getting|go|going|travel\w*|mov\w*)\s+around\b|\b(public )?transport\w*\b|\btransit\b|"
+                r"\b(metro|subway|underground|tram|trams|buses|taxis?|ferr(y|ies))\b", re.I),
+     ["Transport in {}", "Public transport in {}", "Transportation in {}"]),
+    (re.compile(r"\b(weather|climate|monsoons?|rainy season|dry season|wet season|temperatures?|"
+                r"best (time|month|season) to (visit|go)|when (should I|to) (visit|go))\b", re.I),
+     ["Climate of {}"]),
+    (re.compile(r"\b(food|foods|cuisine|dishes|dish|eat|eating|specialt(y|ies))\b", re.I),
+     ["Cuisine of {}", "{} cuisine"]),
+]
+
+
+def topic_articles(pack: "Pack", question: str, rows) -> list:
+    """ResearchPipeline.topicArticles: "Transport in X" etc. for title matches written as names."""
+    out = []
+    for rx, forms in TOPIC_FORMS:
+        if not rx.search(question):
+            continue
+        for row in rows:
+            if not row[1][:1].isupper() or row[1] not in question:
+                continue
+            for form in forms:
+                hit = pack.find_article(form.format(row[1]))
+                if hit:
+                    out.append(hit[:4])
+                    break
+    return out
+
+
 def named_articles(pack: "Pack", question: str, k: int = 3):
-    """The list article first, then title matches, deduplicated (ResearchPipeline.retrieve)."""
+    """The list article first, then topic articles, then title matches, deduplicated (ResearchPipeline.retrieve)."""
     out, seen = [], set()
-    for row in [list_article(pack, question)] + title_matches(pack, question):
+    titles = title_matches(pack, question)
+    for row in [list_article(pack, question)] + topic_articles(pack, question, titles) + titles:
         if row and row[0] not in seen:
             out.append(row)
             seen.add(row[0])

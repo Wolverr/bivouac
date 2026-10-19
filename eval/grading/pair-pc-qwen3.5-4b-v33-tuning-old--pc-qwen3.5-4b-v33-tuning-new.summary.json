@@ -1,0 +1,21 @@
+{
+ "old": "results-pc-qwen3.5-4b-v33-tuning-old.jsonl",
+ "new": "results-pc-qwen3.5-4b-v33-tuning-new.jsonl",
+ "questions": 9,
+ "identical": 0,
+ "old_mean": 4.89,
+ "new_mean": 6,
+ "mean_diff": 1.11,
+ "ci95": [
+  -0.17,
+  2.39
+ ],
+ "new_better": 5,
+ "old_better": 2,
+ "ties": 2,
+ "sign_test_p": 0.453,
+ "by_category": {
+  "science": 1,
+  "travel": 1.12
+ }
+}

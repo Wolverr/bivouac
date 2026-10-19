@@ -241,7 +241,8 @@ class ResearchPipeline(
         val t0 = System.currentTimeMillis()
 
         // Articles named in the question lead with their intro: that's where definitions live.
-        val named = (listOfNotNull(listArticle(corpus, question)) + titleMatches(corpus, question))
+        val titles = titleMatches(corpus, question)
+        val named = (listOfNotNull(listArticle(corpus, question)) + topicArticles(corpus, question, titles) + titles)
             .distinctBy { it.id }.take(3)
         val namedIds = named.map { it.id }.toSet()
         val namedTitles = named.map { it.title }
@@ -413,6 +414,27 @@ class ResearchPipeline(
         // names push these out: "why do we have seasons" keeps "Season", and "is a snake bite
         // venomous" keeps "Snakebite" next to "Venom".
         return if (namedHit) found.values.filterNot { it.id in plain } else found.values.toList()
+    }
+
+    /**
+     * Travel questions about a named place have their own Wikipedia articles: "the best way to get
+     * around Istanbul" is answered by Transport in Istanbul, "the monsoon season in Thailand" by
+     * Climate of Thailand. Tried for [titles] written as names in the question. Mirrors tools/retrieve_proto.py.
+     */
+    private suspend fun topicArticles(corpus: Corpus, question: String, titles: List<Article>): List<Article> {
+        val out = ArrayList<Article>()
+        for ((rx, forms) in TOPIC_FORMS) {
+            if (!rx.containsMatchIn(question)) continue
+            for (a in titles) {
+                if (!a.title.first().isUpperCase() || !question.contains(a.title)) continue
+                for (form in forms) {
+                    val hit = corpus.findArticle(form.format(a.title)) ?: continue
+                    out += hit
+                    break
+                }
+            }
+        }
+        return out
     }
 
     /**
@@ -594,8 +616,14 @@ class ResearchPipeline(
         const val AUTO_THINK_MIN_TPS = 6.0
 
         /** The diet sentence only when a diet was asked for: otherwise small models add diet notes to pharmacies. */
+        /** Someone looking for a hospital may need help now. Mirrored in tools/answer_proto.py. */
+        private const val EMERGENCY_NOTE = "Also give the local emergency phone number."
+        private val EMERGENCY_WORDS = setOf("hospital", "emergency", "clinic", "doctor", "medical", "police")
+
         fun placesHeader(intent: PlaceIntent): String =
-            if (intent.categoryWords.any { it in PlaceIntent.DIET_WORDS }) "$PLACES_HEADER $DIET_NOTE" else PLACES_HEADER
+            PLACES_HEADER +
+                (if (intent.categoryWords.any { it in PlaceIntent.DIET_WORDS }) " $DIET_NOTE" else "") +
+                (if (intent.categoryWords.any { it in EMERGENCY_WORDS }) " $EMERGENCY_NOTE" else "")
         private val LIST_QUERY = Regex(
             "((?:[\\p{L}-]+\\s+){0,2}[\\p{L}-]+s)\\s+(in|of|near|around)\\s+(?:the\\s+)?([\\p{L}][\\p{L}'\\- ]*)",
         )
@@ -604,6 +632,20 @@ class ResearchPipeline(
         private val SIGHT_NOUNS = setOf("sight", "attraction", "landmark", "monument")
         private val PLACE_STOP = setOf("and", "or", "for", "with", "that", "which", "what", "to", "is", "are")
         private const val COMMON_DF = 20_000
+        private val TOPIC_FORMS = listOf(
+            Regex(
+                "\\b(get|getting|go|going|travel\\w*|mov\\w*)\\s+around\\b|\\b(public )?transport\\w*\\b|\\btransit\\b|" +
+                    "\\b(metro|subway|underground|tram|trams|buses|taxis?|ferr(y|ies))\\b",
+                RegexOption.IGNORE_CASE,
+            ) to listOf("Transport in %s", "Public transport in %s", "Transportation in %s"),
+            Regex(
+                "\\b(weather|climate|monsoons?|rainy season|dry season|wet season|temperatures?|" +
+                    "best (time|month|season) to (visit|go)|when (should I|to) (visit|go))\\b",
+                RegexOption.IGNORE_CASE,
+            ) to listOf("Climate of %s"),
+            Regex("\\b(food|foods|cuisine|dishes|dish|eat|eating|specialt(y|ies))\\b", RegexOption.IGNORE_CASE) to
+                listOf("Cuisine of %s", "%s cuisine"),
+        )
         private const val INFOBOX_FACT_CHARS = 200
         private const val LIST_LINE_CHARS = 160
         /** Section label of an expanded list article's source; mirrored in tools/answer_proto.py. */

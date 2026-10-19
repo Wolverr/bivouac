@@ -1,0 +1,25 @@
+{
+ "old": "results-pc-qwen3.5-4b-v33-all-old-r3.jsonl",
+ "new": "results-pc-qwen3.5-4b-v33-all-new-r3.jsonl",
+ "questions": 17,
+ "identical": 0,
+ "old_mean": 6.06,
+ "new_mean": 6.53,
+ "mean_diff": 0.47,
+ "ci95": [
+  -0.42,
+  1.36
+ ],
+ "new_better": 9,
+ "old_better": 5,
+ "ties": 3,
+ "sign_test_p": 0.424,
+ "by_category": {
+  "explain": 1,
+  "fact": -4,
+  "places": 0,
+  "reasoning": -1,
+  "science": 0.5,
+  "travel": 1
+ }
+}
