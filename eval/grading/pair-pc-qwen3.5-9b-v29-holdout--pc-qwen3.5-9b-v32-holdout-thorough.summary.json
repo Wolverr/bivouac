@@ -1,0 +1,30 @@
+{
+ "old": "results-pc-qwen3.5-9b-v29-holdout.jsonl",
+ "new": "results-pc-qwen3.5-9b-v32-holdout-thorough.jsonl",
+ "questions": 40,
+ "identical": 0,
+ "old_mean": 6.4,
+ "new_mean": 7.2,
+ "mean_diff": 0.8,
+ "ci95": [
+  0.34,
+  1.26
+ ],
+ "new_better": 24,
+ "old_better": 4,
+ "ties": 12,
+ "sign_test_p": 0.0,
+ "by_category": {
+  "compare": 1.5,
+  "explain": 0.5,
+  "fact": 0.25,
+  "health": 1.25,
+  "history": 1,
+  "places": -0.33,
+  "reasoning": 0.25,
+  "science": 0.67,
+  "synthesis": 2.33,
+  "tech": 2,
+  "travel": -0.5
+ }
+}

@@ -117,7 +117,7 @@ completeness and usefulness. Details and how to reproduce: [docs/EVAL.md](docs/E
 PC harness (same pipeline and prompt as the app, llama.cpp on a desktop CPU), as % of the
 frontier + web answers' score:
 
-| Model | Held-out, current build (2026-10-19) | Held-out, 2026-10-02 build | Main set (60 questions, 2026-10-02 build) |
+| Model | Held-out, 2026-10-19 build ("be concise" prompt) | Held-out, 2026-10-02 build | Main set (60 questions, 2026-10-02 build) |
 |---|---|---|---|
 | Qwen3.5-9B Q4_K_M | **62.0 %** | 62.7 % | 60.7 % |
 | Qwen3.5-4B Q4_K_M | **66.5 %** | 54.0 % | 60.2 % |
@@ -132,6 +132,16 @@ monsoon), the 4B writes fuller answers. Since 2026-10-02 the build fixed questio
 answered without any sources: "what first aid should I give?" and "when should I see a doctor?"
 were taken for personal chat, and "the deepest lake in the world" or "RAM and storage in a phone"
 for map searches. That and the retrieval changes are most of the 4B's gain.
+
+**Prompt change (2026-10-19, current build): "be thorough but focused" instead of "be concise".**
+Graded head-to-head against the build above on the held-out set: 4B +0.75 points out of 10 (95 % CI
++0.24 to +1.26, better on 27 questions, worse on 6), 9B +0.80 (CI +0.34 to +1.26, 24 vs 4), 2B +0.33
+(CI −0.27 to +0.92, 22 vs 16). A second grader model on the 4B pair agreed (+0.55, 22 vs 8). It first
+won on the main set (4B +0.62, 9B +0.65). Answers are about 50 % longer (4B: 750 → 1,130 characters,
+220 → 300 tokens); on a phone that is roughly 25–30 s more per answer. Absolute scores against the
+frontier answers move with the grader: the same old 4B answers scored 57.0 % to 66.5 % across three
+grades, and the new build 60.4 % and 60.9 %, so the paired result is the one to go by. Packets and
+grades: `eval/grading/pair-pc-*-v29-holdout--pc-*-v32-holdout-thorough.*`, `eval/grading/pc-*-v32-holdout-thorough.*`.
 
 The eval harness sends every question with prompt caching off: with the server reusing the
 previous prompt's prefix, the same seeded question gave different answers depending on the

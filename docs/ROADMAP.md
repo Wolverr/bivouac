@@ -16,6 +16,20 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 - **Honest evaluation:** blind-graded comparison against a frontier model with web
   search, with the questions and answers published.
 
+## Resume here (2026-10-19 afternoon, home PC)
+
+**Done:** prompt "be thorough but focused" merged (5b94e64). Main set paired: 4B +0.62, 9B +0.65; held-out
+paired: 4B +0.75, 9B +0.80, 2B +0.33; a second grader model on the 4B held-out pair agreed (+0.55). Answers
+~50 % longer (phone: roughly +25-30 s per 4B answer). Absolute held-out scores drift with the grader (same old
+4B answers: 57.0 / 63.8 / 66.5 %), so the README keeps the v29 table and reports the paired gain. Re-route
+check (queue30, 9B, 6 questions): +1.17, 4 better / 2 worse. 9B v29 main set finished (60/60).
+WSL note: the distro shuts down ~15 s after the last wsl.exe client exits unless an Ubuntu terminal is open;
+a run started from Claude needs a waiting wsl call (background `while systemctl --user is-active ...`) to live.
+
+**Next:** Redmi session: install the current build, check the restyle + excerpt card, re-run the on-phone
+held-out (the published 53.9 % predates the no-sources fixes and the new prompt), packs from Downloads;
+then the release build with the real key.
+
 ## Resume here (2026-10-19 night, home PC)
 
 **Fixed and pushed (main f0d7542), all in harness + app with tests:**
