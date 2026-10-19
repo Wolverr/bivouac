@@ -62,13 +62,24 @@ class CrashGuard(context: Context) {
         val am = app.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val exit = runCatching { am.getHistoricalProcessExitReasons(null, 0, 1).firstOrNull() }.getOrNull() ?: return null
         if (exit.timestamp < since) return null
-        // The low-memory killer often reports SIGKILL rather than REASON_LOW_MEMORY.
-        return exit.reason == ApplicationExitInfo.REASON_LOW_MEMORY ||
-            (exit.reason == ApplicationExitInfo.REASON_SIGNALED && exit.status == 9) ||
-            exit.reason == ApplicationExitInfo.REASON_CRASH_NATIVE
+        return countsAgainstSettings(exit.reason, exit.status, exit.importance)
     }
 
     companion object {
         private const val TAG = "bivouac-crashguard"
+
+        /**
+         * A kill that smaller settings would have avoided: low memory (the low-memory killer often
+         * reports SIGKILL instead) or a native crash, while the app was on screen. Killed in the
+         * background (importance 400, cached), it was Android reclaiming a backgrounded app holding
+         * the model; shrinking the budget for that dropped repacking on the Redmi and halved prompt
+         * reading in every answer after it.
+         */
+        fun countsAgainstSettings(reason: Int, status: Int, importance: Int): Boolean {
+            val memory = reason == ApplicationExitInfo.REASON_LOW_MEMORY ||
+                (reason == ApplicationExitInfo.REASON_SIGNALED && status == 9) ||
+                reason == ApplicationExitInfo.REASON_CRASH_NATIVE
+            return memory && importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_PERCEPTIBLE
+        }
     }
 }
