@@ -620,6 +620,35 @@ def topic_articles(pack: "Pack", question: str, rows) -> list:
     return out
 
 
+# Travel questions about a named place also search its Wikivoyage guide, and "how do I say ..." its phrasebook: the
+# guide's section ("Brazil > Electricity", "Thailand > Get around > By car") has what Wikipedia leaves out. Boosted in
+# the search, not a lead: a guide's intro is a general description. ResearchPipeline.travelGuides.
+TRAVEL_ASK = re.compile(
+    r"\b(touris\w*|travel\w*|visit\w*|trip|plugs?|sockets?|voltage|adapters?|electricity|tap water|drinking water|"
+    r"tip|tips|tipping|currency|cash|cards?|atms?|money|visas?|driv\w*|roads?|rent\w*|taxis?|ride-hailing|grab|uber|"
+    r"bus|buses|trains?|metro|airport|get from|get to|get around|getting around|say|phrases?|language|speak|"
+    r"emergency numbers?|police|safe|safety|scams?|crime|weather|season|climate|best time|smok\w*|haze|monsoons?|"
+    r"eat|food|dish\w*|hotels?|stay|hostels?)\b", re.I)
+PHRASE_ASK = re.compile(r"\b(say|phrases?|speak|greet\w*)\b", re.I)
+
+
+def travel_guides(pack: "Pack", question: str, named) -> list[int]:
+    """Article ids of the Wikivoyage guides (and phrasebooks) to boost for a travel question."""
+    if not TRAVEL_ASK.search(question):
+        return []
+    names = [r[1] for r in named if r[1][:1].isupper() and r[1] in question]
+    phrase = bool(PHRASE_ASK.search(question))
+    if phrase:  # "thank you in Thai": the language is a word, not a title match
+        names += [t for t in TOKEN_RE.findall(question) if t[:1].isupper() and t != "I"]
+    out = []
+    for n in dict.fromkeys(names):
+        for form in [f"Wikivoyage: {n}"] + ([f"Wikivoyage: {n} phrasebook"] if phrase else []):
+            row = pack.find_article(form)
+            if row and row[0] not in out:
+                out.append(row[0])
+    return out
+
+
 def named_articles(pack: "Pack", question: str, k: int = 3):
     """The list article first, then topic articles, then title matches, deduplicated (ResearchPipeline.retrieve)."""
     out, seen = [], set()

@@ -117,10 +117,14 @@ class ResearchPipeline(
         val decision = Router.decide(question, !conversation.isEmpty)
         val placeIntent = places?.takeIf { it.path != null }?.let { PlaceIntent.parse(question, it.placeNouns) }
         val fastEnough = (writeTps ?: 0.0) >= AUTO_THINK_MIN_TPS
-        val think = thinkHarder || (autoThink && fastEnough && decision.reasoning && placeIntent == null)
+        // Calculations reason first on every phone: without it the 4B got "7.5 L/100 km in mpg" and Naismith's rule
+        // wrong (Boar's set). Phones that write slowly get a shorter budget (SLOW_THINK_BUDGET).
+        val think = thinkHarder || (autoThink && decision.reasoning && placeIntent == null)
         emit(ResearchEvent.Routed(decision, think))
 
         val nearby = if (placeIntent != null) findPlaces(placeIntent) else emptyList()
+        val eat = if (nearby.isNotEmpty()) eatGuide(placeIntent!!, question, Evidence.keywords(question)) else null
+        eat?.let { emit(ResearchEvent.Sources(listOf(it), 0)) }
         // "the deepest lake in the world" reads like a places search ("lake in the world"); when the place
         // isn't on the map, answer from Wikipedia instead of from no sources at all.
         val notAPlace = placeIntent != null && !placeIntent.nearMe && nearby.isEmpty()
@@ -137,7 +141,7 @@ class ResearchPipeline(
             if (nearby.isNotEmpty()) {
                 // Place instructions travel with the list: in the system prompt, small models
                 // leaked them ("cuisine notes") into unrelated answers.
-                appendLine(placesHeader(placeIntent!!))
+                appendLine(placesHeader(placeIntent!!, guide = eat != null))
                 // The screen shows all of them; the model gets the nearest few (every line costs
                 // reading time on a phone, and it described all 12, 483 tokens, ~3 min on the Redmi).
                 nearby.take(PROMPT_PLACES).forEachIndexed { i, p ->
@@ -145,6 +149,12 @@ class ResearchPipeline(
                     listOfNotNull(p.street, p.locality).joinToString(", ").takeIf { it.isNotEmpty() }?.let { append(" — $it") }
                     p.phone?.let { append(" — $it") }
                     appendLine()
+                }
+                eat?.let { s ->
+                    appendLine()
+                    appendLine("Travel guide excerpt:")
+                    appendLine("[1] ${s.passage.title} — ${s.passage.section}")
+                    appendLine(s.evidence)
                 }
                 appendLine()
                 append("Question: ")
@@ -162,7 +172,7 @@ class ResearchPipeline(
         }
 
         // Thinking needs room in the context: the reasoning (~3 chars/token) comes out of the history.
-        val budget = settings.thinkBudget
+        val budget = if (thinkHarder || fastEnough) settings.thinkBudget else minOf(settings.thinkBudget, SLOW_THINK_BUDGET)
         val promptChars = settings.historyChars - if (think) budget * 3 else 0
         val turns = history(conversation, promptChars - prompt.length) + ChatTurn("user", prompt)
         val (prefix, rest) = llm.chatPrompt(system, turns, thinking = think)
@@ -273,6 +283,8 @@ class ResearchPipeline(
                 n.passage.copy(section = nearbySection(n.km, loc.article.title, n.direction))
             }
         }.orEmpty()
+        // A travel question's Wikivoyage guide: its best sections ("Brazil > Electricity"), after the leads.
+        val guideLeads = travelGuides(corpus, question, named).flatMap { guidePassages(corpus, it, words) }
         // Boosted before the cut to maxSources * 4, as in tools/retrieve_proto.py: boosting afterwards
         // let other articles fill the candidates (6 sources instead of 3 for "capital of Kazakhstan",
         // ~900 prompt tokens instead of ~650: 25 s more on the Redmi), unlike the evaluated harness.
@@ -291,7 +303,7 @@ class ResearchPipeline(
                 // An album or song sharing the question's words ("ice floats" -> "Floating Ice"), unless named.
                 (it.article in namedIds || it.title in question || !isWork(corpus, it.title, question))
         }
-        val picked = (leads + nearbyLeads + relevant).filter { p ->
+        val picked = (leads + nearbyLeads + guideLeads + relevant).filter { p ->
             val n = perArticle.getOrDefault(p.article, 0)
             if (n >= settings.perArticle || !seen.add(p.chunk)) false else { perArticle[p.article] = n + 1; true }
         }.take(settings.maxSources)
@@ -414,6 +426,66 @@ class ResearchPipeline(
         // names push these out: "why do we have seasons" keeps "Season", and "is a snake bite
         // venomous" keeps "Snakebite" next to "Venom".
         return if (namedHit) found.values.filterNot { it.id in plain } else found.values.toList()
+    }
+
+    /**
+     * Travel questions about a named place also search its Wikivoyage guide, and "how do I say ..." its
+     * phrasebook: the guide's section ("Brazil > Electricity", "Thailand > Get around > By car") has what
+     * Wikipedia leaves out. Mirrors tools/retrieve_proto.travel_guides.
+     */
+    private suspend fun travelGuides(corpus: Corpus, question: String, named: List<Article>): List<Article> {
+        if (!TRAVEL_ASK.containsMatchIn(question)) return emptyList()
+        val phrase = PHRASE_ASK.containsMatchIn(question)
+        val names = named.map { it.title }.filter { it.first().isUpperCase() && question.contains(it) } +
+            // "thank you in Thai": the language is a word, not a title match
+            if (phrase) Evidence.titleTokens(question).filter { it.isNotEmpty() && it.first().isUpperCase() && it != "I" } else emptyList()
+        val out = LinkedHashMap<Long, Article>()
+        for (n in names.distinct()) {
+            for (form in listOf("Wikivoyage: $n") + if (phrase) listOf("Wikivoyage: $n phrasebook") else emptyList()) {
+                corpus.findArticle(form)?.let { out.putIfAbsent(it.id, it) }
+            }
+        }
+        return out.values.toList()
+    }
+
+    /**
+     * The sections of a Wikivoyage guide sharing the most question words, the place's own name aside (every
+     * section of the Thailand guide says "Thailand"): at least half of the others, and a second one only if it
+     * shares as many as the first. Search can't find them: "plug type and voltage in Brazil" ranks Wikipedia's
+     * Voltage and Spark plug first. A country guide has ~170 chunks, a few blocks. Mirrors tools/answer_proto.py.
+     */
+    private suspend fun guidePassages(corpus: Corpus, guide: Article, words: List<String>): List<Passage> {
+        val own = Evidence.keywords(guide.title.substringAfter(":")).toSet()
+        val rest = words.filterNot { it in own }
+        if (rest.isEmpty()) return emptyList()
+        val need = maxOf(1, (rest.size + 1) / 2)
+        val scored = (0 until guide.n_chunks).mapNotNull { i ->
+            corpus.chunk(guide, i)?.let { p -> Evidence.overlap("${p.section} ${p.text}", rest).takeIf { it >= need }?.let { p to it } }
+        }.sortedByDescending { it.second }  // stable: earlier first on ties
+        val best = scored.firstOrNull()?.second ?: return emptyList()
+        return scored.take(GUIDE_PASSAGES).filter { it.second == best }.map { it.first }
+    }
+
+    /**
+     * "Vegetarian restaurants in Chiang Mai": the city guide's eating section that names the diet (vegetarian
+     * restaurants with addresses), next to the map's list. Only for diet questions: a guide's general "Eat"
+     * section matched "best restaurants" anywhere. Mirrors tools/answer_proto.eat_guide.
+     */
+    private suspend fun eatGuide(intent: PlaceIntent, question: String, words: List<String>): Source? {
+        val corpus = corpus?.takeIf { it.path != null } ?: return null
+        val location = intent.location ?: return null
+        val lower = question.lowercase()
+        val diet = PlaceIntent.DIET_WORDS.filter { it in lower }
+        if (diet.isEmpty() || intent.nounWords.none { it in EAT_NOUNS }) return null
+        val guide = listOf(location, location.substringAfterLast(" in ")).distinct()
+            .firstNotNullOfOrNull { corpus.findArticle("Wikivoyage: $it") } ?: return null
+        val best = (0 until guide.n_chunks).mapNotNull { i ->
+            corpus.chunk(guide, i)?.takeIf { it.section.startsWith("Eat") }?.let { p ->
+                val text = p.text.lowercase()
+                diet.sumOf { d -> text.windowed(d.length).count { it == d } }.takeIf { it > 0 }?.let { p to it }
+            }
+        }.maxByOrNull { it.second }?.first ?: return null
+        return Source(1, best, Evidence.compress(best.text, words + diet, EAT_GUIDE_CHARS))
     }
 
     /**
@@ -604,9 +676,14 @@ class ResearchPipeline(
 
     companion object {
         /** Mirrored in tools/answer_proto.py. */
-        const val PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend the best 3 to 5 " +
-            "from this list, nearest first, one short line each, using the labels like [P1] and saying how far each is; " +
-            "never invent places that aren't listed."
+        /**
+         * 5 to 8 places with their street, and nothing the map doesn't say: with "best 3 to 5" the 4B listed three
+         * and guessed each one's menu ("typically German-style dumplings"); the map has no menus, prices or hours.
+         */
+        const val PLACES_HEADER = "Places from the offline map (straight-line distances). Recommend 5 to 8 of them, nearest " +
+            "first, one line each: the label like [P1], the name, how far it is and its street. Describe a place only by " +
+            "what its name and category say: the map has no menus, prices, ratings or opening hours, so never guess them, " +
+            "and never invent places that aren't listed."
         /** "Point out places" made the model name restaurants that weren't listed ("Osteria del Duomo"). */
         private const val DIET_NOTE = "The list may be incomplete, so you may add which kinds of cuisine usually suit " +
             "this diet, without naming places that aren't listed."
@@ -620,8 +697,12 @@ class ResearchPipeline(
         private const val EMERGENCY_NOTE = "Also give the local emergency phone number."
         private val EMERGENCY_WORDS = setOf("hospital", "emergency", "clinic", "doctor", "medical", "police")
 
-        fun placesHeader(intent: PlaceIntent): String =
-            PLACES_HEADER +
+        /** With a travel guide excerpt after the list (eatGuide). Mirrored in tools/answer_proto.py. */
+        private const val GUIDE_NOTE = "After the list comes a travel guide excerpt: you may also recommend places it " +
+            "names, citing it as [1]."
+
+        fun placesHeader(intent: PlaceIntent, guide: Boolean = false): String =
+            PLACES_HEADER + (if (guide) " $GUIDE_NOTE" else "") +
                 (if (intent.categoryWords.any { it in PlaceIntent.DIET_WORDS }) " $DIET_NOTE" else "") +
                 (if (intent.categoryWords.any { it in EMERGENCY_WORDS }) " $EMERGENCY_NOTE" else "")
         private val LIST_QUERY = Regex(
@@ -632,6 +713,21 @@ class ResearchPipeline(
         private val SIGHT_NOUNS = setOf("sight", "attraction", "landmark", "monument")
         private val PLACE_STOP = setOf("and", "or", "for", "with", "that", "which", "what", "to", "is", "are")
         private const val COMMON_DF = 20_000
+        private val TRAVEL_ASK = Regex(
+            """\b(touris\w*|travel\w*|visit\w*|trip|plugs?|sockets?|voltage|adapters?|electricity|tap water|drinking water|""" +
+                """tip|tips|tipping|currency|cash|cards?|atms?|money|visas?|driv\w*|roads?|rent\w*|taxis?|ride-hailing|grab|uber|""" +
+                """bus|buses|trains?|metro|airport|get from|get to|get around|getting around|say|phrases?|language|speak|""" +
+                """emergency numbers?|police|safe|safety|scams?|crime|weather|season|climate|best time|smok\w*|haze|monsoons?|""" +
+                """eat|food|dish\w*|hotels?|stay|hostels?)\b""",
+            RegexOption.IGNORE_CASE,
+        )
+        private val PHRASE_ASK = Regex("""\b(say|phrases?|speak|greet\w*)\b""", RegexOption.IGNORE_CASE)
+        /** Sections of a travel guide added after the leads; mirrored in tools/answer_proto.py. */
+        private const val GUIDE_PASSAGES = 2
+        private val EAT_NOUNS = setOf("restaurant", "cafe", "coffee", "food", "bakery")
+        private const val EAT_GUIDE_CHARS = 600
+        /** Thinking for calculations on phones that write slowly: ~80 s at 3 tok/s, instead of none. */
+        private const val SLOW_THINK_BUDGET = 256
         private val TOPIC_FORMS = listOf(
             Regex(
                 "\\b(get|getting|go|going|travel\\w*|mov\\w*)\\s+around\\b|\\b(public )?transport\\w*\\b|\\btransit\\b|" +

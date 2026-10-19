@@ -20,7 +20,7 @@ from pathlib import Path
 
 from places_proto import Places, parse_intent
 from retrieve_proto import (Pack, compress, fts_query, is_namesake, is_qualified_twin, is_work, is_sights_question, keywords, list_entries,
-                            named_articles, nearby_articles, nearby_location, sights_evidence)
+                            named_articles, nearby_articles, nearby_location, sights_evidence, travel_guides)
 
 ROOT = Path(__file__).resolve().parent.parent
 SYSTEM = (ROOT / "app/src/main/assets/prompts/system.txt").read_text().strip()
@@ -82,6 +82,7 @@ def retrieve(pack: Pack, q: str):
     named = named_articles(pack, q)
     named_ids = {a[0] for a in named}
     named_titles = [a[1] for a in named]
+    guides = travel_guides(pack, q, named)
     cands, facts, seen, whole, expanded = [], {}, set(), {}, set()
     sights_q = is_sights_question(q)
     for art_id, title, first_chunk, n_chunks in named:
@@ -108,7 +109,10 @@ def retrieve(pack: Pack, q: str):
                 cands.append((cid, aid, title, nearby_section(km, loc[0][1], direction)))
                 whole[cid] = compress(text, words, EVIDENCE_CHARS)
                 expanded.add(aid)
-    n_leads = len(cands)  # named articles' leads (and sights lists) always pass the relevance gate
+    for gid in guides:  # a travel guide's best sections ("Brazil > Electricity"), after the leads
+        for cid, sec in guide_passages(pack, gid, words):
+            cands.append((cid, gid, pack.db.execute("SELECT title FROM article WHERE id = ?", (gid,)).fetchone()[0], sec))
+    n_leads = len(cands)  # named articles' leads (and sights lists, guide sections) always pass the relevance gate
     for score, cid, title, sec in pack.search(fts_query(words), limit=MAX_SOURCES * 4, per_article=99,
                                               prior_weight=PRIOR_WEIGHT, boost_articles=named_ids, boost=NAMED_BOOST):
         art, first, n = pack.db.execute("SELECT c.article, a.first_chunk, a.n_chunks FROM chunk c JOIN article a "
@@ -140,6 +144,30 @@ def retrieve(pack: Pack, q: str):
         ev = compress(pack.text(cid), words, EVIDENCE_CHARS - len(f))
         out.append((i + 1, title, sec, f"{f}\n{ev}" if f else ev))
     return out
+
+
+GUIDE_PASSAGES = 2  # ResearchPipeline.GUIDE_PASSAGES
+
+
+def guide_passages(pack: Pack, article_id: int, words, k: int = GUIDE_PASSAGES):
+    """ResearchPipeline.guidePassages: the sections of a Wikivoyage guide sharing the most question words, the
+    place's own name aside (every section of the Thailand guide says "Thailand"): at least half of the others, and a
+    second one only if it shares as many as the first. A country guide has ~170 chunks: a few blocks to read.
+    Search can't find them: "plug type and voltage in Brazil" ranks Wikipedia's Voltage and Spark plug first."""
+    title, first, n = pack.db.execute("SELECT title, first_chunk, n_chunks FROM article WHERE id = ?", (article_id,)).fetchone()
+    own = set(keywords(title.split(":", 1)[-1]))
+    rest = [w for w in words if w not in own]
+    if not rest:
+        return []
+    need = max(1, (len(rest) + 1) // 2)
+    scored = []
+    for cid in range(first, first + n):
+        sec = pack.db.execute("SELECT section FROM chunk WHERE id = ?", (cid,)).fetchone()[0]
+        ov = overlap(f"{sec} {pack.text(cid)}", rest)
+        if ov >= need:
+            scored.append((-ov, cid, sec))
+    scored.sort()
+    return [(cid, sec) for ov, cid, sec in scored[:k] if ov == scored[0][0]]
 
 
 def nearby_section(km: float, place: str, direction: str) -> str:
@@ -180,9 +208,13 @@ def lead(pack: Pack, title: str, first_chunk: int, n_chunks: int, words):
 
 
 # ResearchPipeline.PLACES_HEADER / placesHeader(): the diet sentence only for diet requests.
-PLACES_HEADER = ("Places from the offline map (straight-line distances). Recommend the best 3 to 5 "
-                 "from this list, nearest first, one short line each, using the labels like [P1] and saying how far "
-                 "each is; never invent places that aren't listed.")
+PLACES_HEADER = ("Places from the offline map (straight-line distances). Recommend 5 to 8 of them, nearest first, one "
+                 "line each: the label like [P1], the name, how far it is and its street. Describe a place only by what its "
+                 "name and category say: the map has no menus, prices, ratings or opening hours, so never guess them, and "
+                 "never invent places that aren't listed.")
+GUIDE_NOTE = "After the list comes a travel guide excerpt: you may also recommend places it names, citing it as [1]."
+EAT_NOUNS = {"restaurant", "cafe", "coffee", "food", "bakery"}  # ResearchPipeline.EAT_NOUNS
+EAT_GUIDE_CHARS = 600
 DIET_NOTE = ("The list may be incomplete, so you may add which kinds of cuisine usually suit this diet, "
              "without naming places that aren't listed.")
 PROMPT_PLACES = 8  # ResearchPipeline.PROMPT_PLACES: the model reads the nearest few, the screen shows all
@@ -211,12 +243,38 @@ def find_places(places: Places, q: str):
     return intent, found
 
 
-def build_places_prompt(q: str, intent, found) -> str:
+def eat_guide(pack: Pack, intent, q: str):
+    """ResearchPipeline.eatGuide: (title, section, evidence) of the city guide's eating section that names the diet
+    ("vegetarian restaurants in Chiang Mai"), or None. Only for diet questions about places to eat."""
+    loc = intent["location"]
+    lower = q.lower()
+    diet = [d for d in sorted(DIET_WORDS) if d in lower]
+    if not loc or not diet or not any(n in EAT_NOUNS for n in intent["noun"]):
+        return None
+    row = next((r for r in (pack.find_article(f"Wikivoyage: {x}") for x in dict.fromkeys([loc, loc.split(" in ")[-1]])) if r), None)
+    if not row:
+        return None
+    best, best_n = None, 0
+    for cid in range(row[2], row[2] + row[3]):
+        sec = pack.db.execute("SELECT section FROM chunk WHERE id = ?", (cid,)).fetchone()[0]
+        if not sec.startswith("Eat"):
+            continue
+        text = pack.text(cid)
+        n = sum(text.lower().count(d) for d in diet)
+        if n > best_n:
+            best, best_n = (cid, sec, text), n
+    if not best:
+        return None
+    return row[1], best[1], compress(best[2], keywords(q) + diet, EAT_GUIDE_CHARS)
+
+
+def build_places_prompt(q: str, intent, found, guide=None) -> str:
     if not found:
         return q
     diet = any(w in DIET_WORDS for w in intent["modifiers"] + intent["noun"])
     urgent = any(w in EMERGENCY_WORDS for w in intent["modifiers"] + intent["noun"])
-    lines = [PLACES_HEADER + (" " + DIET_NOTE if diet else "") + (" " + EMERGENCY_NOTE if urgent else "")]
+    lines = [PLACES_HEADER + (" " + GUIDE_NOTE if guide else "") + (" " + DIET_NOTE if diet else "")
+             + (" " + EMERGENCY_NOTE if urgent else "")]
     for i, p in enumerate(found[:PROMPT_PLACES]):
         name = p["name"] + (f" ({p['name_en']})" if p["name_en"] else "")
         line = f"[P{i + 1}] {name} — {p['cat'].replace('_', ' ')} — {format_distance(p['dist'])}"
@@ -226,6 +284,8 @@ def build_places_prompt(q: str, intent, found) -> str:
         if p["phone"]:
             line += f" — {p['phone']}"
         lines.append(line)
+    if guide:
+        lines += ["", "Travel guide excerpt:", f"[1] {guide[0]} — {guide[1]}", guide[2]]
     return "\n".join(lines) + "\n\nQuestion: " + q
 
 
@@ -315,8 +375,10 @@ def main():
             hit = None
         if hit is not None:
             intent, found = hit
-            r, sources = "places", []
-            prompt = build_places_prompt(q["q"], intent, found)
+            r = "places"
+            guide = eat_guide(pack, intent, q["q"])
+            sources = [(1, guide[0], guide[1], guide[2])] if guide else []
+            prompt = build_places_prompt(q["q"], intent, found, guide)
         else:
             sources = retrieve(pack, q["q"]) if r == "lookup" else []
             prompt = build_prompt(q["q"], sources)
