@@ -109,6 +109,11 @@ class EvidenceTest {
     fun creativeWorksAreRecognised() {
         assertTrue(Evidence.describesWork("Floating Ice is an album by American jazz bassist Michael Bisio. It was recorded in 2012."))
         assertTrue(Evidence.describesWork("Monsoon Season is the debut mixtape from Hanumankind."))
+        assertTrue(Evidence.isQualifiedTwin("Snake Bite (truck)", listOf("Snakebite")))
+        assertFalse(Evidence.isQualifiedTwin("Snakebite", listOf("Snakebite")))
+        assertFalse(Evidence.isQualifiedTwin("Mercury (planet)", listOf("Venus")))
+        // The intro opens with a review-scores table ("What should I do after a snake bite?" got the Motörhead album).
+        assertTrue(Evidence.describesWork("| Review scores | Review scores |\n| Source | Rating |\n| AllMusic | [ 2 ] |\n\nSnake Bite Love is the fourteenth studio album by British rock band Motörhead."))
         assertFalse(Evidence.describesWork("Ice is water that is frozen into a solid state. It is the subject of many songs."))
         assertTrue(Evidence.isWorkTitle("Big (film)"))
         assertTrue(Evidence.isWorkTitle("Northern Light (song)"))

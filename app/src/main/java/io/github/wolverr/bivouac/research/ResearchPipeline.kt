@@ -244,6 +244,7 @@ class ResearchPipeline(
         val named = (listOfNotNull(listArticle(corpus, question)) + titleMatches(corpus, question))
             .distinctBy { it.id }.take(3)
         val namedIds = named.map { it.id }.toSet()
+        val namedTitles = named.map { it.title }
         val seen = HashSet<Long>()
         val facts = HashMap<Long, String>()
         val whole = HashMap<Long, String>()  // chunk -> finished evidence of an expanded list article
@@ -285,7 +286,7 @@ class ResearchPipeline(
         val needed = (words.size + 1) / 2
         val relevant = candidates.filter {
             it.article !in expanded && Evidence.overlap("${it.title} ${it.section} ${it.text}", words) >= needed &&
-                !Evidence.isNamesake(it.title, question) &&
+                !Evidence.isNamesake(it.title, question) && !Evidence.isQualifiedTwin(it.title, namedTitles) &&
                 // An album or song sharing the question's words ("ice floats" -> "Floating Ice"), unless named.
                 (it.article in namedIds || it.title in question || !isWork(corpus, it.title, question))
         }

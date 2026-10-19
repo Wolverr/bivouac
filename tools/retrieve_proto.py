@@ -272,6 +272,18 @@ def same_stem(title: str, phrase: str) -> bool:
     return any(t[:3] == p[:3] for p in re.findall(r"\w+", phrase.lower()) if len(p) >= 3 for t in tw)
 
 
+TWIN_QUALIFIER = re.compile(r"\s*\([^()]+\)$")
+
+
+def is_qualified_twin(title: str, named_titles) -> bool:
+    """Evidence.isQualifiedTwin: "Snake Bite (truck)" when the question's own article is "Snakebite"."""
+    m = TWIN_QUALIFIER.search(title)
+    if not m:
+        return False
+    key = re.sub(r"[^\w]+", "", title[:m.start()].lower())
+    return bool(key) and any(t != title and re.sub(r"[^\w]+", "", t.lower()) == key for t in named_titles)
+
+
 def is_work(pack: "Pack", row, question: str) -> bool:
     """Evidence.isWork: an album, song, film... that the question doesn't ask about."""
     if MEDIA_ASK.search(question):
@@ -282,7 +294,9 @@ def is_work(pack: "Pack", row, question: str) -> bool:
     if row[0] not in cache:
         first, n = row[2], row[3]
         cid = intro_chunk(pack, first, n)
-        sent = SENT_RE.split(PADDING_RE.sub(" ", pack.text(cid)).strip(), 1)[0][:250]
+        # Without markdown table rows: some intros open with one (an album's review scores before "X is an album").
+        intro = "\n".join(l for l in pack.text(cid).splitlines() if not l.lstrip().startswith("|"))
+        sent = SENT_RE.split(PADDING_RE.sub(" ", intro).strip(), 1)[0][:250]
         cache[row[0]] = bool(WORK_KIND.search(sent))
     return cache[row[0]]
 

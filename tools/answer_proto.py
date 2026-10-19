@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 from places_proto import Places, parse_intent
-from retrieve_proto import (Pack, compress, fts_query, is_namesake, is_work, is_sights_question, keywords, list_entries,
+from retrieve_proto import (Pack, compress, fts_query, is_namesake, is_qualified_twin, is_work, is_sights_question, keywords, list_entries,
                             named_articles, nearby_articles, nearby_location, sights_evidence)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,6 +81,7 @@ def retrieve(pack: Pack, q: str):
         return []
     named = named_articles(pack, q)
     named_ids = {a[0] for a in named}
+    named_titles = [a[1] for a in named]
     cands, facts, seen, whole, expanded = [], {}, set(), {}, set()
     sights_q = is_sights_question(q)
     for art_id, title, first_chunk, n_chunks in named:
@@ -123,7 +124,7 @@ def retrieve(pack: Pack, q: str):
             continue
         # Relevance gate (Evidence.overlap): named articles' leads always pass.
         if i >= n_leads and (overlap(f"{title} {sec} {pack.text(cid)}", words) < needed
-                                or is_namesake(title, q)):
+                                or is_namesake(title, q) or is_qualified_twin(title, named_titles)):
             continue
         seen.add(cid)
         per[art] = per.get(art, 0) + 1

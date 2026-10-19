@@ -121,7 +121,10 @@ object Evidence {
     fun isWorkTitle(title: String) = WORK_TITLE.containsMatchIn(title)
     /** [intro]: the article's intro text; only its first sentence counts. */
     fun describesWork(intro: String) =
-        WORK_KIND.containsMatchIn(intro.replace(PADDING, " ").trim().split(SENTENCE_END, 2)[0].take(250))
+        WORK_KIND.containsMatchIn(withoutTables(intro).replace(PADDING, " ").trim().split(SENTENCE_END, 2)[0].take(250))
+
+    /** Drops markdown table rows, which some intros open with (an album's review scores before "X is an album"). */
+    private fun withoutTables(text: String) = text.lines().filterNot { it.trimStart().startsWith("|") }.joinToString("\n")
 
     private val ASKS_ADVICE = Regex(
         "\\b(what (should|do|can) (i|you|we) do|what to do|how (do|can|should) (i|you|we) (treat|stop|prevent|avoid|help)|" +
@@ -195,6 +198,18 @@ object Evidence {
                 " ${names[0]} ${names[1]} " !in q  // asked about "Rome, New York" itself
         }
     }
+
+    /**
+     * "Snake Bite (truck)" when the question's own article is "Snakebite": the same name with a
+     * qualifier, so another thing called that. Mirrors tools/retrieve_proto.py.
+     */
+    fun isQualifiedTwin(title: String, namedTitles: Collection<String>): Boolean {
+        val base = TWIN_QUALIFIER.find(title)?.let { title.substring(0, it.range.first) } ?: return false
+        val key = base.lowercase().replace(NON_WORD, "")
+        return key.isNotEmpty() && namedTitles.any { it != title && it.lowercase().replace(NON_WORD, "") == key }
+    }
+
+    private val TWIN_QUALIFIER = Regex("\\s*\\([^()]+\\)$")
 
     /** An entry of a list article: its name, the other cells, and whether a rank column led it. */
     data class ListRow(val name: String, val cells: List<String>, val ranked: Boolean)
