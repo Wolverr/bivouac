@@ -71,6 +71,8 @@ std::string Engine::load(const std::string & path, int n_ctx, int n_batch, const
         model_ = nullptr;
         return "could not create context (not enough memory for the requested context size?)";
     }
+    // Stop takes effect inside a batch: a 256-token batch takes ~40 s on a phone without repacking.
+    llama_set_abort_callback(ctx_, [](void * self) { return static_cast<Engine *>(self)->cancel_.load(); }, this);
 
     // Persistent threadpools pinned to chosen cores. Letting the scheduler move
     // decode threads onto little cores roughly halves generation speed, while
@@ -175,7 +177,9 @@ bool Engine::decode_tokens(const std::vector<llama_token> & toks, int n_past, bo
         const int rc = llama_decode(ctx_, batch);
         llama_batch_free(batch);
         if (rc != 0) {
-            LOGE("llama_decode failed: %d", rc);
+            // An aborted batch leaves the recurrent state part-way through it: forget the cache.
+            if (cancel_.load()) kv_tokens_.clear();
+            else LOGE("llama_decode failed: %d", rc);
             return false;
         }
         kv_tokens_.insert(kv_tokens_.end(), toks.begin() + i, toks.begin() + i + cur);
@@ -328,7 +332,13 @@ CompletionStats Engine::complete(const std::string & prefix, const std::string &
 
         llama_batch batch = llama_batch_get_one(const_cast<llama_token *>(&tok), 1);
         if (llama_decode(ctx_, batch) != 0) {
-            st.error = "decode failed during generation";
+            if (cancel_.load()) {
+                kv_tokens_.clear();
+                st.cancelled = true;
+                st.stop_reason = "cancelled";
+            } else {
+                st.error = "decode failed during generation";
+            }
             break;
         }
         kv_tokens_.push_back(tok);
@@ -356,7 +366,13 @@ CompletionStats Engine::complete(const std::string & prefix, const std::string &
                 }
                 llama_batch cb_batch = llama_batch_get_one(const_cast<llama_token *>(close.data()), (int32_t) close.size());
                 if (llama_decode(ctx_, cb_batch) != 0) {
-                    st.error = "decode failed during generation";
+                    if (cancel_.load()) {
+                        kv_tokens_.clear();
+                        st.cancelled = true;
+                        st.stop_reason = "cancelled";
+                    } else {
+                        st.error = "decode failed during generation";
+                    }
                     break;
                 }
                 for (llama_token t : close) {
