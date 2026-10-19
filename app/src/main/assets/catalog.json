@@ -49,13 +49,13 @@
     {
       "id": "wiki-en",
       "kind": "pack",
-      "name": "Wikipedia (English)",
+      "name": "Wikipedia + Wikivoyage + Ethereum (English)",
       "file": "wiki.db",
       "url": "https://huggingface.co/datasets/Wolverrr/bivouac-packs/resolve/main/wiki.db",
-      "bytes": 18401787904,
+      "bytes": 18688712704,
       "min_ram_gb": 0,
-      "license": "CC BY-SA 4.0",
-      "about": "6.49M articles (2025-08); full text for the 2M most-read, intro + infobox for the rest."
+      "license": "CC BY-SA 4.0 (Wikipedia, Wikivoyage); CC0 / MIT / public domain (Ethereum, NIST)",
+      "about": "6.49M Wikipedia articles (2025-08; full text for the 2M most-read), 27k Wikivoyage travel guides, Ethereum's EIPs and docs, NIST post-quantum standards."
     },
     {
       "id": "places-world",

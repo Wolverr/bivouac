@@ -22,6 +22,12 @@ more than half as good as a frontier AI with web search, on a phone with at most
 
 ## What it does
 
+- **Ethereum and travel knowledge Wikipedia lacks.** The same pack carries every finalized EIP and ERC,
+  the ethereum.org developer docs, Ben Edgington's *Upgrading Ethereum*, NIST's post-quantum standards
+  (ML-KEM, ML-DSA, SLH-DSA, LMS/XMSS) and all 27,000 Wikivoyage guides (+0.3 GB). "What does EIP-7702
+  let an EOA do?" reads the EIP; "what plug type does Brazil use?" reads the Brazil guide's
+  *Electricity* section; "vegetarian restaurants in Chiang Mai" adds the guide's vegetarian picks to
+  the map's list.
 - **Cited answers from all of English Wikipedia.** 6.49 M articles (2025-08) in an 18.3 GB
   pack: full text for the 2 M most-read articles, intro and infobox for the rest. Every
   answer is written from numbered excerpts and cites them, like `[1][3]`. Each source has its
@@ -85,7 +91,7 @@ Which model to pick:
 The 8 GB row is the app itself on the phone; the other speeds are llama-bench on the phone's CPU,
 and a warm phone under load runs slower (the clocks drop).
 
-Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the bounty's 50 GB limit.
+Storage: model + knowledge pack (18.7 GB) + places pack = about 27 GB, under the bounty's 50 GB limit.
 
 ## How it works
 
@@ -180,6 +186,18 @@ of 10 on the 10 travel questions it changes (8 of them from the tuning sets); a 
 everyday words like "train" or "world" as sources lost 0.3 on its 6 questions and was left out. Files:
 `eval/results-pc-qwen3.5-4b-v33-*`, `eval/grading/pair-pc-qwen3.5-4b-v33-*`.
 
+**A shared yardstick** (2026-10-19): Boar's 61 Vitalik-style questions (vegan restaurants, Ethereum and
+post-quantum cryptography, travel, emergencies, travel arithmetic; MIT), which AndroidLM also used, with
+the frontier + web answers AndroidLM published as the reference. The 4B as on the Redmi (no thinking)
+reached 50 % of the reference before the Ethereum and Wikivoyage material and 51 % after, one grader each
+(absolute shares move by several points between graders). Graded side by side by one grader, the
+additions are clearly better: +1.13 points out of 10 (95 % CI +0.66 to +1.60; better on 35, worse on 8;
+Ethereum +1.25, restaurants +1.6, travel +0.9). Head-to-head against AndroidLM's published answers
+(Qwen3.6-35B-A3B on a 12 GB Pixel), the 35B model is still clearly ahead: −2.59 (CI −3.23 to −1.95),
+from −3.38 before. On our own questions the additions are neutral (−0.19 on the 43 tuning questions
+whose prompt changes, held-out about even). Files: `eval/questions-boar61.jsonl`,
+`eval/results-*boar61*`, `eval/grading/*boar61*`, `eval/*v37*`.
+
 Retrieval finds a correct Wikipedia article in the top 6 for 92 %
 of the questions that have one (44/48), and 94 % on the held-out set (34/36).
 
@@ -208,6 +226,12 @@ tools/status.sh                  # progress
 
 - Wikipedia text: [FineWiki](https://huggingface.co/datasets/HuggingFaceFW/finewiki)
   (English Wikipedia, 2025-08), CC BY-SA 4.0. Pageviews and redirects: Wikimedia dumps.
+- Travel guides: [Wikivoyage](https://en.wikivoyage.org) (English, 2026-10 dump), CC BY-SA 4.0.
+- Ethereum: [EIPs](https://github.com/ethereum/EIPs) and [ERCs](https://github.com/ethereum/ERCs) (CC0),
+  [ethereum.org](https://github.com/ethereum/ethereum-org-website) docs (MIT),
+  [Upgrading Ethereum](https://github.com/benjaminion/upgrading-ethereum-book) by Ben Edgington (CC BY-SA 4.0).
+- Post-quantum: NIST FIPS 203, 204, 205, SP 800-208, IR 8547 (public domain).
+  Built by `tools/build_supplements.py` and `tools/append_supplements.py`.
 - Places: [Overture Maps](https://overturemaps.org) places theme (2026-09), CDLA-Permissive-2.0.
 - Models: Qwen3.5 (Apache-2.0) as GGUF files.
 - Engine: [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT), SQLite (public domain),

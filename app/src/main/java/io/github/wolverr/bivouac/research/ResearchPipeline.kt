@@ -117,9 +117,10 @@ class ResearchPipeline(
         val decision = Router.decide(question, !conversation.isEmpty)
         val placeIntent = places?.takeIf { it.path != null }?.let { PlaceIntent.parse(question, it.placeNouns) }
         val fastEnough = (writeTps ?: 0.0) >= AUTO_THINK_MIN_TPS
-        // Calculations reason first on every phone: without it the 4B got "7.5 L/100 km in mpg" and Naismith's rule
-        // wrong (Boar's set). Phones that write slowly get a shorter budget (SLOW_THINK_BUDGET).
-        val think = thinkHarder || (autoThink && decision.reasoning && placeIntent == null)
+        // Slow phones don't reason first by themselves: a 256-token budget (~80 s on the Redmi) did worse than none,
+        // the cut-off reasoning spilling into the answer ("~6h06" under a "4h15" headline; 11 calculations, paired
+        // blind, 2026-10-19), and 1,024 takes several minutes there.
+        val think = thinkHarder || (autoThink && fastEnough && decision.reasoning && placeIntent == null)
         emit(ResearchEvent.Routed(decision, think))
 
         val nearby = if (placeIntent != null) findPlaces(placeIntent) else emptyList()
@@ -172,7 +173,7 @@ class ResearchPipeline(
         }
 
         // Thinking needs room in the context: the reasoning (~3 chars/token) comes out of the history.
-        val budget = if (thinkHarder || fastEnough) settings.thinkBudget else minOf(settings.thinkBudget, SLOW_THINK_BUDGET)
+        val budget = settings.thinkBudget
         val promptChars = settings.historyChars - if (think) budget * 3 else 0
         val turns = history(conversation, promptChars - prompt.length) + ChatTurn("user", prompt)
         val (prefix, rest) = llm.chatPrompt(system, turns, thinking = think)
@@ -727,8 +728,6 @@ class ResearchPipeline(
         private const val GUIDE_PASSAGES = 2
         private val EAT_NOUNS = setOf("restaurant", "cafe", "coffee", "food", "bakery")
         private const val EAT_GUIDE_CHARS = 600
-        /** Thinking for calculations on phones that write slowly: ~80 s at 3 tok/s, instead of none. */
-        private const val SLOW_THINK_BUDGET = 256
         private val TOPIC_FORMS = listOf(
             Regex(
                 "\\b(get|getting|go|going|travel\\w*|mov\\w*)\\s+around\\b|\\b(public )?transport\\w*\\b|\\btransit\\b|" +
