@@ -58,6 +58,13 @@ class ScreenshotTest {
         LibraryContent(LIBRARY, "Redmi Note 15 Pro · MediaTek MT6789 · 7.6 GB RAM · fast cores 6,7", 7.6, CATALOG, LibraryActions(), it)
     }
 
+    @Test fun setup() = shot("setup") {
+        SetupContent(LibraryState(), 7.6, CATALOG + PACKS, 41_000_000_000, setOf("qwen-4b"), SetupActions(), it)
+    }
+    @Test fun setupDark() = shot("setup-dark", dark = true) {
+        SetupContent(LibraryState(needsStorageAccess = true), 7.6, CATALOG + PACKS, 20_000_000_000, emptySet(), SetupActions(), it)
+    }
+
     private companion object {
         const val SNAKE = "What should I do after a snake bite?"
 
@@ -115,6 +122,10 @@ class ScreenshotTest {
         val CATALOG = listOf(
             CatalogItem("qwen-4b", "model", "Qwen3.5 4B (balanced)", "Qwen3.5-4B-Q4_K_M.gguf", "https://x", 2_740_000_000, 7.0, "Apache-2.0", "Reads sources and answers with citations."),
             CatalogItem("qwen-9b", "model", "Qwen3.5 9B (best answers)", "Qwen3.5-9B-Q4_K_M.gguf", "https://x", 5_680_000_000, 11.0, "Apache-2.0", "Most accurate; needs a 12 GB phone."),
+        )
+        val PACKS = listOf(
+            CatalogItem("wiki", "pack", "Wikipedia (English)", "wiki.db", "https://x", 18_401_787_904),
+            CatalogItem("places", "pack", "Places (worldwide)", "places.db", "https://x", 5_316_935_680),
         )
     }
 }

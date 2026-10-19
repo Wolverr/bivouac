@@ -88,7 +88,8 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     AskContent(
         s,
         // The file name ("Qwen3.5-4B-Q4_K_M") reads better than llama.cpp's "qwen35 4B Q4_K - Medium".
-        model = lib.models.find { it.id == lib.loadedModel }?.name?.removeSuffix(".gguf") ?: lib.modelInfo?.desc,
+        model = lib.models.find { it.id == lib.loadedModel }?.name?.removeSuffix(".gguf") ?: lib.modelInfo?.desc
+            ?: lib.busy?.takeIf { it.startsWith("Loading") }?.let { "Loading the model…" },
         library = lib.openPack != null,
         evalStatus = evalStatus,
         onInput = vm::setInput,

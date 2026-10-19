@@ -32,4 +32,10 @@ object Catalog {
         context.assets.open("catalog.json").use { input ->
             Json { ignoreUnknownKeys = true }.decodeFromString<CatalogFile>(input.readBytes().decodeToString()).items
         }.filter { it.url.isNotEmpty() }
+
+    /** The biggest model that fits [ramGb] (the catalog lists them small to large), else the smallest. */
+    fun recommendedModel(items: List<CatalogItem>, ramGb: Double): CatalogItem? {
+        val models = items.filter { it.kind == "model" }
+        return models.filter { it.min_ram_gb <= ramGb }.maxByOrNull { it.min_ram_gb } ?: models.minByOrNull { it.min_ram_gb }
+    }
 }

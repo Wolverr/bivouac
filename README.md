@@ -8,11 +8,12 @@ Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline to
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
 <p align="center">
-  <img src="docs/screenshots/ask-empty.png" width="19%" alt="Start screen with example questions">
-  <img src="docs/screenshots/ask-reading.png" width="19%" alt="While the model reads: the source sentence that answers the question">
-  <img src="docs/screenshots/ask-answer.png" width="19%" alt="A cited answer about HTTPS">
-  <img src="docs/screenshots/ask-places.png" width="19%" alt="Vegetarian places near the Duomo in Florence">
-  <img src="docs/screenshots/ask-answer-dark.png" width="19%" alt="The same answer in dark mode">
+  <img src="docs/screenshots/setup.png" width="16%" alt="First launch: the files recommended for this phone">
+  <img src="docs/screenshots/ask-empty.png" width="16%" alt="Start screen with example questions">
+  <img src="docs/screenshots/ask-reading.png" width="16%" alt="While the model reads: the source sentence that answers the question">
+  <img src="docs/screenshots/ask-answer.png" width="16%" alt="A cited answer about HTTPS">
+  <img src="docs/screenshots/ask-places.png" width="16%" alt="Vegetarian places near the Duomo in Florence">
+  <img src="docs/screenshots/ask-answer-dark.png" width="16%" alt="The same answer in dark mode">
 </p>
 <p align="center"><sub>The app's screens rendered from its code with sample data
 (<code>app/src/test/…/ScreenshotTest.kt</code>); light or dark follows the phone.</sub></p>
@@ -62,8 +63,11 @@ more than half as good as a frontier AI with web search, on a phone with at most
 ## Install (no PC needed)
 
 1. Install the APK from [the latest release](https://github.com/Wolverr/bivouac/releases/latest).
-2. Open **Library → Download** for a model and the packs. Your browser saves them to Downloads.
-3. Tap **Add downloaded files** and allow "All files access" when asked. Bivouac uses the files
+2. On first launch, Bivouac shows the model that fits your phone and the two packs, with one
+   **Download** button after the other (your browser saves them to Downloads), or pick others in the
+   **Library**.
+3. Tap **Add downloaded files** and allow "All files access" when asked. The model loads by itself,
+   and again every time the app starts, until you load another one. Bivouac uses the files
    where the browser saved them, without copying (no second 25 GB). It needs that permission
    because llama.cpp and SQLite open files by path; the app has no internet permission, so
    nothing it reads can leave the phone. Tested on the Redmi Note 15 Pro (Android 16).

@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -60,10 +61,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             BivouacTheme {
                 var tab by rememberSaveable { mutableIntStateOf(0) }
+                val lib by vm.library.collectAsStateWithLifecycle()
                 AppFrame(tab, onTab = { tab = it }) { m ->
-                    when (tab) {
-                        0 -> AskScreen(vm, m)
-                        else -> LibraryScreen(vm, m)
+                    when {
+                        tab != 0 -> LibraryScreen(vm, m)
+                        !lib.setupDone -> SetupScreen(vm, onChooseMyself = { tab = 1 }, modifier = m)
+                        else -> AskScreen(vm, m)
                     }
                 }
             }

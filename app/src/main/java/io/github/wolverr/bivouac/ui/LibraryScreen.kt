@@ -65,27 +65,7 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         if (uris.isNotEmpty()) vm.linkFiles(uris)
     }
     val context = LocalContext.current
-    // Storage access: "All files access" in Settings (Android 11+), the storage permission on Android 10.
-    val allFilesScreen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        vm.storageAccessChanged()
-    }
-    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        vm.storageAccessChanged()
-    }
-    val askStorageAccess: () -> Unit = {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            val intent = Intent(
-                android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                Uri.parse("package:${context.packageName}"),
-            )
-            runCatching { allFilesScreen.launch(intent) }.onFailure {
-                allFilesScreen.launch(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-            }
-            Unit
-        } else {
-            storagePermission.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
-    }
+    val askStorageAccess = rememberStorageAccess(vm)
     val catalog = remember { Catalog.load(context) }
     LibraryContent(
         s,
@@ -108,10 +88,40 @@ fun LibraryScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             setAutoMemory = vm::setAutoMemory,
             setRepack = vm::setRepack,
             setAutoThink = vm::setAutoThink,
-            download = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
+            download = { url -> openDownload(context, url) },
         ),
         modifier = modifier,
     )
+}
+
+/** Downloads open in the browser: the app has no internet permission. */
+fun openDownload(context: android.content.Context, url: String) =
+    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+
+/** Storage access: "All files access" in Settings (Android 11+), the storage permission on Android 10. */
+@Composable
+fun rememberStorageAccess(vm: AppViewModel): () -> Unit {
+    val context = LocalContext.current
+    val allFilesScreen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        vm.storageAccessChanged()
+    }
+    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        vm.storageAccessChanged()
+    }
+    return {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            val intent = Intent(
+                android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                Uri.parse("package:${context.packageName}"),
+            )
+            runCatching { allFilesScreen.launch(intent) }.onFailure {
+                allFilesScreen.launch(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            }
+            Unit
+        } else {
+            storagePermission.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
 }
 
 /** The Library screen from state alone (no view model), so it can be rendered in tests. */
@@ -233,8 +243,7 @@ private fun GetDataSection(s: LibraryState, ramGb: Double, items: List<CatalogIt
     if (items.isEmpty()) return
     val rb = LocalRainbow.current
     val have = (s.models + s.packs).map { it.name }.toSet()
-    // The biggest model that fits: the catalog lists them from small to large.
-    val recommended = items.filter { it.kind == "model" && it.min_ram_gb <= ramGb }.maxByOrNull { it.min_ram_gb }?.id
+    val recommended = Catalog.recommendedModel(items, ramGb)?.id
     Heading("Get data")
     Text(
         "1. Tap Download: your browser saves the file to Downloads.  2. Come back and tap \"Add downloaded files\". " +
@@ -276,7 +285,7 @@ private fun Heading(text: String) {
 
 /** A bordered card in the blog's callout style. */
 @Composable
-private fun Panel(content: @Composable ColumnScope.() -> Unit) {
+internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),

@@ -57,6 +57,8 @@ data class LibraryState(
     val notice: String? = null,
     /** "Add downloaded files" needs storage access first (see FileStore.hasStorageAccess). */
     val needsStorageAccess: Boolean = false,
+    /** First-run setup finished (a model and a Wikipedia pack added) or skipped for the Library. */
+    val setupDone: Boolean = false,
 )
 
 /** One question and its answer in the conversation. */
@@ -122,6 +124,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repack = prefs.getBoolean("repack", true),
             autoMemory = prefs.getBoolean("auto_memory", true),
             autoThink = prefs.getBoolean("auto_think", true),
+            setupDone = prefs.getBoolean("setup_done", false),
             notice = runtime.crashGuard.previous?.let { c ->
                 "Bivouac was stopped while ${c.phase}${if (c.lowMemory) ", probably because the phone ran out of memory" else ""}. " +
                     "The next load of that model uses smaller memory settings."
@@ -135,13 +138,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var askJob: Job? = null
 
+    /** The running or last model load; loads queue behind it. Declared before init, which starts one. */
+    private var loadJob: Job? = null
+
     init {
         // Open packs automatically: one Wikipedia pack and one places pack at most.
         packs.list().filter(::isPlacesPack).firstOrNull()?.let(::openPack)
         packs.list().filterNot(::isPlacesPack).firstOrNull()?.let(::openPack)
+        refresh()  // phones set up before the first-run screen existed skip it
+        // The model loaded last time loads again, unless Android killed the app for memory: then
+        // the notice explains, and the user loads it (with smaller settings) when ready.
+        val last = prefs.getString("last_model", null)
+        if (runtime.crashGuard.previous?.lowMemory != true) {
+            models.list().firstOrNull { it.name == last }?.let { loadModel(it) }
+        }
     }
 
-    private fun refresh() = _library.update { it.copy(models = models.list(), packs = packs.list()) }
+    private fun refresh() {
+        _library.update { it.copy(models = models.list(), packs = packs.list()) }
+        val lib = _library.value
+        if (!lib.setupDone && lib.models.isNotEmpty() && lib.packs.any { !isPlacesPack(it) }) finishSetup()
+    }
+
+    /** Leaves the first-run setup for good: everything needed is added, or the user picks in the Library. */
+    fun finishSetup() {
+        prefs.edit().putBoolean("setup_done", true).apply()
+        _library.update { it.copy(setupDone = true) }
+    }
 
     /**
      * "Add downloaded files": links every model (.gguf) and pack (wiki*.db, places*.db) in Downloads
@@ -168,6 +191,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 .onFailure { e -> _library.update { it.copy(error = "${f.name}: ${e.message}") } }
         }
         refresh()
+        // No model loaded yet (first run): load the one recommended for this phone, or any added.
+        if (_library.value.loadedModel == null && loadJob?.isActive != true) {
+            val added = models.list().filter { m -> found.any { it.name == m.name } }
+            val pick = Catalog.recommendedModel(Catalog.load(app), runtime.device.totalRamGb)?.file
+            (added.firstOrNull { it.name == pick } ?: added.firstOrNull())?.let { loadModel(it) }
+        }
         _library.update {
             it.copy(
                 busy = null,
@@ -197,7 +226,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** [forceRepack] (adb eval/bench only) overrides the planner's weight-repacking choice, for measurements. */
-    fun loadModel(file: LibFile, forceRepack: Boolean? = null) = viewModelScope.launch {
+    fun loadModel(file: LibFile, forceRepack: Boolean? = null): Job {
+        val previous = loadJob
+        return viewModelScope.launch {
+            previous?.join()
+            load(file, forceRepack)
+        }.also { loadJob = it }
+    }
+
+    private suspend fun load(file: LibFile, forceRepack: Boolean?) {
         _library.update { it.copy(busy = "Loading ${file.name}…", error = null, benchResult = null) }
         val lib = _library.value
         val path = models.path(file)
@@ -206,7 +243,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (lib.autoMemory) {
             val plan = runtime.planLoad(path, file.size, runtime.crashGuard.safety(file.id)).getOrElse { e ->
                 _library.update { it.copy(busy = null, loadedModel = null, modelInfo = null, error = e.message) }
-                return@launch
+                return
             }
             opts = opts.copy(nCtx = plan.nCtx, repack = forceRepack ?: plan.repack)
             note = plan.note + (forceRepack?.let { " · repack forced $it" } ?: "")
@@ -215,6 +252,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runtime.load(path, opts)
             .onSuccess { info ->
                 pipeline.system = promptFor(file.name)
+                prefs.edit().putString("last_model", file.name).apply()
                 _library.update { it.copy(loadedModel = file.id, modelInfo = info, loadNote = note) }
             }
             .onFailure { e -> _library.update { it.copy(loadedModel = null, modelInfo = null, loadNote = null, error = e.message) } }
@@ -246,6 +284,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun delete(file: LibFile) = viewModelScope.launch {
         val lib = _library.value
         if (lib.loadedModel == file.id) {
+            prefs.edit().remove("last_model").apply()
             runtime.unload()
             _library.update { it.copy(loadedModel = null, modelInfo = null) }
         }
@@ -321,14 +360,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun run(q: String, thinkHarder: Boolean) {
-        if (_library.value.loadedModel == null) {
+        val loading = loadJob?.takeIf { it.isActive }
+        if (_library.value.loadedModel == null && loading == null) {
             _ask.update { it.copy(error = "Load a model first (Library tab).") }
             return
         }
-        val turn = TurnUi(q, status = if (thinkHarder) "Thinking harder…" else "Thinking…", thoughtHarder = thinkHarder)
+        val status = if (thinkHarder) "Thinking harder…" else "Thinking…"
+        val turn = TurnUi(q, status = if (loading != null) "Loading the model…" else status, thoughtHarder = thinkHarder)
         _ask.update { it.copy(running = true, error = null, turns = it.turns + turn) }
-        val modelId = _library.value.loadedModel!!
         askJob = viewModelScope.launch {
+            loading?.join()
+            val modelId = _library.value.loadedModel
+            if (modelId == null) {
+                updateLast { it.copy(error = "The model did not load: ${_library.value.error ?: "see Library"}.", status = null) }
+                _ask.update { it.copy(running = false) }
+                return@launch
+            }
+            if (loading != null) updateLast { it.copy(status = status) }
             runtime.crashGuard.begin(modelId, "answering", "ctx ${runtime.contextSize}")
             try {
                 pipeline.answer(q, conversation, thinkHarder = thinkHarder, autoThink = _library.value.autoThink).collect { ev ->
@@ -399,6 +447,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 android.util.Log.e(EvalRunner.TAG, "model $modelName not found")
                 return@launch
             }
+            loadJob?.join()
             if (_library.value.loadedModel != model.id || forceRepack != null) loadModel(model, forceRepack).join()
             val info = _library.value.modelInfo ?: run {
                 _eval.value = "Eval failed: ${_library.value.error ?: "model did not load"}"
@@ -423,6 +472,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 android.util.Log.e(EvalRunner.TAG, "bench: model $modelName not found")
                 return@launch
             }
+            loadJob?.join()
             if (_library.value.loadedModel != model.id || forceRepack != null) loadModel(model, forceRepack).join()
             android.util.Log.i(EvalRunner.TAG, "load: ${_library.value.loadNote ?: _library.value.error}")
             android.util.Log.i(EvalRunner.TAG, "bench ${model.name}: ${runtime.bench(256, 32)}")
