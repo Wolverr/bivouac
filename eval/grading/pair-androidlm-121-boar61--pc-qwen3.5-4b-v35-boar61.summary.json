@@ -1,0 +1,24 @@
+{
+ "old": "results-androidlm-121-boar61.jsonl",
+ "new": "results-pc-qwen3.5-4b-v35-boar61.jsonl",
+ "questions": 61,
+ "identical": 0,
+ "old_mean": 7.89,
+ "new_mean": 4.51,
+ "mean_diff": -3.38,
+ "ci95": [
+  -4.03,
+  -2.73
+ ],
+ "new_better": 2,
+ "old_better": 53,
+ "ties": 6,
+ "sign_test_p": 0.0,
+ "by_category": {
+  "emergency": -2,
+  "ethereum-crypto": -3.8,
+  "places-food": -3.25,
+  "travel": -3.5,
+  "travel-math": -3.33
+ }
+}
