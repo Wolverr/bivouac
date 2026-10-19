@@ -26,7 +26,15 @@ check (queue30, 9B, 6 questions): +1.17, 4 better / 2 worse. 9B v29 main set fin
 WSL note: the distro shuts down ~15 s after the last wsl.exe client exits unless an Ubuntu terminal is open;
 a run started from Claude needs a waiting wsl call (background `while systemctl --user is-active ...`) to live.
 
-**Next:** Redmi session: install the current build, check the restyle + excerpt card, re-run the on-phone
+**Redmi session (same afternoon):** restyle looks right on the phone (dark theme, rainbow icon/divider, pastel
+suggestion dots); the "while the answer is written" excerpt card shows. Found: the home-screen snake bite question
+listed a Motorhead album and a monster truck as sources -> fixed (740dfea: intros opening with a review table,
+"X (qualifier)" twins of the question's own article; no eval question's sources change). Found: the planner
+loaded the 4B without repacking (3 tok/s prompt reading instead of 14) because the crash guard sits at 75 %
+after an earlier memory crash; it regains 5 % per answer. The held-out re-run forces repack (`--ez repack true`).
+Builds need JAVA_HOME=~/.local/opt/jdk-17.0.20+8 (set by tools/setup_dev.sh, not in the login shell).
+
+**Next (was):** Redmi session: install the current build, check the restyle + excerpt card, re-run the on-phone
 held-out (the published 53.9 % predates the no-sources fixes and the new prompt), packs from Downloads;
 then the release build with the real key.
 
