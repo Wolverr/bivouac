@@ -23,10 +23,10 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 1. [x] On-phone held-out (done 16:48 Oct 19, 4B repacked, 40/40, never killed): paired vs the PC harness on the same
    build −0.15 (CI −0.75..+0.45, 11/13/16), 63.3 % of frontier (one grader); median 110 s, one answer cut at 700
    tokens (h-reason-01). README updated. Phone file eval/results-Qwen3.5-4B-Q4_K_M.jsonl is this run.
-2. [ ] Install the current build (a3dae02 or later; c4c7e77 with 1000-token answers is on the phone) -> Stop reacts at
+2. [x] (done 2026-10-19 20:37-20:50 with the real-key build, see 3+4) Install the current build (a3dae02 or later; c4c7e77 with 1000-token answers is on the phone) -> Stop reacts at
    once (abort callback), scrolling works while an answer streams, and a bench without `--ez repack` says "repacked"
    (safety was 80 %; 3 answers asked since, ~95 %; eval answers don't count towards recovery).
-3+4. [ ] Packs from Downloads + real-key install, in one session: `adb shell mv` the models and packs from
+3+4. [x] DONE 2026-10-19 evening: files copied to Download (~110 MB/s, a copy not a rename), uninstall, real-key install, setup screen shown, Add downloaded files linked all 6 and auto-loaded the 4B with repack=1 (fresh install, safety 100 %), pharmacy near the Duomo (places pack from Download), scrolling while streaming, Stop, and auto-load after swiping the app away all worked. Prefill was 7.6 tok/s at 3-4 % battery (MIUI throttling; re-measure above 20 %). The loading-indicator build bd4de50 is in the draft but not on the phone (Xiaomi install prompt timed out). Packs from Downloads + real-key install, in one session: `adb shell mv` the models and packs from
    Android/data/io.github.wolverr.bivouac/files/{models,packs} to /sdcard/Download (same filesystem: instant), uninstall,
    `adb install ~/bivouac-dist/bivouac-0.1.0.apk` (real key, R8; sha256 8a6f9ed1...), Add downloaded files, ask a few
    questions incl. a places one. Rebuild + re-upload the APK if the phone run finds anything.
