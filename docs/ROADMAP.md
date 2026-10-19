@@ -33,6 +33,8 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
    The fresh install also tests the first-run setup (4d0ff7d): it should list the 4B + both packs as downloadable,
    "Add downloaded files" should add all three and load the 4B by itself; then close and reopen the app: the 4B
    must load again without a tap (and asking during that load waits for it).
+   Release build since 2026-10-19 night includes the merged retrieval-fixes (travel topic articles, hospitals):
+   real-key APK sha256 dd4c1233..., uploaded to the draft.
 5. [ ] Publish the draft release v0.1.0 (notes + APK uploaded, 2026-10-19), make the repo public. Checked: no secrets in
    history, LICENSE present, all 6 catalog download URLs answer anonymously, HF packs = local packs (sha256).
 6. [ ] Demo video (user).
