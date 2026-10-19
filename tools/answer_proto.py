@@ -187,6 +187,9 @@ DIET_NOTE = ("The list may be incomplete, so you may add which kinds of cuisine 
              "without naming places that aren't listed.")
 PROMPT_PLACES = 8  # ResearchPipeline.PROMPT_PLACES: the model reads the nearest few, the screen shows all
 DIET_WORDS = {"vegetarian", "vegan", "halal", "kosher", "gluten", "gluten-free"}  # PlaceIntent.DIET_WORDS
+# ResearchPipeline.EMERGENCY_NOTE: someone looking for a hospital may need help now.
+EMERGENCY_NOTE = "Also give the local emergency phone number."
+EMERGENCY_WORDS = {"hospital", "emergency", "clinic", "doctor", "medical", "police"}
 
 
 def format_distance(m: float) -> str:
@@ -212,7 +215,8 @@ def build_places_prompt(q: str, intent, found) -> str:
     if not found:
         return q
     diet = any(w in DIET_WORDS for w in intent["modifiers"] + intent["noun"])
-    lines = [PLACES_HEADER + (" " + DIET_NOTE if diet else "")]
+    urgent = any(w in EMERGENCY_WORDS for w in intent["modifiers"] + intent["noun"])
+    lines = [PLACES_HEADER + (" " + DIET_NOTE if diet else "") + (" " + EMERGENCY_NOTE if urgent else "")]
     for i, p in enumerate(found[:PROMPT_PLACES]):
         name = p["name"] + (f" ({p['name_en']})" if p["name_en"] else "")
         line = f"[P{i + 1}] {name} — {p['cat'].replace('_', ' ')} — {format_distance(p['dist'])}"

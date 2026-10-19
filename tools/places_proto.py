@@ -282,7 +282,8 @@ class Places:
                 break
             radius *= 2.5
         return sorted(found, key=lambda p: p["dist"] * (1.6 - p["conf"])
-                      * (NAME_HINT_FACTOR if named_as_category(p) else 1.0))[:limit], radius
+                      * (NAME_HINT_FACTOR if named_as_category(p) else 1.0)
+                      * (RESTRICTED_FACTOR if restricted(p) else 1.0))[:limit], radius
 
 
 # Places.NAME_HINTS: category name part -> words in place names that confirm it. Overture tags law
@@ -296,6 +297,14 @@ NAME_HINTS = [
                             r"病院|医院|醫院|병원|クリニック|medical|medic", re.I)),
 ]
 NAME_HINT_FACTOR = 0.4
+# Places.RESTRICTED: hospitals the public can't walk into. Rome's two military hospitals ranked first for
+# "a hospital near the Colosseum", ahead of the emergency departments a visitor needs.
+RESTRICTED = re.compile(r"milit|army|armed forces|veteran|prison|penitentiar|caserma|kaserne|自衛隊|軍", re.I)
+RESTRICTED_FACTOR = 4.0
+
+
+def restricted(p) -> bool:
+    return any(c in p["cat"] for c in ("hospital", "clinic", "medical")) and bool(RESTRICTED.search(p["name"]))
 
 
 def named_as_category(p):

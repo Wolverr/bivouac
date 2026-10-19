@@ -150,6 +150,22 @@ TOKEN_RE = re.compile(r"[\w][\w'\-.]*", re.UNICODE)
 # and is skipped when obscure ("Determine" 272 views/month, "Broad Strokes" 87).
 COMMON_DF = 20_000
 COMMON_MIN_VIEWS = 3_000
+# An everyday word used as wording, not topic: a verb before its object ("how do vaccines train the
+# immune system", "how do we know the age of ..."), a rate ("two a day", "once per year"), or "in the
+# world" after a superlative. Its article (Train, Knowledge, Day, World) only crowds out real sources.
+DETERMINERS = {"the", "a", "an", "my", "your", "our", "their", "his", "her", "its", "this", "that", "these", "those"}
+RATE_WORDS = {"per", "each", "every"}
+
+
+def is_wording(toks: list[str], i: int) -> bool:
+    before = toks[i - 1].lower() if i > 0 else ""
+    after = toks[i + 1].lower() if i + 1 < len(toks) else ""
+    if after in DETERMINERS or before in RATE_WORDS:
+        return True
+    two_back = toks[i - 2].lower() if i > 1 else ""
+    if before in ("a", "an") and (two_back in NUMBER_WORDS or two_back in ("once", "twice", "times") or two_back.replace(".", "").isdigit()):
+        return True  # "two a day", "once a year"
+    return toks[i].lower() == "world" and i > 1 and before == "the" and toks[i - 2].lower() == "in"
 
 
 def everyday(pack: "Pack", words: list[str], starts: list[bool]) -> bool:
@@ -187,6 +203,7 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
     used = [False] * len(toks)
     found, seen = [], set()
     plain = set()  # everyday-word matches ("North", "Time"), dropped when a name matched
+    wording = set()  # single everyday words used as wording (is_wording), dropped when anything else matched
     named_hit = False
     for n in range(min(max_n, len(toks)), 0, -1):
         for i in range(len(toks) - n + 1):
@@ -239,6 +256,8 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                 # Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
                 if common or (n == 1 and obscure and not named):
                     plain.add(row[0])
+                if n == 1 and common and is_wording(toks, i):
+                    wording.add(row[0])
                 for j in range(i, i + n):
                     used[j] = True
                 break
@@ -247,6 +266,8 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
     # venomous" keeps "Snakebite" next to "Venom".
     if named_hit:
         found = [r for r in found if r[0] not in plain]
+    if any(r[0] not in wording for r in found):
+        found = [r for r in found if r[0] not in wording]
     return found
 
 
@@ -591,10 +612,42 @@ def list_entries(pack: "Pack", article, k: int = 8, max_chunks: int = 80, max_na
 LIST_LINE_CHARS = 160
 
 
+# Travel questions about a named place have their own Wikipedia articles: "the best way to get around
+# Istanbul" is answered by Transport in Istanbul, "the monsoon season in Thailand" by Climate of Thailand.
+TOPIC_FORMS = [
+    (re.compile(r"\b(get|getting|go|going|travel\w*|mov\w*)\s+around\b|\b(public )?transport\w*\b|\btransit\b|"
+                r"\b(metro|subway|underground|tram|trams|buses|taxis?|ferr(y|ies))\b", re.I),
+     ["Transport in {}", "Public transport in {}", "Transportation in {}"]),
+    (re.compile(r"\b(weather|climate|monsoons?|rainy season|dry season|wet season|temperatures?|"
+                r"best (time|month|season) to (visit|go)|when (should I|to) (visit|go))\b", re.I),
+     ["Climate of {}"]),
+    (re.compile(r"\b(food|foods|cuisine|dishes|dish|eat|eating|specialt(y|ies))\b", re.I),
+     ["Cuisine of {}", "{} cuisine"]),
+]
+
+
+def topic_articles(pack: "Pack", question: str, rows) -> list:
+    """ResearchPipeline.topicArticles: "Transport in X" etc. for title matches written as names."""
+    out = []
+    for rx, forms in TOPIC_FORMS:
+        if not rx.search(question):
+            continue
+        for row in rows:
+            if not row[1][:1].isupper() or row[1] not in question:
+                continue
+            for form in forms:
+                hit = pack.find_article(form.format(row[1]))
+                if hit:
+                    out.append(hit[:4])
+                    break
+    return out
+
+
 def named_articles(pack: "Pack", question: str, k: int = 3):
-    """The list article first, then title matches, deduplicated (ResearchPipeline.retrieve)."""
+    """The list article first, then topic articles, then title matches, deduplicated (ResearchPipeline.retrieve)."""
     out, seen = [], set()
-    for row in [list_article(pack, question)] + title_matches(pack, question):
+    titles = title_matches(pack, question)
+    for row in [list_article(pack, question)] + topic_articles(pack, question, titles) + titles:
         if row and row[0] not in seen:
             out.append(row)
             seen.add(row[0])

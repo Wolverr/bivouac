@@ -184,8 +184,10 @@ class Places(private val knownPlaces: Map<String, GeoPoint> = emptyMap()) {
             if (found.size >= limit / 2) break
             radius *= 2.5
         }
-        return found.sortedBy { it.distanceM * (1.6 - it.confidence) * (if (namedAsCategory(it)) NAME_HINT_FACTOR else 1.0) }
-            .take(limit)
+        return found.sortedBy {
+            it.distanceM * (1.6 - it.confidence) * (if (namedAsCategory(it)) NAME_HINT_FACTOR else 1.0) *
+                (if (restricted(it)) RESTRICTED_FACTOR else 1.0)
+        }.take(limit)
     }
 
     /**
@@ -195,6 +197,13 @@ class Places(private val knownPlaces: Map<String, GeoPoint> = emptyMap()) {
      */
     private fun namedAsCategory(p: Place): Boolean =
         NAME_HINTS.any { (cat, re) -> cat in p.category && re.containsMatchIn(p.name) }
+
+    /**
+     * A hospital the public can't walk into: Rome's two military hospitals ranked first for "a hospital
+     * near the Colosseum", ahead of the emergency departments a visitor needs. Mirrors tools/places_proto.py.
+     */
+    private fun restricted(p: Place): Boolean =
+        listOf("hospital", "clinic", "medical").any { it in p.category } && RESTRICTED.containsMatchIn(p.name)
 
     private suspend fun within(c: GeoPoint, radiusM: Double, cats: Set<Int>): List<Place> {
         val dLat = radiusM / 111_320.0
@@ -260,6 +269,10 @@ class Places(private val knownPlaces: Map<String, GeoPoint> = emptyMap()) {
             ),
         )
         private const val NAME_HINT_FACTOR = 0.4
+        private val RESTRICTED = Regex(
+            "milit|army|armed forces|veteran|prison|penitentiar|caserma|kaserne|自衛隊|軍", RegexOption.IGNORE_CASE,
+        )
+        private const val RESTRICTED_FACTOR = 4.0
         private val GENERIC_ENDINGS = setOf("store", "shop", "station", "center", "centre", "office")
         private val CLAUSE = Regex("\\s+(?:and|that|which|where|with|for|so|because|to)\\s+|[;:]")
 
