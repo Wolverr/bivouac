@@ -30,6 +30,9 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
    Android/data/io.github.wolverr.bivouac/files/{models,packs} to /sdcard/Download (same filesystem: instant), uninstall,
    `adb install ~/bivouac-dist/bivouac-0.1.0.apk` (real key, R8; sha256 8a6f9ed1...), Add downloaded files, ask a few
    questions incl. a places one. Rebuild + re-upload the APK if the phone run finds anything.
+   The fresh install also tests the first-run setup (4d0ff7d): it should list the 4B + both packs as downloadable,
+   "Add downloaded files" should add all three and load the 4B by itself; then close and reopen the app: the 4B
+   must load again without a tap (and asking during that load waits for it).
 5. [ ] Publish the draft release v0.1.0 (notes + APK uploaded, 2026-10-19), make the repo public. Checked: no secrets in
    history, LICENSE present, all 6 catalog download URLs answer anonymously, HF packs = local packs (sha256).
 6. [ ] Demo video (user).
