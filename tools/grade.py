@@ -27,7 +27,8 @@ ROOT = Path(__file__).resolve().parent.parent
 # baseline (eval/questions-sights.jsonl, ids "s-...") are for paired old-vs-new comparisons only.
 QUESTION_FILES = [ROOT / "eval/questions.jsonl", ROOT / "eval/questions-holdout.jsonl"] + sorted(
     p for p in (ROOT / "eval").glob("questions-*.jsonl") if p.name != "questions-holdout.jsonl")
-BASELINE_FILES = [ROOT / "eval/baseline_frontier_web.jsonl", ROOT / "eval/baseline_holdout_frontier_web.jsonl"]
+BASELINE_FILES = [ROOT / "eval/baseline_frontier_web.jsonl", ROOT / "eval/baseline_holdout_frontier_web.jsonl",
+                  ROOT / "eval/baseline_boar61_frontier_web.jsonl"]  # Boar set: AndroidLM's published reference
 GRADING = ROOT / "eval/grading"
 
 GRADER_INSTRUCTIONS = """You are grading answers from two assistants to the same questions, blind.

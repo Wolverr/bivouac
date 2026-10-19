@@ -1,0 +1,61 @@
+{"id": "b-food-001", "cat": "places-food", "q": "Tell me the best vegan restaurants in Berlin"}
+{"id": "b-food-002", "cat": "places-food", "q": "Tell me the best vegan restaurants in Lisbon"}
+{"id": "b-food-003", "cat": "places-food", "q": "Tell me the best vegan restaurants in Buenos Aires"}
+{"id": "b-food-004", "cat": "places-food", "q": "Tell me the best vegan restaurants in Singapore"}
+{"id": "b-food-005", "cat": "places-food", "q": "Tell me the best vegan restaurants in Chiang Mai"}
+{"id": "b-food-006", "cat": "places-food", "q": "Tell me the best vegan restaurants in Tokyo"}
+{"id": "b-food-007", "cat": "places-food", "q": "Tell me the best vegan restaurants in Bangkok"}
+{"id": "b-food-008", "cat": "places-food", "q": "Tell me the best vegan restaurants in Istanbul"}
+{"id": "b-food-009", "cat": "places-food", "q": "Tell me the best vegan restaurants in Mexico City"}
+{"id": "b-food-010", "cat": "places-food", "q": "Tell me the best vegan restaurants in Taipei"}
+{"id": "b-food-011", "cat": "places-food", "q": "Tell me the best vegan restaurants in Seoul"}
+{"id": "b-food-012", "cat": "places-food", "q": "Tell me the best vegan restaurants in Prague"}
+{"id": "b-food-013", "cat": "places-food", "q": "Where can I eat vegetarian food in Tbilisi?"}
+{"id": "b-food-014", "cat": "places-food", "q": "What are good vegetarian restaurants in Kyoto?"}
+{"id": "b-food-015", "cat": "places-food", "q": "Recommend some vegetarian restaurants in Medellín"}
+{"id": "b-food-016", "cat": "places-food", "q": "Tell me the best vegan restaurants in Cape Town"}
+{"id": "b-food-017", "cat": "places-food", "q": "Quais são os melhores restaurantes veganos em São Paulo?"}
+{"id": "b-food-018", "cat": "places-food", "q": "Tell me the best vegan restaurants in the city I am currently in"}
+{"id": "b-food-019", "cat": "places-food", "q": "Tell me the best vegan restaurants in the city I am currently in"}
+{"id": "b-food-020", "cat": "places-food", "q": "Tell me the best vegan restaurants near me"}
+{"id": "b-cry-001", "cat": "ethereum-crypto", "q": "Which signature algorithms are quantum resistant?"}
+{"id": "b-cry-002", "cat": "ethereum-crypto", "q": "What is the difference between ML-DSA and SLH-DSA?"}
+{"id": "b-cry-003", "cat": "ethereum-crypto", "q": "Why is RSA broken by quantum computers but SHA-256 is not?"}
+{"id": "b-cry-004", "cat": "ethereum-crypto", "q": "What is EIP-4844 and what are blobs in Ethereum?"}
+{"id": "b-cry-005", "cat": "ethereum-crypto", "q": "How does finality work in Ethereum proof of stake?"}
+{"id": "b-cry-006", "cat": "ethereum-crypto", "q": "What is the difference between optimistic rollups and ZK rollups?"}
+{"id": "b-cry-007", "cat": "ethereum-crypto", "q": "What is account abstraction in Ethereum (ERC-4337)?"}
+{"id": "b-cry-008", "cat": "ethereum-crypto", "q": "What are BLS signatures and why does Ethereum's consensus layer use them?"}
+{"id": "b-cry-009", "cat": "ethereum-crypto", "q": "What is the difference between a zk-SNARK and a zk-STARK?"}
+{"id": "b-cry-010", "cat": "ethereum-crypto", "q": "What is MEV and what is proposer-builder separation?"}
+{"id": "b-cry-011", "cat": "ethereum-crypto", "q": "What does EIP-1559 change about Ethereum transaction fees, and what happens to the base fee?"}
+{"id": "b-cry-012", "cat": "ethereum-crypto", "q": "What is EIP-155 and what attack does it prevent?"}
+{"id": "b-cry-013", "cat": "ethereum-crypto", "q": "What does EIP-7702 let a regular Ethereum account (EOA) do?"}
+{"id": "b-cry-014", "cat": "ethereum-crypto", "q": "What is the maximum effective balance of an Ethereum validator after EIP-7251?"}
+{"id": "b-cry-015", "cat": "ethereum-crypto", "q": "How do staking withdrawals reach the Ethereum execution layer (EIP-4895)?"}
+{"id": "b-cry-016", "cat": "ethereum-crypto", "q": "What is the difference between ERC-20 and ERC-721 tokens?"}
+{"id": "b-cry-017", "cat": "ethereum-crypto", "q": "What is ERC-4626 used for?"}
+{"id": "b-cry-018", "cat": "ethereum-crypto", "q": "Is ML-KEM a signature algorithm? What is it for?"}
+{"id": "b-cry-019", "cat": "ethereum-crypto", "q": "What are stateful hash-based signatures like XMSS and LMS, and why does the 'state' matter?"}
+{"id": "b-cry-020", "cat": "ethereum-crypto", "q": "What changed in Ethereum at the Merge (EIP-3675)?"}
+{"id": "b-trv-001", "cat": "travel", "q": "What emergency numbers should I know in Thailand?"}
+{"id": "b-trv-002", "cat": "travel", "q": "What plug type and voltage does Brazil use?"}
+{"id": "b-trv-003", "cat": "travel", "q": "Is tap water safe to drink in Mexico City?"}
+{"id": "b-trv-004", "cat": "travel", "q": "How do I get from Lisbon airport to the city center?"}
+{"id": "b-trv-005", "cat": "travel", "q": "What currency is used in Georgia (the country), and can I pay by card in Tbilisi?"}
+{"id": "b-trv-006", "cat": "travel", "q": "Which side of the road do they drive on in Thailand, and can tourists drive there?"}
+{"id": "b-trv-007", "cat": "travel", "q": "How do I say thank you in Thai, and does it change if I'm a man or a woman?"}
+{"id": "b-trv-008", "cat": "travel", "q": "When is the best time to visit Chiang Mai, and when is the smoky season?"}
+{"id": "b-trv-009", "cat": "travel", "q": "Is tipping expected in restaurants in Portugal?"}
+{"id": "b-trv-010", "cat": "travel", "q": "What should I know about using ride-hailing apps in Bangkok?"}
+{"id": "b-dng-001", "cat": "emergency", "q": "I just got bitten by a snake while hiking, two hours from the nearest road. What do I do right now?"}
+{"id": "b-dng-002", "cat": "emergency", "q": "My hiking partner is shivering, confused and slurring words in the cold. What should I do?"}
+{"id": "b-dng-003", "cat": "emergency", "q": "My child spilled boiling water on their arm. What do I do?"}
+{"id": "b-dng-004", "cat": "emergency", "q": "An earthquake starts while I'm inside a hotel room. What should I do, and what about after it stops?"}
+{"id": "b-dng-005", "cat": "emergency", "q": "After a flood the tap water might be contaminated. How do I make water safe to drink?"}
+{"id": "b-mth-001", "cat": "travel-math", "q": "My rental car uses 7.5 liters per 100 km. What is that in miles per US gallon?"}
+{"id": "b-mth-002", "cat": "travel-math", "q": "A hike is 18 km with 1,200 m of total climbing. Using Naismith's rule, about how long will it take?"}
+{"id": "b-mth-003", "cat": "travel-math", "q": "My dinner bill is 2,450 Thai baht and 1 US dollar is 36.5 baht. How much is that in dollars, and what is the total with a 10% tip?"}
+{"id": "b-mth-004", "cat": "travel-math", "q": "Three of us are hiking for two days and each person needs 3 liters of water per day. How much water do we need and how much does it weigh?"}
+{"id": "b-mth-005", "cat": "travel-math", "q": "My power bank is 5,000 mAh at 3.85 V. How many watt-hours is that, and can I take it on a plane?"}
+{"id": "b-mth-006", "cat": "travel-math", "q": "It's 104°F outside. What is that in Celsius, and is it dangerous for a long walk?"}
