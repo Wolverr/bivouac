@@ -23,11 +23,15 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 1. [x] On-phone held-out (done 16:48 Oct 19, 4B repacked, 40/40, never killed): paired vs the PC harness on the same
    build −0.15 (CI −0.75..+0.45, 11/13/16), 63.3 % of frontier (one grader); median 110 s, one answer cut at 700
    tokens (h-reason-01). README updated. Phone file eval/results-Qwen3.5-4B-Q4_K_M.jsonl is this run.
-2. [ ] Install the crash-guard build (54b3af4) -> the Library note says "repacked" without forcing.
-3. [ ] Packs from Downloads on the Redmi (never tested).
-4. [ ] Release signed with the real key (~/bivouac-release): move ~35 GB out of Android/data first, uninstall, install,
-   open the app, move the files back, test a few answers on the R8 build.
-5. [ ] GitHub release (notes + APK), make the repo public.
+2. [ ] Install the current build (a3dae02 or later; c4c7e77 with 1000-token answers is on the phone) -> Stop reacts at
+   once (abort callback), scrolling works while an answer streams, and a bench without `--ez repack` says "repacked"
+   (safety was 80 %; 3 answers asked since, ~95 %; eval answers don't count towards recovery).
+3+4. [ ] Packs from Downloads + real-key install, in one session: `adb shell mv` the models and packs from
+   Android/data/io.github.wolverr.bivouac/files/{models,packs} to /sdcard/Download (same filesystem: instant), uninstall,
+   `adb install ~/bivouac-dist/bivouac-0.1.0.apk` (real key, R8; sha256 8a6f9ed1...), Add downloaded files, ask a few
+   questions incl. a places one. Rebuild + re-upload the APK if the phone run finds anything.
+5. [ ] Publish the draft release v0.1.0 (notes + APK uploaded, 2026-10-19), make the repo public. Checked: no secrets in
+   history, LICENSE present, all 6 catalog download URLs answer anonymously, HF packs = local packs (sha256).
 6. [ ] Demo video (user).
 7. [ ] poidh claim (user; draft ~/bivouac-claim-draft.md in WSL).
 
