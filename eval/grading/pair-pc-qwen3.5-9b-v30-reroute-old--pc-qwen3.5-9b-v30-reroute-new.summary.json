@@ -1,0 +1,21 @@
+{
+ "old": "results-pc-qwen3.5-9b-v30-reroute-old.jsonl",
+ "new": "results-pc-qwen3.5-9b-v30-reroute-new.jsonl",
+ "questions": 6,
+ "identical": 0,
+ "old_mean": 4.5,
+ "new_mean": 5.67,
+ "mean_diff": 1.17,
+ "ci95": [
+  -0.69,
+  3.02
+ ],
+ "new_better": 4,
+ "old_better": 2,
+ "ties": 0,
+ "sign_test_p": 0.688,
+ "by_category": {
+  "places": 1,
+  "travel": 1.33
+ }
+}
