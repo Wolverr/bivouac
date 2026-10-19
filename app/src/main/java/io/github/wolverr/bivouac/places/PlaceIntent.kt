@@ -57,7 +57,11 @@ data class PlaceIntent(
         /** Modifiers that are about diet (after synonym expansion). */
         val DIET_WORDS = setOf("vegetarian", "vegan", "halal", "kosher", "gluten", "gluten-free")
 
-        private val NEAR_ME = Regex("\\b(near me|nearby|near here|around here|close by|closest|nearest|around me)\\b")
+        /** Also "the best vegan restaurants in the city I am currently in" (Boar's set). Mirrors tools/places_proto.py. */
+        private val NEAR_ME = Regex(
+            "\\b(near me|nearby|near here|around here|close by|closest|nearest|around me|where i am|where i'm|" +
+                "my (?:current )?location|this (?:city|town|area))\\b|\\bi(?: am|'m) (?:currently |now |right now )?in(?: right now)?\\s*[?.!]?$",
+        )
         private val LOCATION = Regex("\\b(?:near|around|close to|in|at|by|next to)\\s+(?:the\\s+)?(.+?)\\s*[?.!]*$", RegexOption.IGNORE_CASE)
         private val WORD = Regex("[\\p{L}][\\p{L}'\\-]*")
 

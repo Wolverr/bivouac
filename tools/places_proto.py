@@ -42,7 +42,9 @@ SIGHT_NOUNS = {"castle", "waterfall", "mountain", "peak", "lake", "temple", "bea
                "island", "cathedral", "palace", "ruin", "monument", "glacier", "volcano", "cave"}
 GENERIC_ENDINGS = {"store", "shop", "station", "center", "centre", "office"}
 CLAUSE = re.compile(r"\s+(?:and|that|which|where|with|for|so|because|to)\s+|[;:]")
-NEAR_ME = re.compile(r"\b(near me|nearby|near here|around here|close by|closest|nearest|around me)\b")
+# "the best vegan restaurants in the city I am currently in" (Boar's set) means here, too.
+NEAR_ME = re.compile(r"\b(near me|nearby|near here|around here|close by|closest|nearest|around me|where i am|where i'm|"
+                     r"my (?:current )?location|this (?:city|town|area))\b|\bi(?: am|'m) (?:currently |now |right now )?in(?: right now)?\s*[?.!]?$")
 LOCATION = re.compile(r"\b(?:near|around|close to|in|at|by|next to)\s+(?:the\s+)?(.+?)\s*[?.!]*$", re.I)
 WORD = re.compile(r"[^\W\d_][\w'\-]*")
 DECIMAL_COORDS = re.compile(r"(\d+(?:\.\d+)?)°\s*([NS])\s+(\d+(?:\.\d+)?)°\s*([EW])")
