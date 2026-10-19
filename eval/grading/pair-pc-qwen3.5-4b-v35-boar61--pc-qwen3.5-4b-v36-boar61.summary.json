@@ -1,0 +1,24 @@
+{
+ "old": "results-pc-qwen3.5-4b-v35-boar61.jsonl",
+ "new": "results-pc-qwen3.5-4b-v36-boar61.jsonl",
+ "questions": 61,
+ "identical": 12,
+ "old_mean": 4.78,
+ "new_mean": 6.18,
+ "mean_diff": 1.13,
+ "ci95": [
+  0.66,
+  1.6
+ ],
+ "new_better": 35,
+ "old_better": 8,
+ "ties": 18,
+ "sign_test_p": 0.0,
+ "by_category": {
+  "emergency": 0,
+  "ethereum-crypto": 1.25,
+  "places-food": 1.6,
+  "travel": 0.9,
+  "travel-math": 0.5
+ }
+}

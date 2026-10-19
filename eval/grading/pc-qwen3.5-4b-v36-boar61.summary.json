@@ -1,0 +1,35 @@
+{
+ "results": "results-pc-qwen3.5-4b-v36-boar61.jsonl",
+ "questions": 61,
+ "bivouac_mean": 4.44,
+ "frontier_mean": 8.67,
+ "parity_pct": 51.2,
+ "bivouac_wins_or_ties": 0,
+ "by_category": {
+  "emergency": {
+   "bivouac": 5.6,
+   "frontier": 9,
+   "parity_pct": 62.2
+  },
+  "ethereum-crypto": {
+   "bivouac": 4.55,
+   "frontier": 9,
+   "parity_pct": 50.6
+  },
+  "places-food": {
+   "bivouac": 3.9,
+   "frontier": 7.95,
+   "parity_pct": 49.1
+  },
+  "travel": {
+   "bivouac": 4.3,
+   "frontier": 9,
+   "parity_pct": 47.8
+  },
+  "travel-math": {
+   "bivouac": 5.17,
+   "frontier": 9.17,
+   "parity_pct": 56.4
+  }
+ }
+}
