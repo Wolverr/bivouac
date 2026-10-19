@@ -698,8 +698,9 @@ class ResearchPipeline(
         private val EMERGENCY_WORDS = setOf("hospital", "emergency", "clinic", "doctor", "medical", "police")
 
         /** With a travel guide excerpt after the list (eatGuide). Mirrored in tools/answer_proto.py. */
+        /** "Vegan Heaven, 2.1 km": the 4B gave the guide's places made-up distances. */
         private const val GUIDE_NOTE = "After the list comes a travel guide excerpt: you may also recommend places it " +
-            "names, citing it as [1]."
+            "names, citing it as [1]. The guide gives no distances, so give none for its places."
 
         fun placesHeader(intent: PlaceIntent, guide: Boolean = false): String =
             PLACES_HEADER + (if (guide) " $GUIDE_NOTE" else "") +

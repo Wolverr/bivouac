@@ -36,6 +36,8 @@ object Router {
     private val RATE = Regex("\\b(per|every|each|a (day|week|month|year|hour)|in an? (day|week|month|year|hour))\\b|/")
     private val IF_START = Regex("^\\s*if\\b")
     private val BY_HOW = Regex("\\bby (roughly |about |approximately )?how (many|much)\\b")
+    /** "7.5 L/100 km, what is that in miles per US gallon?": answered 24.6 (it's 31.4) without thinking (Boar's set). */
+    private val CONVERT = Regex("""\b(convert\w*|what(?: is|'s) (?:that|this|it) in|how (?:much|many) is (?:that|this|it) in)\b""")
 
     /**
      * Calculations ("23 km with a 900 m climb, how long…", "a 4 GB file at 12 MB/s…") and "by how
@@ -50,7 +52,7 @@ object Router {
         val numbers = NUMBER.findAll(m).count()
         val calc = CALC.containsMatchIn(m) &&
             (numbers >= 2 || (numbers == 1 && (RATE.containsMatchIn(m) || IF_START.containsMatchIn(m))))
-        return calc || BY_HOW.containsMatchIn(m)
+        return calc || BY_HOW.containsMatchIn(m) || (numbers >= 1 && CONVERT.containsMatchIn(m))
     }
 
     fun decide(message: String, hasHistory: Boolean): Decision {

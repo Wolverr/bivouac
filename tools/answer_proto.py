@@ -65,13 +65,15 @@ R_CALC = re.compile(r"\b(how (long|many|much|far)|what (local )?time|is (that|it
 R_RATE = re.compile(r"\b(per|every|each|a (day|week|month|year|hour)|in an? (day|week|month|year|hour))\b|/")
 R_IF = re.compile(r"^\s*if\b")
 R_BY_HOW = re.compile(r"\bby (roughly |about |approximately )?how (many|much)\b")
+# Router.CONVERT: "7.5 L/100 km, what is that in miles per US gallon?" was answered 24.6 (it's 31.4) without thinking.
+R_CONVERT = re.compile(r"\b(convert\w*|what(?: is|'s) (?:that|this|it) in|how (?:much|many) is (?:that|this|it) in)\b")
 
 
 def needs_reasoning(q: str) -> bool:
     m = q.strip().lower()
     n = len(R_NUMBER.findall(m))
     calc = R_CALC.search(m) and (n >= 2 or (n == 1 and (R_RATE.search(m) or R_IF.search(m))))
-    return bool(calc or R_BY_HOW.search(m))
+    return bool(calc or R_BY_HOW.search(m) or (n >= 1 and R_CONVERT.search(m)))
 
 
 def retrieve(pack: Pack, q: str):
@@ -212,7 +214,8 @@ PLACES_HEADER = ("Places from the offline map (straight-line distances). Recomme
                  "line each: the label like [P1], the name, how far it is and its street. Describe a place only by what its "
                  "name and category say: the map has no menus, prices, ratings or opening hours, so never guess them, and "
                  "never invent places that aren't listed.")
-GUIDE_NOTE = "After the list comes a travel guide excerpt: you may also recommend places it names, citing it as [1]."
+GUIDE_NOTE = ("After the list comes a travel guide excerpt: you may also recommend places it names, citing it as [1]. "
+              "The guide gives no distances, so give none for its places.")
 EAT_NOUNS = {"restaurant", "cafe", "coffee", "food", "bakery"}  # ResearchPipeline.EAT_NOUNS
 EAT_GUIDE_CHARS = 600
 DIET_NOTE = ("The list may be incomplete, so you may add which kinds of cuisine usually suit this diet, "
