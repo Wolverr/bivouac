@@ -20,8 +20,9 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
 
 "Go forward" = do the next unchecked step, tick it here, push.
 
-1. [ ] On-phone held-out (running since 15:31 Oct 19: 4B, `--ez repack true`, phone file eval/results-Qwen3.5-4B-Q4_K_M.jsonl;
-   the Oct 7 run is renamed old-results-4B-oct7.jsonl) -> pull, blind-grade, replace the README's 53.9 %.
+1. [x] On-phone held-out (done 16:48 Oct 19, 4B repacked, 40/40, never killed): paired vs the PC harness on the same
+   build −0.15 (CI −0.75..+0.45, 11/13/16), 63.3 % of frontier (one grader); median 110 s, one answer cut at 700
+   tokens (h-reason-01). README updated. Phone file eval/results-Qwen3.5-4B-Q4_K_M.jsonl is this run.
 2. [ ] Install the crash-guard build (54b3af4) -> the Library note says "repacked" without forcing.
 3. [ ] Packs from Downloads on the Redmi (never tested).
 4. [ ] Release signed with the real key (~/bivouac-release): move ~35 GB out of Android/data first, uninstall, install,

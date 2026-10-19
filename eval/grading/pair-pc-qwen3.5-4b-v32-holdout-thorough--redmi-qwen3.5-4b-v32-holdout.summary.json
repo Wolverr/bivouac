@@ -1,0 +1,30 @@
+{
+ "old": "results-pc-qwen3.5-4b-v32-holdout-thorough.jsonl",
+ "new": "results-redmi-qwen3.5-4b-v32-holdout.jsonl",
+ "questions": 40,
+ "identical": 0,
+ "old_mean": 7.2,
+ "new_mean": 7.05,
+ "mean_diff": -0.15,
+ "ci95": [
+  -0.75,
+  0.45
+ ],
+ "new_better": 11,
+ "old_better": 13,
+ "ties": 16,
+ "sign_test_p": 0.839,
+ "by_category": {
+  "compare": -0.5,
+  "explain": 0.75,
+  "fact": -0.75,
+  "health": -0.25,
+  "history": -0.67,
+  "places": 1.33,
+  "reasoning": -2.5,
+  "science": -1,
+  "synthesis": 1,
+  "tech": 1.5,
+  "travel": -0.25
+ }
+}

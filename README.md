@@ -154,14 +154,18 @@ question before it. Current-build answers, packets and grades: `eval/results-pc-
 - **Screened out earlier** (main set, older pipeline): LFM2.5-8B-A1B 46 %, Gemma-4-E4B 44 %, both
   below the Qwen3.5-4B of the same run (55 %).
 
-**On the phone** (2026-10-07 build, before the fixes above; to be re-run with the current build):
-the 4B in the app on a Redmi Note 15 Pro (8 GB, MediaTek MT6789), release
-build (no INTERNET permission), the 40 held-out questions: **53.9 %** of the frontier + web score, the
-same as the PC harness of that time (54.0 %), so the phone loses nothing. Median 93 s per answer (first words
-after 35 s, search 3.7 s), longest 136 s; the app used 3.9 GB of RAM and never got killed.
-Answers, packet and grades: `eval/results-redmi-qwen3.5-4b-holdout.jsonl`,
-`eval/grading/redmi-qwen3.5-4b-holdout.*`. Weakest there: travel (43 %), comparisons (47 %), tech
-(49 %); strongest: health (66 %), facts (60 %), history (59 %).
+**On the phone** (2026-10-19 build, "be thorough" prompt): the 4B in the app on a Redmi Note 15 Pro
+(8 GB, MediaTek MT6789), the 40 held-out questions, weights repacked. Paired against the PC harness
+answering with the same build and prompts, the phone scores −0.15 points out of 10 (95 % CI −0.75 to
++0.45; phone better on 11, PC on 13, 16 ties), so running on the phone costs nothing measurable. Against the
+frontier + web baseline it reached **63.3 %** (one grader; absolute scores drift by grader, see above).
+Median 110 s per answer (first words after 29 s, search 5.7 s; prompt reading 12.7 tok/s, writing 3.2
+tok/s), longest 267 s; one answer hit the 700-token cap and was cut off. The app ran all 40 without
+being killed. Weakest: travel (47 %) and reasoning (48 %, including the cut-off answer); strongest:
+explanations (75 %) and history (72 %). Answers, packets and grades:
+`eval/results-redmi-qwen3.5-4b-v32-holdout.jsonl`, `eval/grading/redmi-qwen3.5-4b-v32-holdout.*`,
+`eval/grading/pair-pc-qwen3.5-4b-v32-holdout-thorough--redmi-qwen3.5-4b-v32-holdout.*`. The
+2026-10-07 build scored 53.9 % there with another grader (`eval/results-redmi-qwen3.5-4b-holdout.jsonl`).
 
 Retrieval finds a correct Wikipedia article in the top 6 for 92 %
 of the questions that have one (44/48), and 94 % on the held-out set (34/36).
