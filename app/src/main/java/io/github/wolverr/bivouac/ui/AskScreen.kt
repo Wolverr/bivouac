@@ -125,9 +125,9 @@ fun AskContent(
         onAsk()
     }
 
-    // Follow the newest turn while it streams.
-    val last = s.turns.lastOrNull()
-    LaunchedEffect(s.turns.size, last?.answer?.length) {
+    // Bring a new question to the top, then leave scrolling to the reader: following every
+    // streamed word snapped the list back to the turn's top whenever they scrolled down.
+    LaunchedEffect(s.turns.size) {
         if (s.turns.isNotEmpty()) list.animateScrollToItem(s.turns.lastIndex)
     }
 
