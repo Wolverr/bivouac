@@ -369,7 +369,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val turn = TurnUi(q, status = if (loading != null) "Loading the model…" else status, thoughtHarder = thinkHarder)
         _ask.update { it.copy(running = true, error = null, turns = it.turns + turn) }
         askJob = viewModelScope.launch {
-            loading?.join()
+            // Stop while the model loads cancels this join: the finally below must still end the turn.
+            try {
+                loading?.join()
+            } catch (e: CancellationException) {
+                _ask.update { it.copy(running = false) }
+                updateLast { it.copy(status = null) }
+                throw e
+            }
             val modelId = _library.value.loadedModel
             if (modelId == null) {
                 updateLast { it.copy(error = "The model did not load: ${_library.value.error ?: "see Library"}.", status = null) }
