@@ -150,24 +150,6 @@ TOKEN_RE = re.compile(r"[\w][\w'\-.]*", re.UNICODE)
 # and is skipped when obscure ("Determine" 272 views/month, "Broad Strokes" 87).
 COMMON_DF = 20_000
 COMMON_MIN_VIEWS = 3_000
-# An everyday word used as wording, not topic: a verb before its object ("how do vaccines train the
-# immune system", "how do we know the age of ..."), a rate ("two a day", "once per year"), or "in the
-# world" after a superlative. Its article (Train, Knowledge, Day, World) only crowds out real sources.
-DETERMINERS = {"the", "a", "an", "my", "your", "our", "their", "his", "her", "its", "this", "that", "these", "those"}
-RATE_WORDS = {"per", "each", "every"}
-
-
-def is_wording(toks: list[str], i: int) -> bool:
-    before = toks[i - 1].lower() if i > 0 else ""
-    after = toks[i + 1].lower() if i + 1 < len(toks) else ""
-    if after in DETERMINERS or before in RATE_WORDS:
-        return True
-    two_back = toks[i - 2].lower() if i > 1 else ""
-    if before in ("a", "an") and (two_back in NUMBER_WORDS or two_back in ("once", "twice", "times") or two_back.replace(".", "").isdigit()):
-        return True  # "two a day", "once a year"
-    return toks[i].lower() == "world" and i > 1 and before == "the" and toks[i - 2].lower() == "in"
-
-
 def everyday(pack: "Pack", words: list[str], starts: list[bool]) -> bool:
     """No name-like word and every content word common. starts[k]: words[k] begins a sentence."""
     if any(is_named(w, s) for w, s in zip(words, starts)):
@@ -203,7 +185,6 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
     used = [False] * len(toks)
     found, seen = [], set()
     plain = set()  # everyday-word matches ("North", "Time"), dropped when a name matched
-    wording = set()  # single everyday words used as wording (is_wording), dropped when anything else matched
     named_hit = False
     for n in range(min(max_n, len(toks)), 0, -1):
         for i in range(len(toks) - n + 1):
@@ -256,8 +237,6 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
                 # Also a lone lowercase word naming something obscure ("whereabouts" -> an album).
                 if common or (n == 1 and obscure and not named):
                     plain.add(row[0])
-                if n == 1 and common and is_wording(toks, i):
-                    wording.add(row[0])
                 for j in range(i, i + n):
                     used[j] = True
                 break
@@ -266,8 +245,6 @@ def title_matches(pack: "Pack", question: str, max_n: int = 5):
     # venomous" keeps "Snakebite" next to "Venom".
     if named_hit:
         found = [r for r in found if r[0] not in plain]
-    if any(r[0] not in wording for r in found):
-        found = [r for r in found if r[0] not in wording]
     return found
 
 
