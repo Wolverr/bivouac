@@ -100,6 +100,7 @@ fun AskScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         onRetry = vm::retryLast,
         onThinkHarder = vm::thinkHarder,
         modifier = modifier,
+        modelLoading = lib.busy?.startsWith("Loading") == true,
     )
 }
 
@@ -118,6 +119,8 @@ fun AskContent(
     onRetry: () -> Unit,
     onThinkHarder: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The model is still loading (at start): questions wait for it, and the screen says so. */
+    modelLoading: Boolean = false,
 ) {
     val focus = LocalFocusManager.current
     val list = rememberLazyListState()
@@ -153,6 +156,7 @@ fun AskContent(
             if (s.turns.isNotEmpty()) TextButton(onClick = onNewChat, enabled = !s.running) { Text("New chat") }
         }
         RainbowRule()
+        if (modelLoading) RainbowProgress(null)
 
         LazyColumn(
             state = list,
@@ -184,7 +188,15 @@ fun AskContent(
                 value = s.input,
                 onValueChange = onInput,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text(if (s.turns.isEmpty()) "Ask anything" else "Follow up…") },
+                placeholder = {
+                    Text(
+                        when {
+                            modelLoading -> "Ask (model loading…)"
+                            s.turns.isEmpty() -> "Ask anything"
+                            else -> "Follow up…"
+                        },
+                    )
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { ask() }),
                 maxLines = 4,

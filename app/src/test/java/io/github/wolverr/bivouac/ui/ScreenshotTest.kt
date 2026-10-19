@@ -50,6 +50,14 @@ class ScreenshotTest {
         Ask(AskState(running = true, turns = listOf(TurnUi(SNAKE, prefill = 312 to 649, sources = SNAKE_SOURCES))), it)
     }
     @Test fun askPlaces() = shot("ask-places") { Ask(AskState(turns = listOf(FLORENCE)), it) }
+    @Test fun askLoading() = shot("ask-loading") {
+        AskContent(
+            AskState(running = true, turns = listOf(TurnUi("How does a heat pump work?", status = "Waiting for the model to finish loading…"))),
+            model = "Loading the model…", library = true, evalStatus = null,
+            onInput = {}, onAsk = {}, onExample = {}, onStop = {}, onNewChat = {}, onRetry = {}, onThinkHarder = {},
+            modifier = it, modelLoading = true,
+        )
+    }
 
     @Test fun library() = shot("library", tab = 1) {
         LibraryContent(LIBRARY, "Redmi Note 15 Pro · MediaTek MT6789 · 7.6 GB RAM · fast cores 6,7", 7.6, CATALOG, LibraryActions(), it)

@@ -366,7 +366,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val status = if (thinkHarder) "Thinking harder…" else "Thinking…"
-        val turn = TurnUi(q, status = if (loading != null) "Loading the model…" else status, thoughtHarder = thinkHarder)
+        val turn = TurnUi(q, status = if (loading != null) "Waiting for the model to finish loading…" else status, thoughtHarder = thinkHarder)
         _ask.update { it.copy(running = true, error = null, turns = it.turns + turn) }
         askJob = viewModelScope.launch {
             // Stop while the model loads cancels this join: the finally below must still end the turn.
