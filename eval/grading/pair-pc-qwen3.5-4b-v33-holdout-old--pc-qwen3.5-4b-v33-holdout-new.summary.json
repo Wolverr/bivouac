@@ -1,0 +1,25 @@
+{
+ "old": "results-pc-qwen3.5-4b-v33-holdout-old.jsonl",
+ "new": "results-pc-qwen3.5-4b-v33-holdout-new.jsonl",
+ "questions": 8,
+ "identical": 0,
+ "old_mean": 7.12,
+ "new_mean": 6.62,
+ "mean_diff": -0.5,
+ "ci95": [
+  -1.89,
+  0.89
+ ],
+ "new_better": 2,
+ "old_better": 4,
+ "ties": 2,
+ "sign_test_p": 0.688,
+ "by_category": {
+  "explain": 1,
+  "fact": -4,
+  "places": 0,
+  "reasoning": -1,
+  "science": -1,
+  "travel": 0
+ }
+}
