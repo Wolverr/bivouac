@@ -98,7 +98,9 @@ Storage: model + Wikipedia pack + places pack = about 25–30 GB, under the boun
    list articles for list questions, read as their most viewed entries ("must-see museums in
    Berlin" → Pergamon Museum, …) or in rank order ("tallest buildings in Dubai"). Albums,
    songs and films that merely share the question's words are left out unless the question is
-   about one ("why does ice float" is not about the jazz album *Floating Ice*).
+   about one ("why does ice float" is not about the jazz album *Floating Ice*). Travel questions
+   about a named place also read its own article: "getting around Istanbul" → *Public transport in
+   Istanbul*, "weather in Iceland" → *Climate of Iceland*, "dishes in Peru" → *Peruvian cuisine*.
 3. **Compress:** each source is cut down to the sentences that match the question.
 4. **Answer:** llama.cpp on the phone's CPU. The fixed instructions are evaluated once and
    reused from a cache, so only the question and excerpts are read each time.
@@ -170,6 +172,13 @@ explanations (75 %) and history (72 %). Answers, packets and grades:
 `eval/results-redmi-qwen3.5-4b-v32-holdout.jsonl`, `eval/grading/redmi-qwen3.5-4b-v32-holdout.*`,
 `eval/grading/pair-pc-qwen3.5-4b-v32-holdout-thorough--redmi-qwen3.5-4b-v32-holdout.*`. The
 2026-10-07 build scored 53.9 % there with another grader (`eval/results-redmi-qwen3.5-4b-holdout.jsonl`).
+
+**Travel topic articles** (2026-10-19, after the phone run above): the 4B answered the 17 questions
+whose prompts that day's retrieval changes touched, three times each with the old and the new code,
+blind-graded in pairs. Reading the place's transport, climate or cuisine article gained +1.1 points out
+of 10 on the 10 travel questions it changes (8 of them from the tuning sets); a rule that dropped
+everyday words like "train" or "world" as sources lost 0.3 on its 6 questions and was left out. Files:
+`eval/results-pc-qwen3.5-4b-v33-*`, `eval/grading/pair-pc-qwen3.5-4b-v33-*`.
 
 Retrieval finds a correct Wikipedia article in the top 6 for 92 %
 of the questions that have one (44/48), and 94 % on the held-out set (34/36).
