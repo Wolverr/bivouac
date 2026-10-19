@@ -17,7 +17,7 @@ more than half as good as a frontier AI with web search, on a phone with at most
 <p align="center"><sub>The app's screens rendered from its code with sample data
 (<code>app/src/test/…/ScreenshotTest.kt</code>); light or dark follows the phone.</sub></p>
 
-> Status: work in progress. Numbers marked *TBD* are not measured on a phone yet (the 12 GB tier).
+> Version 0.1.0. The 12 GB tier (the 9B) is measured on a PC only: we have no 12 GB test phone.
 
 ## What it does
 
@@ -61,7 +61,7 @@ more than half as good as a frontier AI with web search, on a phone with at most
 
 ## Install (no PC needed)
 
-1. Install the APK (*TBD: release link*).
+1. Install the APK from [the latest release](https://github.com/Wolverr/bivouac/releases/latest).
 2. Open **Library → Download** for a model and the packs. Your browser saves them to Downloads.
 3. Tap **Add downloaded files** and allow "All files access" when asked. Bivouac uses the files
    where the browser saved them, without copying (no second 25 GB). It needs that permission
@@ -74,7 +74,7 @@ Which model to pick:
 |---|---|---|---|---|
 | 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 44 % | 20 tok/s reading, 6 tok/s writing |
 | 6 GB | Qwen3.5-4B Q3_K_M | 2.3 GB | slightly below the 4B Q4_K_M¹ | 6 tok/s reading, 2.8 tok/s writing |
-| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **66 %** (PC harness, current build); 54 % on the phone with the 2026-10-07 build | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 35 s, whole answer 93 s (medians, 40 questions) |
+| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **63 %** in the app on the phone, 66 % in the PC harness (current build; graded side by side, the phone loses nothing) | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 29 s, whole answer 110 s (medians, 40 questions) |
 | 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 62 % (PC harness; head-to-head with the 4B: a tie, see below) | not measured: no 12 GB test phone |
 
 ¹ Graded head-to-head against the 4B Q4_K_M: −0.38 points out of 10 (95 % CI −0.80 to +0.03).
