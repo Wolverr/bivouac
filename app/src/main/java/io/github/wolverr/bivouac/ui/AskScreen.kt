@@ -218,6 +218,14 @@ fun AskContent(
     }
 }
 
+/**
+ * Joins the hard line breaks of wrapped source text (EIPs wrap their markdown at ~80 columns:
+ * "a list of\naccounts"), keeping paragraphs and list rows. Display only: the model sees the text as is.
+ */
+private val WRAPPED = Regex("""(?<=[\p{L}\p{N},;)"*])\n(?=[\p{Ll}("*])""")
+
+internal fun unwrapLines(text: String): String = WRAPPED.replace(text, " ")
+
 @Composable
 private fun Welcome(onExample: (String) -> Unit) {
     val rb = LocalRainbow.current
@@ -486,10 +494,10 @@ private fun SourceCard(src: Source) {
                     )
                 }
                 if (expanded) {
-                    SelectionContainer { Text(src.passage.text, style = MaterialTheme.typography.bodySmall) }
+                    SelectionContainer { Text(unwrapLines(src.passage.text), style = MaterialTheme.typography.bodySmall) }
                 } else {
                     Text(
-                        src.evidence, style = MaterialTheme.typography.bodySmall, maxLines = 3,
+                        unwrapLines(src.evidence), style = MaterialTheme.typography.bodySmall, maxLines = 3,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
