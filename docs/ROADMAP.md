@@ -35,7 +35,7 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
    must load again without a tap (and asking during that load waits for it).
    Release build since 2026-10-19 night includes the merged retrieval-fixes (travel topic articles, hospitals):
    real-key APK sha256 dd4c1233..., uploaded to the draft.
-5. [ ] Publish the draft release v0.1.0 (notes + APK uploaded, 2026-10-19), make the repo public. Checked: no secrets in
+5. [x] DONE 2026-10-20 20:49 (repo public, release v0.1.0 published at 61a3046, anonymous download sha checked). Publish the draft release v0.1.0 (notes + APK uploaded, 2026-10-19), make the repo public. Checked: no secrets in
    history, LICENSE present, all 6 catalog download URLs answer anonymously, HF packs = local packs (sha256).
    2026-10-20: draft APK replaced (source-card line fix c8646d2), sha256 a3d4153a..., same signing cert 520602de...;
    release notes updated; installed on the Redmi. Previous APK kept as ~/bivouac-dist/bivouac-0.1.0-7f67e57e.apk.bak.
