@@ -9,7 +9,6 @@ Google Play Services. Everything runs on the phone.
 Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline tool that is
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
-
 > Version 0.1.0. The 12 GB tier (the 9B) is measured on a PC only: we have no 12 GB test phone.
 
 ## For judges
@@ -20,7 +19,7 @@ more than half as good as a frontier AI with web search, on a phone with at most
 |---|---|
 | Android / GrapheneOS, ≤ 12 GB RAM | arm64, Android 10 or newer. Developed on an **8 GB** Redmi Note 15 Pro (MediaTek MT6789); the 4B uses about 4 GB of RAM. Model tiers for 4, 6, 8 and 12 GB phones. |
 | ≤ 50 GB in total | 27 GB with the 4B (model 2.7 + knowledge pack 18.7 + places 5.3), 30 GB with the 9B. APK 12 MB. |
-| Offline, no network requests | The APK declares **no INTERNET permission**, so Android blocks every network call: `aapt2 dump permissions bivouac-0.1.0.apk` lists only location (optional, for "near me") and file access. Downloads go through the phone's browser. |
+| Offline, no network requests | The APK declares **no INTERNET permission**, so Android blocks every network call: `aapt2 dump permissions bivouac-0.1.0.apk` lists only location (optional, for "near me") and file access, plus one internal AndroidX permission. Downloads go through the phone's browser. |
 | No Google Play Services | None used (location comes from the platform's LocationManager). |
 | Usable speed | On the 8 GB phone: the best source sentence shows after the search (~6 s), first words after ~30 s, a whole cited answer in a median 110 s. Places lists appear at once. |
 | Public repo, reproducible | MIT code, llama.cpp pinned as a submodule, scripts that rebuild both data packs from public dumps ([Build from source](#build-from-source)), every eval question, answer and grade in `eval/`. |
@@ -53,10 +52,9 @@ more than half as good as a frontier AI with web search, on a phone with at most
 - **Ethereum and travel knowledge Wikipedia lacks.** The same pack carries every finalized EIP and ERC,
   the ethereum.org developer docs, Ben Edgington's *Upgrading Ethereum*, NIST's post-quantum standards
   (ML-KEM, ML-DSA, SLH-DSA, LMS/XMSS) and all 27,000 Wikivoyage guides (+0.3 GB). "What does EIP-7702
-  let an EOA do?" reads the EIP; "what plug type does Brazil use?" reads the Brazil guide's
-  *Electricity* section; "vegetarian restaurants in Chiang Mai" adds the guide's vegetarian picks to
-  the map's list.
-- **Cited answers from all of English Wikipedia.** 6.49 M articles (2025-08) in an 18.3 GB
+  let an EOA do?" reads the EIP; "vegetarian restaurants in Chiang Mai" adds the guide's vegetarian
+  picks to the map's list; travel questions about a country read the matching section of its guide.
+- **Cited answers from all of English Wikipedia.** 6.49 M articles (2025-08) in an 18.4 GB
   pack: full text for the 2 M most-read articles, intro and infobox for the rest. Every
   answer is written from numbered excerpts and cites them, like `[1][3]`. Each source has its
   own color, and its markers in the answer are highlighted in the same color, so you can see
@@ -73,7 +71,7 @@ more than half as good as a frontier AI with web search, on a phone with at most
   lakes, temples and towns rank above events, companies and racetracks, and a day-trip list
   names each destination once (Florence: Pisa, San Gimignano, Siena, Lucca, Volterra). A city's
   "Main sights" list is used when it has one.
-- **Something useful while it thinks.** An 8 GB phone reads the excerpts for 30–45 s before
+- **Something useful while it thinks.** An 8 GB phone reads the excerpts for about 30 s before
   the first word. Meanwhile the app shows the one source sentence that best answers the
   question (for "what should I do" questions, the treatment section), in that source's color.
 - **Fast on ordinary phones.** The target is 8 GB phones, not just flagships. The app reads the
@@ -102,7 +100,7 @@ more than half as good as a frontier AI with web search, on a phone with at most
    **Library**.
 3. Tap **Add downloaded files** and allow "All files access" when asked. The model loads by itself,
    and again every time the app starts, until you load another one. Bivouac uses the files
-   where the browser saved them, without copying (no second 25 GB). It needs that permission
+   where the browser saved them, without copying (no second 27 GB). It needs that permission
    because llama.cpp and SQLite open files by path; the app has no internet permission, so
    nothing it reads can leave the phone. Tested on the Redmi Note 15 Pro (Android 16).
 
@@ -112,8 +110,8 @@ Which model to pick:
 |---|---|---|---|---|
 | 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 44 % | 20 tok/s reading, 6 tok/s writing |
 | 6 GB | Qwen3.5-4B Q3_K_M | 2.3 GB | slightly below the 4B Q4_K_M¹ | 6 tok/s reading, 2.8 tok/s writing |
-| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **63 %** in the app on the phone, 66 % in the PC harness (current build; graded side by side, the phone loses nothing) | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 29 s, whole answer 110 s (medians, 40 questions) |
-| 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 62 % (PC harness; head-to-head with the 4B: a tie, see below) | not measured: no 12 GB test phone |
+| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **63 %** in the app on the phone (current build; graded side by side with the same build on a PC, the phone loses nothing) | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 29 s, whole answer 110 s (medians, 40 questions) |
+| 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 62 % (PC harness, previous prompt; the current prompt is +0.80 of 10 better head-to-head; a tie with the 4B, see below) | not measured: no 12 GB test phone |
 
 ¹ Graded head-to-head against the 4B Q4_K_M: −0.38 points out of 10 (95 % CI −0.80 to +0.03).
 The 8 GB row is the app itself on the phone; the other speeds are llama-bench on the phone's CPU,
@@ -157,10 +155,10 @@ completeness and usefulness. Details and how to reproduce: [docs/EVAL.md](docs/E
 PC harness (same pipeline and prompt as the app, llama.cpp on a desktop CPU), as % of the
 frontier + web answers' score:
 
-| Model | Held-out, 2026-10-19 build ("be concise" prompt) | Held-out, 2026-10-02 build | Main set (60 questions, 2026-10-02 build) |
+| Model | Held-out, 2026-10-19 build ("be concise" prompt, before the current one) | Held-out, 2026-10-02 build | Main set (60 questions, 2026-10-02 build) |
 |---|---|---|---|
-| Qwen3.5-9B Q4_K_M | **62.0 %** | 62.7 % | 60.7 % |
-| Qwen3.5-4B Q4_K_M | **66.5 %** | 54.0 % | 60.2 % |
+| Qwen3.5-9B Q4_K_M | 62.0 % | 62.7 % | 60.7 % |
+| Qwen3.5-4B Q4_K_M | 66.5 % | 54.0 % | 60.2 % |
 | Qwen3.5-2B Q4_K_M | 44.5 % | 45.2 % | 40.7 % |
 
 The 4B and the 9B clear the bounty's 50 % bar on questions that were never used for tuning;
@@ -209,7 +207,7 @@ explanations (75 %) and history (72 %). Answers, packets and grades:
 
 **A 1B model on its own** (2026-10-20), the comparison the bounty asks the demo to show: Llama 3.2 1B
 Instruct (Q4_K_M, greedy, no sources) on the same 40 held-out questions, graded blind the same way,
-reached **41.5 %** of the frontier + web baseline and was never as good as it on any question. Its
+reached **41.5 %** of the frontier + web baseline and did not match the frontier answer on any question. Its
 errors are confident: EIP-7702 "lets an EOA claim a reward for deploying an event", Brazil uses "Type A
 and Type B plugs, 127V", and vegetarian restaurants in Chiang Mai include a Bangkok shopping mall.
 Script: `tools/model_alone.py`; files: `eval/results-pc-llama3.2-1b-alone-*.jsonl`,
