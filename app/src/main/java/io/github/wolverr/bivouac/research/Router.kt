@@ -27,7 +27,7 @@ object Router {
     )
     private val FOLLOW_UP_START = Regex(
         "^(and|but|also|so|what about|how about|why|why not|tell me more|more|explain|really|is that|are they|" +
-            "does it|did they|it|its|it's|that|those|these|they|he|she|which one)\\b",
+            "does it|did they|it|its|it's|that|those|these|they|he|she|which one|which ones|which of|any of|are any|do any|is any)\\b",
     )
 
     // Reasoning questions: numbers to work with plus a question that asks for a result.

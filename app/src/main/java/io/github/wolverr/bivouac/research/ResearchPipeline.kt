@@ -34,7 +34,8 @@ sealed interface ResearchEvent {
  * turn, and the bare question, used when history has to be compacted.
  */
 class Conversation {
-    internal data class Turn(val question: String, val prompt: String, var answer: String)
+    /** [places]: the places list (and guide excerpt) the turn answered from, for follow-ups about it. */
+    internal data class Turn(val question: String, val prompt: String, var answer: String, val places: String? = null)
 
     internal val turns = ArrayList<Turn>()
     val isEmpty: Boolean get() = turns.isEmpty()
@@ -129,8 +130,13 @@ class ResearchPipeline(
         // "the deepest lake in the world" reads like a places search ("lake in the world"); when the place
         // isn't on the map, answer from Wikipedia instead of from no sources at all.
         val notAPlace = placeIntent != null && !placeIntent.nearMe && nearby.isEmpty()
+        // "Which of those are vegan?" after a places answer is about that list. Searched like any follow-up it
+        // found Wikipedia's veganism articles, and the model said it couldn't see a list; it gets the list again.
+        val earlierPlaces = if (placeIntent == null && decision.followUp) conversation.turns.lastOrNull()?.places else null
 
-        val sources = if ((placeIntent == null || notAPlace) && decision.route == Router.Route.LOOKUP && corpus?.path != null) {
+        val sources = if ((placeIntent == null || notAPlace) && earlierPlaces == null &&
+            decision.route == Router.Route.LOOKUP && corpus?.path != null
+        ) {
             // A short follow-up ("and its population?") needs the earlier topic to search well.
             val query = if (decision.followUp) "${conversation.lastQuestion.orEmpty()} $question" else question
             retrieve(query, settings)
@@ -138,27 +144,36 @@ class ResearchPipeline(
             emptyList()
         }
 
+        val placesBlock = if (nearby.isNotEmpty()) buildString {
+            // Place instructions travel with the list: in the system prompt, small models
+            // leaked them ("cuisine notes") into unrelated answers.
+            appendLine(placesHeader(placeIntent!!, guide = eat != null))
+            // The screen shows all of them; the model gets the nearest few (every line costs
+            // reading time on a phone, and it described all 12, 483 tokens, ~3 min on the Redmi).
+            nearby.take(PROMPT_PLACES).forEachIndexed { i, p ->
+                append("[P${i + 1}] ${p.displayName} — ${p.categoryLabel} — ${formatDistance(p.distanceM)}")
+                listOfNotNull(p.street, p.locality).joinToString(", ").takeIf { it.isNotEmpty() }?.let { append(" — $it") }
+                p.phone?.let { append(" — $it") }
+                appendLine()
+            }
+            eat?.let { s ->
+                appendLine()
+                appendLine("Travel guide excerpt:")
+                appendLine("[1] ${s.passage.title} — ${s.passage.section}")
+                appendLine(s.evidence)
+            }
+        } else {
+            null
+        }
         val prompt = buildString {
-            if (nearby.isNotEmpty()) {
-                // Place instructions travel with the list: in the system prompt, small models
-                // leaked them ("cuisine notes") into unrelated answers.
-                appendLine(placesHeader(placeIntent!!, guide = eat != null))
-                // The screen shows all of them; the model gets the nearest few (every line costs
-                // reading time on a phone, and it described all 12, 483 tokens, ~3 min on the Redmi).
-                nearby.take(PROMPT_PLACES).forEachIndexed { i, p ->
-                    append("[P${i + 1}] ${p.displayName} — ${p.categoryLabel} — ${formatDistance(p.distanceM)}")
-                    listOfNotNull(p.street, p.locality).joinToString(", ").takeIf { it.isNotEmpty() }?.let { append(" — $it") }
-                    p.phone?.let { append(" — $it") }
-                    appendLine()
-                }
-                eat?.let { s ->
-                    appendLine()
-                    appendLine("Travel guide excerpt:")
-                    appendLine("[1] ${s.passage.title} — ${s.passage.section}")
-                    appendLine(s.evidence)
-                }
+            if (placesBlock != null) {
+                append(placesBlock)
                 appendLine()
                 append("Question: ")
+            } else if (earlierPlaces != null) {
+                append(earlierPlaces)
+                appendLine()
+                append("Follow-up question about these places: ")
             } else if (sources.isNotEmpty()) {
                 appendLine("Wikipedia excerpts:")
                 for (s in sources) {
@@ -202,7 +217,7 @@ class ResearchPipeline(
                     emit(ResearchEvent.Llm(GenEvent.Token(it)))
                 }
                 if (ev.stats.error.isEmpty() && !ev.stats.cancelled) {
-                    conversation.turns += Conversation.Turn(question, prompt, answer.toString().trim())
+                    conversation.turns += Conversation.Turn(question, prompt, answer.toString().trim(), placesBlock ?: earlierPlaces)
                     if (ev.stats.n_gen >= 32) {
                         val tps = ev.stats.genTps
                         writeTps = writeTps?.let { 0.7 * it + 0.3 * tps } ?: tps

@@ -78,5 +78,8 @@ class RouterTest {
         assertTrue(route("why?", history = true).followUp)
         assertFalse(route("and its population?", history = false).followUp)
         assertFalse(route("What were the main causes of the Thirty Years' War in Europe?", history = true).followUp)
+        // About the places list of the last answer, however long.
+        assertTrue(route("Which of those are open late on a Sunday?", history = true).followUp)
+        assertTrue(route("Are any of them good for a group of eight people?", history = true).followUp)
     }
 }
