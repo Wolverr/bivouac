@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/icon.svg" width="120" alt="Bivouac icon"></p>
+
 # Bivouac
 
 **An offline research assistant for Android.** Ask a question and get a cited answer from
@@ -7,16 +9,6 @@ Google Play Services. Everything runs on the phone.
 Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline tool that is
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
-<p align="center">
-  <img src="docs/screenshots/setup.png" width="16%" alt="First launch: the files recommended for this phone">
-  <img src="docs/screenshots/ask-empty.png" width="16%" alt="Start screen with example questions">
-  <img src="docs/screenshots/ask-reading.png" width="16%" alt="While the model reads: the source sentence that answers the question">
-  <img src="docs/screenshots/ask-answer.png" width="16%" alt="A cited answer about HTTPS">
-  <img src="docs/screenshots/ask-places.png" width="16%" alt="Vegetarian places near the Duomo in Florence">
-  <img src="docs/screenshots/ask-answer-dark.png" width="16%" alt="The same answer in dark mode">
-</p>
-<p align="center"><sub>The app's screens rendered from its code with sample data
-(<code>app/src/test/…/ScreenshotTest.kt</code>); light or dark follows the phone.</sub></p>
 
 > Version 0.1.0. The 12 GB tier (the 9B) is measured on a PC only: we have no 12 GB test phone.
 
