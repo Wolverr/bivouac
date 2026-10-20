@@ -20,6 +20,42 @@ more than half as good as a frontier AI with web search, on a phone with at most
 
 > Version 0.1.0. The 12 GB tier (the 9B) is measured on a PC only: we have no 12 GB test phone.
 
+## For judges
+
+**The bounty's requirements, one by one:**
+
+| Requirement | Bivouac |
+|---|---|
+| Android / GrapheneOS, ≤ 12 GB RAM | arm64, Android 10 or newer. Developed on an **8 GB** Redmi Note 15 Pro (MediaTek MT6789); the 4B uses about 4 GB of RAM. Model tiers for 4, 6, 8 and 12 GB phones. |
+| ≤ 50 GB in total | 27 GB with the 4B (model 2.7 + knowledge pack 18.7 + places 5.3), 30 GB with the 9B. APK 12 MB. |
+| Offline, no network requests | The APK declares **no INTERNET permission**, so Android blocks every network call: `aapt2 dump permissions bivouac-0.1.0.apk` lists only location (optional, for "near me") and file access. Downloads go through the phone's browser. |
+| No Google Play Services | None used (location comes from the platform's LocationManager). |
+| Usable speed | On the 8 GB phone: the best source sentence shows after the search (~6 s), first words after ~30 s, a whole cited answer in a median 110 s. Places lists appear at once. |
+| Public repo, reproducible | MIT code, llama.cpp pinned as a submodule, scripts that rebuild both data packs from public dumps ([Build from source](#build-from-source)), every eval question, answer and grade in `eval/`. |
+| Set up on a real device in minutes | No PC: install the APK, tap the three **Download** buttons (the browser saves to Downloads), then **Add downloaded files**; the model loads by itself. The taps take a minute; the 27 GB download takes as long as the connection needs (about 40 min at 100 Mbit/s). |
+| > 50 % as good as internet + frontier AI | **63 %** of a frontier model with live web search, blind-graded, on 40 held-out questions never used for tuning, measured in the app on the 8 GB phone. A 1B model on its own scores 41.5 % on the same questions. [Evaluation](#evaluation) |
+
+**Questions to try** (airplane mode on):
+
+- Ethereum and cryptography: "What does EIP-7702 let an EOA do?", "What is EIP-4844 and what are blobs?",
+  "What is the difference between ML-KEM and ML-DSA?"
+- Places: "Vegetarian restaurants in Chiang Mai"; "pharmacy near me" (GPS);
+  "Best hikes near Interlaken"; "Day trips from Lisbon".
+- Emergencies and health: "What should I do after a snake bite?", "Symptoms of altitude sickness and what to do".
+- Explanations and history: "Why did the Roman Empire split in two?", "How does HTTPS keep my data private?"
+- Calculations: "23 km with a 900 m climb, how long will it take?" (tap **Think harder** for the worked-out version).
+
+**Known limitations** (measured, not guessed):
+
+- An answer takes 1–2 minutes on a mid-range 8 GB phone; the 9B on a 12 GB phone is unmeasured on hardware.
+- Reasoning and multi-step travel questions are the weakest categories (about 48 % and 47 % on the phone);
+  **Think harder** fixes most calculations but takes several minutes on an 8 GB phone.
+- Knowledge is frozen at the packs' dates (Wikipedia 2025-08, Wikivoyage and Ethereum docs 2026-10,
+  places 2026-09); opening hours and prices may be stale.
+- A small model sometimes adds a general sentence the sources don't support; the colored citations show
+  which sentences rest on a source.
+- English only.
+
 ## What it does
 
 - **Ethereum and travel knowledge Wikipedia lacks.** The same pack carries every finalized EIP and ERC,

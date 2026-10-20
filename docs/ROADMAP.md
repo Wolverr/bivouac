@@ -298,12 +298,12 @@ leave things out (662 vs 810 chars).
 long/many/much/far", "what time", "is that enough"; one number only with a rate or "if"; "by how much").
 Built on the main set only (the 4 held-out reasoning questions had been seen in a listing, not used).
 Main set, from the v13/v15 grades: 9B +0.25 over all 60 when on for these only (vs -0.25 always on).
-Held-out h-reason-01..03 (v16, paired blind, Sonnet grader): 4B 5.0 -> 6.3, 9B 8.7 -> 9.0. Calculations
+Held-out h-reason-01..03 (v16, paired blind, second grader model): 4B 5.0 -> 6.3, 9B 8.7 -> 9.0. Calculations
 gained or tied in all 9 cases; timelines (Napoleon/Beethoven, Newton/Galileo) lost (-4 9B, -9 4B), so the
 timeline rule was dropped. 0 false alarms on the other 90 questions and on 20 lookups with numbers.
 
 **Sights sources measured (2026-10-02 night, queue17):** 0725b6e vs the commit before (5f857fb), 13 sights
-questions written blind (eval/questions-sights.jsonl: 12 unseen cities + h-places-03), paired blind (Sonnet).
+questions written blind (eval/questions-sights.jsonl: 12 unseen cities + h-places-03), paired blind (second grader model).
 The change applies to 6 of 13 (the others get the same prompt): 4B -0.33, 9B -0.17 on those 6, i.e. neutral,
 but it splits cleanly. Barcelona, the only city whose sights section has a bulleted list, wins big
 (4B 5 -> 8, 9B 3 -> 8). The 5 cities with prose-only sections lose overall (4B -5, 9B -6 summed): Lisbon

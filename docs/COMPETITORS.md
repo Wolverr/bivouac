@@ -18,10 +18,11 @@ approaches. **Ideas only — no code is copied** (plagiarism disqualifies).
 - **Pipeline:** LLM plans up to 4 article titles → lead + best sections → k=6 passages
   (~4000 chars). Popularity router: popular topics answered from memory first, then a
   cited source check.
-- **Self-eval:** 61 questions blind-graded vs Opus with web search: **64%** parity.
-- **Weaknesses:** slow (1.5–2 min per cited answer); install needs a PC, adb and a 37 GB
-  push (15–40 min); answer-first responses are uncited; tuned for one device; build not
-  pinned; English-centric.
+- **Self-eval:** 61 questions blind-graded vs a frontier model with web search: **64%** parity.
+- **Trade-offs (as of v1.8.4, 2026-10-20):** a cited answer takes about 2 min (median 111 s on a cool
+  Pixel 8 Pro); setup downloads 46 GB in the app (75-100 min on Wi-Fi), earlier versions needed adb;
+  needs a 12 GB phone for full speed (8 GB works at about half). Since 2026-10 it also has saved chats,
+  follow-ups, places and a source check.
 
 ## Boar — github.com/rferrari/boar-app (MIT)
 
