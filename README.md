@@ -9,7 +9,7 @@ Google Play Services. Everything runs on the phone.
 Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline tool that is
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
-> Version 0.1.0. The 12 GB tier (the 9B) is measured on a PC only: we have no 12 GB test phone.
+> Version 0.1.0 · [download](https://github.com/Wolverr/bivouac/releases/latest)
 
 ## For judges
 
@@ -39,7 +39,7 @@ more than half as good as a frontier AI with web search, on a phone with at most
 **Known limitations** (measured, not guessed):
 
 - An answer takes 1–2 minutes on a mid-range 8 GB phone; the 9B on a 12 GB phone is unmeasured on hardware.
-- Reasoning and multi-step travel questions are the weakest categories (about 48 % and 47 % on the phone);
+- Reasoning and travel questions are the weakest categories (about 48 % and 47 % on the phone);
   **Think harder** fixes most calculations but takes several minutes on an 8 GB phone.
 - Knowledge is frozen at the packs' dates (Wikipedia 2025-08, Wikivoyage and Ethereum docs 2026-10,
   places 2026-09); opening hours and prices may be stale.
@@ -108,10 +108,10 @@ Which model to pick:
 
 | Phone RAM | Model | File | Quality (% of frontier + web, held-out questions) | Speed on phone (Redmi Note 15 Pro, 8 GB) |
 |---|---|---|---|---|
-| 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 44 % | 20 tok/s reading, 6 tok/s writing |
+| 4 GB | Qwen3.5-2B Q4_K_M | 1.3 GB | 43 % (below the bounty's bar) | 20 tok/s reading, 6 tok/s writing |
 | 6 GB | Qwen3.5-4B Q3_K_M | 2.3 GB | slightly below the 4B Q4_K_M¹ | 6 tok/s reading, 2.8 tok/s writing |
-| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **63 %** in the app on the phone (current build; graded side by side with the same build on a PC, the phone loses nothing) | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 29 s, whole answer 110 s (medians, 40 questions) |
-| 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 62 % (PC harness, previous prompt; the current prompt is +0.80 of 10 better head-to-head; a tie with the 4B, see below) | not measured: no 12 GB test phone |
+| 8 GB | Qwen3.5-4B Q4_K_M | 2.7 GB | **63 %** in the app on the phone (60 % on the PC; graded side by side, the phone loses nothing) | in the app: 12.7 tok/s reading, 3.2 tok/s writing; first words after 29 s, whole answer 110 s (medians, 40 questions) |
+| 12 GB | Qwen3.5-9B Q4_K_M | 5.7 GB | 59 % (PC harness; a tie with the 4B head-to-head) | not measured: no 12 GB test phone |
 
 ¹ Graded head-to-head against the 4B Q4_K_M: −0.38 points out of 10 (95 % CI −0.80 to +0.03).
 The 8 GB row is the app itself on the phone; the other speeds are llama-bench on the phone's CPU,
@@ -146,94 +146,59 @@ Wikipedia instead.
 
 ## Evaluation
 
-60 questions across facts, explanations, comparisons, synthesis, reasoning, travel, health,
-tech, science, history and places (`eval/questions.jsonl`), plus 40 held-out questions that were
-never used for tuning (`eval/questions-holdout.jsonl`). Each Bivouac answer is compared
-blind with an answer from a frontier model using live web search, scored 1–10 for correctness,
-completeness and usefulness. Details and how to reproduce: [docs/EVAL.md](docs/EVAL.md).
+**Method.** 40 held-out questions across facts, explanations, comparisons, synthesis, reasoning,
+travel, health, tech, history and places (`eval/questions-holdout.jsonl`), written without looking
+at how the pipeline handles them and never used for tuning. Each answer is graded blind against an
+answer from a frontier model with live web search, 1–10 for correctness, completeness and
+usefulness, and reported as a share of the frontier answer's score. A separate set of 60 questions
+(`eval/questions.jsonl`) is used for development. Details and how to reproduce: [docs/EVAL.md](docs/EVAL.md).
 
-PC harness (same pipeline and prompt as the app, llama.cpp on a desktop CPU), as % of the
-frontier + web answers' score:
+**Results on the held-out questions** (one blind grading run each):
 
-| Model | Held-out, 2026-10-19 build ("be concise" prompt, before the current one) | Held-out, 2026-10-02 build | Main set (60 questions, 2026-10-02 build) |
-|---|---|---|---|
-| Qwen3.5-9B Q4_K_M | 62.0 % | 62.7 % | 60.7 % |
-| Qwen3.5-4B Q4_K_M | 66.5 % | 54.0 % | 60.2 % |
-| Qwen3.5-2B Q4_K_M | 44.5 % | 45.2 % | 40.7 % |
+| System | Where it ran | % of frontier + web |
+|---|---|---|
+| Bivouac, Qwen3.5-4B | in the app on a Redmi Note 15 Pro (8 GB, MediaTek MT6789) | **63.3 %** |
+| Bivouac, Qwen3.5-4B | PC harness (same pipeline, prompt and sampling as the app) | 60.4 % |
+| Bivouac, Qwen3.5-9B | PC harness | 59.4 % |
+| Bivouac, Qwen3.5-2B | PC harness | 43.0 % |
+| Llama 3.2 1B on its own, no sources | PC | 41.5 % |
 
-The 4B and the 9B clear the bounty's 50 % bar on questions that were never used for tuning;
-the 2B, for 4 GB phones, does not. A single run varies by about ±3 points (grader noise), so
-choices are made head-to-head in one blind packet instead (`tools/grade.py pair`). Graded that
-way, the 4B and the 9B are a tie on the held-out set (9B −0.28 points out of 10, 95 % CI −1.13
-to +0.58): the 9B gets more facts right (Lake Baikal's depth, which Thai coast gets which
-monsoon), the 4B writes fuller answers. Since 2026-10-02 the build fixed questions that were
-answered without any sources: "what first aid should I give?" and "when should I see a doctor?"
-were taken for personal chat, and "the deepest lake in the world" or "RAM and storage in a phone"
-for map searches. That and the retrieval changes are most of the 4B's gain.
+Regrading the same answers moves a share by about ±3 points, so comparisons are made head-to-head,
+with both answers in one blind packet (`tools/grade.py pair`). Graded that way, the phone and the PC
+give the same quality (phone −0.15 points out of 10, 95 % CI −0.75 to +0.45; better on 11 questions,
+worse on 13, 16 ties), and the 4B and the 9B are a tie (9B −0.10, CI −0.70 to +0.50; the 9B is better
+at reasoning, the 4B slightly better on facts). The 2B, for 4 GB phones, is below the bounty's 50 % bar.
 
-**Prompt change (2026-10-19, current build): "be thorough but focused" instead of "be concise".**
-Graded head-to-head against the build above on the held-out set: 4B +0.75 points out of 10 (95 % CI
-+0.24 to +1.26, better on 27 questions, worse on 6), 9B +0.80 (CI +0.34 to +1.26, 24 vs 4), 2B +0.33
-(CI −0.27 to +0.92, 22 vs 16). A second grader model on the 4B pair agreed (+0.55, 22 vs 8). It first
-won on the main set (4B +0.62, 9B +0.65). Answers are about 50 % longer (4B: 750 → 1,130 characters,
-220 → 300 tokens); on a phone that is roughly 25–30 s more per answer. Absolute scores against the
-frontier answers move with the grader: the same old 4B answers scored 57.0 % to 66.5 % across three
-grades, and the new build 60.4 % and 60.9 %, so the paired result is the one to go by. Packets and
-grades: `eval/grading/pair-pc-*-v29-holdout--pc-*-v32-holdout-thorough.*`, `eval/grading/pc-*-v32-holdout-thorough.*`.
+**On the phone:** median 110 s per answer (search 5.7 s, first words after 29 s; prompt reading
+12.7 tokens/s, writing 3.2 tokens/s), longest 267 s; the app answered all 40 without being killed.
+Strongest categories: explanations (75 %) and history (72 %); weakest: travel (47 %) and reasoning
+(48 %). The phone run was made on 2026-10-19; each change since (travel topic articles, the Ethereum,
+NIST and Wikivoyage material) was graded head-to-head on the questions it affects and was neutral
+or better.
 
-The eval harness sends every question with prompt caching off: with the server reusing the
-previous prompt's prefix, the same seeded question gave different answers depending on the
-question before it. Current-build answers, packets and grades: `eval/results-pc-*-v29-holdout.jsonl`,
-`eval/grading/pc-*-v29-holdout.*`.
+**A 1B model on its own**, the comparison the bounty asks the demo to show: Llama 3.2 1B Instruct
+(Q4_K_M, greedy, no sources). Graded side by side with Bivouac's answers from the phone, Bivouac scores
+2.8 points out of 10 higher (95 % CI +1.95 to +3.65; better on 34 of 40 questions, worse on 5). The 1B
+never matched the frontier answer, and its errors are confident: EIP-7702 "lets an EOA claim a reward
+for deploying an event", Brazil uses "Type A and Type B plugs, 127V", vegetarian restaurants in Chiang
+Mai include a Bangkok shopping mall (`tools/model_alone.py`).
 
-- **12 GB model:** Gemma-4-12B (QAT) scored 1.73 points out of 10 below the 9B (95 % CI −2.43 to
-  −1.04) and needs more RAM; the 9B at Q5 instead of Q4 was no better (+0.02, CI −0.31 to +0.34)
-  and 15 % slower.
-- **Screened out earlier** (main set, older pipeline): LFM2.5-8B-A1B 46 %, Gemma-4-E4B 44 %, both
-  below the Qwen3.5-4B of the same run (55 %).
+**A shared question set:** Boar's 61 Vitalik-style questions (vegan restaurants, Ethereum and
+post-quantum cryptography, travel, emergencies, travel arithmetic; MIT), graded against the frontier +
+web reference answers published in the AndroidLM repository. The 4B, as it runs on the 8 GB phone,
+reaches **51 %**. The Ethereum, NIST and Wikivoyage material in the pack accounts for +1.13 points out
+of 10 there (graded with and without it; 95 % CI +0.66 to +1.60, better on 35 questions, worse on 8).
 
-**On the phone** (2026-10-19 build, "be thorough" prompt): the 4B in the app on a Redmi Note 15 Pro
-(8 GB, MediaTek MT6789), the 40 held-out questions, weights repacked. Paired against the PC harness
-answering with the same build and prompts, the phone scores −0.15 points out of 10 (95 % CI −0.75 to
-+0.45; phone better on 11, PC on 13, 16 ties), so running on the phone costs nothing measurable. Against the
-frontier + web baseline it reached **63.3 %** (one grader; absolute scores drift by grader, see above).
-Median 110 s per answer (first words after 29 s, search 5.7 s; prompt reading 12.7 tok/s, writing 3.2
-tok/s), longest 267 s; one answer hit the 700-token cap and was cut off. The app ran all 40 without
-being killed. Weakest: travel (47 %) and reasoning (48 %, including the cut-off answer); strongest:
-explanations (75 %) and history (72 %). Answers, packets and grades:
-`eval/results-redmi-qwen3.5-4b-v32-holdout.jsonl`, `eval/grading/redmi-qwen3.5-4b-v32-holdout.*`,
-`eval/grading/pair-pc-qwen3.5-4b-v32-holdout-thorough--redmi-qwen3.5-4b-v32-holdout.*`. The
-2026-10-07 build scored 53.9 % there with another grader (`eval/results-redmi-qwen3.5-4b-holdout.jsonl`).
+**Retrieval:** a correct Wikipedia article is among the 6 sources for 92 % of the development
+questions that have one (44/48) and 94 % of the held-out ones (34/36).
 
-**A 1B model on its own** (2026-10-20), the comparison the bounty asks the demo to show: Llama 3.2 1B
-Instruct (Q4_K_M, greedy, no sources) on the same 40 held-out questions, graded blind the same way,
-reached **41.5 %** of the frontier + web baseline and did not match the frontier answer on any question. Its
-errors are confident: EIP-7702 "lets an EOA claim a reward for deploying an event", Brazil uses "Type A
-and Type B plugs, 127V", and vegetarian restaurants in Chiang Mai include a Bangkok shopping mall.
-Script: `tools/model_alone.py`; files: `eval/results-pc-llama3.2-1b-alone-*.jsonl`,
-`eval/grading/pc-llama3.2-1b-alone-holdout.*`.
+Why these models and not Gemma-4-12B, a Q5 9B or the fast MoE models, and how each pipeline change
+was measured: [docs/EVAL.md](docs/EVAL.md#model-choice).
 
-**Travel topic articles** (2026-10-19, after the phone run above): the 4B answered the 17 questions
-whose prompts that day's retrieval changes touched, three times each with the old and the new code,
-blind-graded in pairs. Reading the place's transport, climate or cuisine article gained +1.1 points out
-of 10 on the 10 travel questions it changes (8 of them from the tuning sets); a rule that dropped
-everyday words like "train" or "world" as sources lost 0.3 on its 6 questions and was left out. Files:
-`eval/results-pc-qwen3.5-4b-v33-*`, `eval/grading/pair-pc-qwen3.5-4b-v33-*`.
-
-**A shared yardstick** (2026-10-19): Boar's 61 Vitalik-style questions (vegan restaurants, Ethereum and
-post-quantum cryptography, travel, emergencies, travel arithmetic; MIT), which AndroidLM also used, with
-the frontier + web answers AndroidLM published as the reference. The 4B as on the Redmi (no thinking)
-reached 50 % of the reference before the Ethereum and Wikivoyage material and 51 % after, one grader each
-(absolute shares move by several points between graders). Graded side by side by one grader, the
-additions are clearly better: +1.13 points out of 10 (95 % CI +0.66 to +1.60; better on 35, worse on 8;
-Ethereum +1.25, restaurants +1.6, travel +0.9). Head-to-head against AndroidLM's published answers
-(Qwen3.6-35B-A3B on a 12 GB Pixel), the 35B model is still clearly ahead: −2.59 (CI −3.23 to −1.95),
-from −3.38 before. On our own questions the additions are neutral (−0.19 on the 43 tuning questions
-whose prompt changes, held-out about even). Files: `eval/questions-boar61.jsonl`,
-`eval/results-*boar61*`, `eval/grading/*boar61*`, `eval/*v37*`.
-
-Retrieval finds a correct Wikipedia article in the top 6 for 92 %
-of the questions that have one (44/48), and 94 % on the held-out set (34/36).
+Files: phone `eval/results-redmi-qwen3.5-4b-v32-holdout.jsonl`; PC `eval/results-pc-qwen3.5-{4b,9b}-v32-holdout-thorough.jsonl`,
+`eval/results-pc-qwen3.5-2b-v32-holdout-thorough.jsonl`; 1B `eval/results-pc-llama3.2-1b-alone-holdout.jsonl`;
+shared set `eval/results-pc-qwen3.5-4b-v36-boar61.jsonl`. Blind packets, answer keys and grades for each
+are in `eval/grading/` under the same names.
 
 ## Build from source
 
