@@ -9,7 +9,7 @@ Google Play Services. Everything runs on the phone.
 Built for [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31): an offline tool that is
 more than half as good as a frontier AI with web search, on a phone with at most 12 GB of RAM.
 
-> Version 0.1.0 · [download](https://github.com/Wolverr/bivouac/releases/latest)
+> Version 0.1.1 · [download](https://github.com/Wolverr/bivouac/releases/latest)
 
 ## For judges
 
@@ -19,7 +19,7 @@ more than half as good as a frontier AI with web search, on a phone with at most
 |---|---|
 | Android / GrapheneOS, ≤ 12 GB RAM | arm64, Android 10 or newer. Developed on an **8 GB** Redmi Note 15 Pro (MediaTek MT6789); the 4B uses about 4 GB of RAM. Model tiers for 4, 6, 8 and 12 GB phones. |
 | ≤ 50 GB in total | 27 GB with the 4B (model 2.7 + knowledge pack 18.7 + places 5.3), 30 GB with the 9B. APK 12 MB. |
-| Offline, no network requests | The APK declares **no INTERNET permission**, so Android blocks every network call: `aapt2 dump permissions bivouac-0.1.0.apk` lists only location (optional, for "near me") and file access, plus one internal AndroidX permission. Downloads go through the phone's browser. |
+| Offline, no network requests | The APK declares **no INTERNET permission**, so Android blocks every network call: `aapt2 dump permissions bivouac-0.1.1.apk` lists only location (optional, for "near me") and file access, plus one internal AndroidX permission. Downloads go through the phone's browser. |
 | No Google Play Services | None used (location comes from the platform's LocationManager). |
 | Usable speed | On the 8 GB phone: the best source sentence shows after the search (~6 s), first words after ~30 s, a whole cited answer in a median 110 s. Places lists appear at once. |
 | Public repo, reproducible | MIT code, llama.cpp pinned as a submodule, scripts that rebuild both data packs from public dumps ([Build from source](#build-from-source)), every eval question, answer and grade in `eval/`. |
@@ -79,8 +79,9 @@ more than half as good as a frontier AI with web search, on a phone with at most
   layout that fit. On an 8 GB phone it repacks the weights into a CPU-friendly layout, which
   doubles prompt reading (6.5 → 13.4 tokens/s on a Redmi Note 15 Pro) for 0.8 GB more RAM. If
   Android ever kills it for memory, the next load uses smaller settings.
-- **Conversations.** Follow-up questions ("and its population?") keep the topic; personal or
-  casual messages get a normal reply instead of a Wikipedia search.
+- **Conversations.** Follow-up questions ("and its population?") keep the topic, and a follow-up to a
+  places answer ("which of those are vegan?") is answered from the same list; personal or casual
+  messages get a normal reply instead of a Wikipedia search.
 - **Think harder.** One tap asks the last question again with the model reasoning first
   (hidden, up to 1,024 tokens). On the reasoning questions of the eval it lifts the 4B from
   4.2 to 8.7 out of 10 and the 9B from 3.5 to 8.8, for a few minutes more per answer. Over all
