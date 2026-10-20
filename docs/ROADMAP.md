@@ -48,7 +48,7 @@ paired: 4B +0.75, 9B +0.80, 2B +0.33; a second grader model on the 4B held-out p
 4B answers: 57.0 / 63.8 / 66.5 %), so the README keeps the v29 table and reports the paired gain. Re-route
 check (queue30, 9B, 6 questions): +1.17, 4 better / 2 worse. 9B v29 main set finished (60/60).
 WSL note: the distro shuts down ~15 s after the last wsl.exe client exits unless an Ubuntu terminal is open;
-a run started from Claude needs a waiting wsl call (background `while systemctl --user is-active ...`) to live.
+a run started from a non-interactive shell needs a waiting wsl call (background `while systemctl --user is-active ...`) to live.
 
 **Redmi session (same afternoon):** restyle looks right on the phone (dark theme, rainbow icon/divider, pastel
 suggestion dots); the "while the answer is written" excerpt card shows. Found: the home-screen snake bite question
@@ -79,7 +79,7 @@ then the release build with the real key.
 4B 66.5 %, 9B 62.0 % (README updated, 7dba8b1). 4B vs 9B paired: -0.28 (CI -1.13..0.58), a tie: the 9B is
 more accurate on facts but sometimes writes one-line answers (WWI causes: 164 chars) under its calc2 prompt.
 
-**Interrupted overnight** (Claude Code reaped the WSL keep-alive shells on low memory, WSL stopped):
+**Interrupted overnight** (the WSL keep-alive shells were killed on low memory, WSL stopped):
 the 9B main set (55/60 in ~/bivouac-final/eval/results-pc-qwen3.5-9b-v29-main.jsonl), queue30 (re-routed
 questions, old 83c5f5b vs new) and queue31 (prompt length experiment: branch `prompt-complete`, "be thorough
 but focused" instead of "be concise", worktree ~/bivouac-pc) never ran. Scripts: ~/bivouac-queue30.sh,
