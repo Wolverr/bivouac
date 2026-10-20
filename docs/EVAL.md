@@ -132,8 +132,8 @@ gradings), so the head-to-head results are the ones to go by:
   (`results-redmi-qwen3.5-4b-holdout.jsonl`), the 2026-10-19 build 63.3 %.
 - **Tried and not kept:** 256 thinking tokens for calculations on slow phones (−1.2 on 6 questions: cut-off
   reasoning spilled into the answer); Wikipedia sub-articles like *Climate of X* for every place (−0.47);
-  dropping search hits that don't name the travel guide's place (+0.43, CI −0.52 to +1.38: too noisy, branch
-  `guide-gate`).
+  dropping search hits that don't name the travel guide's place (+0.43, CI −0.52 to +1.38: too noisy, commit
+  ae146db).
 - **Prompt caching off in the harness:** with the server reusing the previous prompt's prefix, the same seeded
   question gave different answers depending on the question before it, so every eval request sends
   `cache_prompt: false`.

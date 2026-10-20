@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Status of the long-running data jobs. They run as memory-capped systemd user
 # services (bivouac-wiki, bivouac-places), independent of any terminal.
-# Start them as in docs/ROADMAP.md "Dev notes". Usage: tools/status.sh
+# Start them as in docs/DEV_SETUP.md "Long jobs". Usage: tools/status.sh
 cd "$(dirname "$0")"
 size() { [ -f "$1" ] && du -h "$1" | cut -f1 || echo "-"; }
 state() {

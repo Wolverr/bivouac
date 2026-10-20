@@ -19,7 +19,7 @@ data class CatalogItem(
     /**
      * System prompt in assets/prompts/ for this model; empty = system.txt. The 9B uses
      * system-calc2.txt (work calculations out before the result): +0.43 overall and
-     * +3.7 on reasoning for the 9B, but no gain for the 4B (docs/ROADMAP.md).
+     * +3.7 on reasoning for the 9B, but no gain for the 4B (eval/grading/pair-pc-qwen3.5-*-v4--*-calc2.*).
      */
     val prompt: String = "",
 )

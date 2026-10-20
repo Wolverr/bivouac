@@ -56,7 +56,16 @@ USB devices aren't visible inside WSL by default. Easiest: use Windows' own adb.
 
 (Alternative: `usbipd-win` attaches the phone to WSL so Linux adb sees it.)
 
-## Picking up on the new machine
+## Long jobs
 
-The project state lives in `docs/ROADMAP.md` (milestones, measurements, next steps),
-so work can pick up where it last stopped.
+Run data builds and evals as memory-capped systemd user services, not from a terminal: when RAM
+and swap fill up, systemd-oomd kills the whole terminal scope, including anything started from it.
+
+```bash
+systemd-run --user --unit=bivouac-wiki --working-directory=$PWD/tools -p MemoryMax=3G \
+  -p MemorySwapMax=1G --collect bash -c '…'
+tools/status.sh                          # progress
+systemctl --user stop bivouac-wiki       # stop
+```
+
+Builds from a non-interactive shell need `JAVA_HOME` set (`tools/setup_dev.sh` installs the JDK).

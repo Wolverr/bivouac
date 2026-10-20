@@ -8,7 +8,7 @@
 #   SERVER_ARGS="--reasoning-budget 0"   extra llama-server flags (needed for LFM2.5)
 #   ANSWER_ARGS="--think --only reason-01,reason-02"   extra answer_proto.py flags
 #
-# Run as a memory-capped service (see docs/ROADMAP.md "Dev notes"):
+# Run as a memory-capped service (see docs/DEV_SETUP.md "Long jobs"):
 #   systemd-run --user --unit=bivouac-models --working-directory=$PWD/tools -p MemoryMax=12G \
 #     -p MemorySwapMax=1G --collect bash -c './run_model_eval.sh > model_eval.log 2>&1'
 # Models over ~6 GB swap on a 16 GB PC and don't fit the phones anyway.

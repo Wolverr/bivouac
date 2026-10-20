@@ -75,7 +75,7 @@ class ResearchPipeline(
         /**
          * "Think harder": tokens of reasoning before the engine makes the model answer. 1,024 kept
          * nearly all of unbounded thinking's gain on the reasoning questions (4B 4.2 -> 8.7, 9B 3.5 -> 8.8
-         * of 10) at ~1,100 tokens per answer; 512 lost much of it for the 4B (docs/ROADMAP.md).
+         * of 10) at ~1,100 tokens per answer; 512 lost much of it for the 4B (eval/grading/pair-pc-qwen3.5-*-v4--*-think*).
          */
         val thinkBudget: Int = 1024,
     ) {
