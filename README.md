@@ -179,6 +179,14 @@ explanations (75 %) and history (72 %). Answers, packets and grades:
 `eval/grading/pair-pc-qwen3.5-4b-v32-holdout-thorough--redmi-qwen3.5-4b-v32-holdout.*`. The
 2026-10-07 build scored 53.9 % there with another grader (`eval/results-redmi-qwen3.5-4b-holdout.jsonl`).
 
+**A 1B model on its own** (2026-10-20), the comparison the bounty asks the demo to show: Llama 3.2 1B
+Instruct (Q4_K_M, greedy, no sources) on the same 40 held-out questions, graded blind the same way,
+reached **41.5 %** of the frontier + web baseline and was never as good as it on any question. Its
+errors are confident: EIP-7702 "lets an EOA claim a reward for deploying an event", Brazil uses "Type A
+and Type B plugs, 127V", and vegetarian restaurants in Chiang Mai include a Bangkok shopping mall.
+Script: `tools/model_alone.py`; files: `eval/results-pc-llama3.2-1b-alone-*.jsonl`,
+`eval/grading/pc-llama3.2-1b-alone-holdout.*`.
+
 **Travel topic articles** (2026-10-19, after the phone run above): the 4B answered the 17 questions
 whose prompts that day's retrieval changes touched, three times each with the old and the new code,
 blind-graded in pairs. Reading the place's transport, climate or cuisine article gained +1.1 points out

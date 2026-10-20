@@ -37,8 +37,42 @@ after install, no Google Play Services, public repo, reproducible, demo on X/Far
    real-key APK sha256 dd4c1233..., uploaded to the draft.
 5. [ ] Publish the draft release v0.1.0 (notes + APK uploaded, 2026-10-19), make the repo public. Checked: no secrets in
    history, LICENSE present, all 6 catalog download URLs answer anonymously, HF packs = local packs (sha256).
-6. [ ] Demo video (user).
-7. [ ] poidh claim (user; draft ~/bivouac-claim-draft.md in WSL).
+   2026-10-20: draft APK replaced (source-card line fix c8646d2), sha256 a3d4153a..., same signing cert 520602de...;
+   release notes updated; installed on the Redmi. Previous APK kept as ~/bivouac-dist/bivouac-0.1.0-7f67e57e.apk.bak.
+6. [ ] Demo video (user). Shot list ~/bivouac-demo-script.md (rewritten 2026-10-20 after watching AndroidLM's video).
+7. [ ] poidh claim (user; draft ~/bivouac-claim-draft.md in WSL; Boar + 1B numbers filled 2026-10-20).
+
+## Resume here (2026-10-20, home PC)
+
+**Knowledge supplements on the phone:** Ethereum (EIPs/ERCs, ethereum.org, Upgrading Ethereum), NIST PQC and
+Wikivoyage appended to wiki.db (18,688,712,704 bytes, sha256 df78ba17...; on Hugging Face). Boar61: 51 % of
+AndroidLM's frontier reference, paired +1.13 (CI +0.66..+1.60), head-to-head vs AndroidLM −2.59 (was −3.38); our own
+sets neutral. Copied to the Redmi's /sdcard/Download (sha256 checked on the phone) and swapped in by rename; old
+pack kept there as wiki-2026-10-07.db (delete once the release is out).
+
+**Phone session (Redmi, real-key build):** Library shows the new pack; loading indicator after reopening and typing
+during the load work; EIP-7702 answered from the EIP itself; "vegetarian restaurants in Chiang Mai" gives 9 real
+map places (user checked on Google Maps) + Wikivoyage picks (last sentence is generic filler). "What plug type does
+Brazil use?" said flat two-pin + round three-pin: follows Wikivoyage's own wording but misses type N, and Spark
+plug / Core plug took source slots. Prefill re-measured at 81 % battery: 14.0 tok/s (pp256), writing 3.7 tok/s:
+the 7.6 on Oct 19 was low-battery throttling. Source cards now join hard-wrapped lines (c8646d2).
+
+**Tried, not merged (branch `guide-gate`):** with a Wikivoyage guide, drop search hits that don't name its place,
+and add the best guide section's next chunk (Brazil > Electricity names type N there). Paired on the 21 travel
+questions whose sources change: +0.43 (CI −0.52..+1.38, 9 better / 8 worse); fixed Thai phrases, tap water, the
+plug answer; broke Istanbul sights (municipal filler) and Bangkok ride-hailing (lost Grab). Too noisy to ship.
+
+**1B on its own** (bounty demo requirement "queries a 1B model fails"): Llama 3.2 1B, no sources, held-out 41.5 %
+(Bivouac 4B on the phone 63.3 %); demo-question answers in eval/results-pc-llama3.2-1b-alone-demo.jsonl
+(EIP-7702 invented, Brazil "Type A/B 127V", Chiang Mai lists a Bangkok mall). README updated.
+
+**AndroidLM's video** (x.com/sriramkiron/status/2103699153293357056, 26 Sep, 2:07): title card "every wait is sped
+up and labelled", airplane mode, 3 questions (Harrods 1983, Big Motor 2023, light to Neptune + source check), a
+caption per question with a 1.7B model's wrong answer, end card "1.7B comparison: 72 questions, 2.6 vs 7.0 / 10".
+No places, Ethereum, follow-ups or setup shown. Their README (v1.8.4): median 111 s on a 12 GB Pixel, 46 GB /
+~1.5 h setup, chats + follow-ups + source check.
+
+**Next:** user OK -> publish v0.1.0 + repo public; user records the video; claim.
 
 ## Resume here (2026-10-19 afternoon, home PC)
 

@@ -1,0 +1,22 @@
+{
+ "old": "results-pc-qwen3.5-4b-v39-guidegate-old.jsonl",
+ "new": "results-pc-qwen3.5-4b-v39-guidegate-new.jsonl",
+ "questions": 21,
+ "identical": 1,
+ "old_mean": 5.15,
+ "new_mean": 5.6,
+ "mean_diff": 0.43,
+ "ci95": [
+  -0.52,
+  1.38
+ ],
+ "new_better": 9,
+ "old_better": 8,
+ "ties": 4,
+ "sign_test_p": 1.0,
+ "by_category": {
+  "places": -0.67,
+  "places-food": 0,
+  "travel": 0.65
+ }
+}
